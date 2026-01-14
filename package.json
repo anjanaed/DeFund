@@ -1,0 +1,10 @@
+{
+  "name": "defund",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "devDependencies": {
+    "hardhat": "^2.28.3"
+  }
+}
