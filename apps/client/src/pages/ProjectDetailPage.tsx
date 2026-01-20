@@ -45,7 +45,7 @@ Our mission is to democratize access to financial services by providing a trustl
     goal: 100000,
     contributors: 156,
     creator: {
-      name: 'Alex Chen',
+      name: 'Max Verstappen',
       address: '0x742d...00Eb',
       avatar: 'AC'
     },
