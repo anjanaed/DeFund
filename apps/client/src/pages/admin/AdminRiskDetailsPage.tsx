@@ -48,9 +48,9 @@ export default function AdminRiskDetailsPage() {
       discord: false
     },
     recentTransactions: [
-      { id: 'tx-123', date: '2026-01-18 14:30', type: 'Withdrawal', amount: '-20.0 ETH', to: '0x8...93a', status: 'Completed' },
-      { id: 'tx-124', date: '2026-01-15 09:15', type: 'Milestone Release', amount: '+30.0 ETH', from: 'Contract', status: 'Completed' },
-      { id: 'tx-125', date: '2026-01-10 11:20', type: 'Expense', amount: '-2.5 ETH', to: '0x1...b2c', status: 'Completed' }
+      { id: 'tx-123', date: '2026-01-18 14:30', type: 'Milestone Release', amount: '-20.0 ETH', to: '0x8...93a', status: 'Completed' },
+      { id: 'tx-124', date: '2026-01-15 09:15', type: 'Contribution', amount: '+3.0 ETH', from: 'Contract', status: 'Completed' },
+      { id: 'tx-125', date: '2026-01-10 11:20', type: 'Contribution', amount: '+5.5 ETH', from: '0x1...b2c', status: 'Completed' }
     ]
   }
 

@@ -101,7 +101,6 @@ export default function CreatorStudioPage() {
           amount: 40000,
           icon: HiXCircle,
           iconColor: 'error',
-          action: 'Resubmit Proof',
           proof: 'Initial engine build v0.1. Physics system implemented but found buggy by community.'
         },
         {

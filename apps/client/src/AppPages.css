@@ -608,13 +608,13 @@
 
 .dashboard-tabs {
   display: flex;
-  gap: var(--space-6);
   margin-bottom: var(--space-8);
   border-bottom: 1px solid var(--color-border);
 }
 
 .dashboard-tab {
-  padding: var(--space-3) 0;
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-secondary);
@@ -626,7 +626,9 @@
   margin-bottom: -1px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
+  text-align: center;
 }
 
 .dashboard-tab:hover,
@@ -841,13 +843,13 @@
 
 .creator-tabs {
   display: flex;
-  gap: var(--space-6);
   margin-bottom: var(--space-8);
   border-bottom: 1px solid var(--color-border);
 }
 
 .creator-tab {
-  padding: var(--space-3) 0;
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-secondary);
@@ -857,6 +859,7 @@
   cursor: pointer;
   transition: all var(--transition);
   margin-bottom: -1px;
+  text-align: center;
 }
 
 .creator-tab:hover,
