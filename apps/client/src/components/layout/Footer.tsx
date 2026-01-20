@@ -1,11 +1,11 @@
 import logo from '../../assets/logo.png'
-import { FaXTwitter, FaGithub, FaLinkedin, FaDiscord } from 'react-icons/fa6'
+
 
 export default function Footer() {
   return (
     <footer className="footer">
       <div className="container">
-        <div className="footer-content">
+        <div className="footer-grid">
           <div className="footer-brand">
             <div className="footer-logo">
               <img src={logo} alt="DeFund Logo" />
@@ -36,31 +36,7 @@ export default function Footer() {
             </ul>
           </div>
           
-          <div className="footer-section">
-            <h4>Connect</h4>
-            <ul className="footer-social">
-              <li>
-                <a href="#" aria-label="Twitter">
-                  <FaXTwitter />
-                </a>
-              </li>
-              <li>
-                <a href="#" aria-label="GitHub">
-                  <FaGithub />
-                </a>
-              </li>
-              <li>
-                <a href="#" aria-label="LinkedIn">
-                  <FaLinkedin />
-                </a>
-              </li>
-              <li>
-                <a href="#" aria-label="Discord">
-                  <FaDiscord />
-                </a>
-              </li>
-            </ul>
-          </div>
+
         </div>
         
         <div className="footer-bottom">
