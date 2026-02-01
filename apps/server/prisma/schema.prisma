@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  CREATOR
+}
+
+enum CampaignStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+  FLAGGED
+}
+
+enum MilestoneStatus {
+  PENDING
+  VOTING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique
+  name          String?
+  email         String?  @unique
+  avatar        String?
+  bio           String?
+  role          UserRole @default(USER)
+
+  twitterHandle String?
+  discordHandle String?
+  githubHandle  String?
+
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  createdCampaigns Campaign[]     @relation("CreatedCampaigns")
+  contributions    Contribution[]
+  votes            Vote[]
+  messages         Message[]
+}
+
+model Campaign {
+  id          String @id @default(uuid())
+  title       String
+  description String
+  category    String
+
+  goalAmount   Decimal @db.Decimal(18, 2)
+  raisedAmount Decimal @default(0) @db.Decimal(18, 2)
+
+  status    CampaignStatus @default(PENDING)
+  deadline  DateTime?
+  website   String?
+  githubUrl String?
+
+  contractAddress String?
+  transactionHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creatorId String
+  creator   User   @relation("CreatedCampaigns", fields: [creatorId], references: [id])
+
+  milestones    Milestone[]
+  contributions Contribution[]
+  updates       Update[]
+  forum         Forum?
+}
+
+
+
+model Milestone {
+  id          String          @id @default(uuid())
+  title       String
+  description String
+  amount      Decimal         @db.Decimal(18, 2)
+  status      MilestoneStatus @default(PENDING)
+
+  proofUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  votes      Vote[]
+}
+
+model Contribution {
+  id              String   @id @default(uuid())
+  amount          Decimal  @db.Decimal(18, 2)
+  transactionHash String   @unique
+  timestamp       DateTime @default(now())
+
+  contributorId String
+  contributor   User     @relation(fields: [contributorId], references: [id])
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  choice    Boolean // True = Approve, False = Reject
+  timestamp DateTime @default(now())
+
+
+  voterId     String
+  voter       User      @relation(fields: [voterId], references: [id])
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id])
+
+  @@unique([voterId, milestoneId]) 
+}
+
+
+model Update {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model Forum {
+  id         String    @id @default(uuid())
+  campaignId String    @unique
+  campaign   Campaign  @relation(fields: [campaignId], references: [id])
+  messages   Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  forumId String
+  forum   Forum  @relation(fields: [forumId], references: [id])
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+}

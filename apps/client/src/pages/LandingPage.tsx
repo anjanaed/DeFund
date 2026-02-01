@@ -3,14 +3,10 @@ import { HiShieldCheck, HiUserGroup, HiDocumentCheck, HiChartBar, HiLockClosed, 
 import Navbar from '../components/layout/Navbar'
 import Footer from '../components/layout/Footer'
 import logo from '../assets/logo.png'
+import { landingStats as stats, landingSteps as steps } from '../data/mockData'
 
 export default function LandingPage() {
-  const stats = [
-    { label: 'Total Raised', value: '$24M+' },
-    { label: 'Projects', value: '1200+' },
-    { label: 'Contributors', value: '45K+' },
-    { label: 'Success Rate', value: '98%' }
-  ]
+
 
   const features = [
     {
@@ -45,28 +41,7 @@ export default function LandingPage() {
     }
   ]
 
-  const steps = [
-    {
-      id: '01',
-      title: 'Project Verification',
-      description: 'Creators submit projects with defined milestones. Admins verify authenticity through wallet signing and GitHub validation.'
-    },
-    {
-      id: '02',
-      title: 'Contribution Phase',
-      description: 'Contributors fund projects on-chain. Funds are locked in smart contracts until milestones are approved.'
-    },
-    {
-      id: '03',
-      title: 'Community Voting',
-      description: 'Project creators submit evidence of milestone completion. Contributors vote to approve fund release.'
-    },
-    {
-      id: '04',
-      title: 'Fund Release',
-      description: 'Once approved by community voting, funds automatically release to project creators via smart contracts.'
-    }
-  ]
+
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', overflowX: 'hidden' }}>

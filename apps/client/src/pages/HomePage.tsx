@@ -2,49 +2,10 @@ import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import { HiUsers, HiChartBar } from 'react-icons/hi2'
 import logo from '../assets/logo.png'
+import { homeStats, trendingProjects } from '../data/mockData'
 
 export default function HomePage() {
-  const stats = [
-    { value: '$247K+', label: 'Total Funds Raised' },
-    { value: '6', label: 'Active Projects' },
-    { value: '488+', label: 'Community Contributors' }
-  ]
 
-  const trendingProjects = [
-    {
-      id: 1,
-      category: 'DeFi',
-      verified: true,
-      title: 'DeFi Lending Protocol',
-      description: 'A decentralized lending platform that allows users to lend and borrow cryptocurrencies with',
-      raised: 75000,
-      goal: 100000,
-      contributors: 156,
-      milestones: 3
-    },
-    {
-      id: 2,
-      category: 'Gaming',
-      verified: true,
-      title: 'Blockchain Gaming Engine',
-      description: 'Open-source game engine optimized for blockchain gaming with built-in NFT and token',
-      raised: 45000,
-      goal: 120000,
-      contributors: 103,
-      milestones: 1
-    },
-    {
-      id: 3,
-      category: 'NFT',
-      verified: true,
-      title: 'NFT Marketplace Platform',
-      description: 'A next-generation NFT marketplace with advanced features for creators and',
-      raised: 35000,
-      goal: 80000,
-      contributors: 67,
-      milestones: 3
-    }
-  ]
 
   return (
     <div className="app-container">
@@ -79,7 +40,7 @@ export default function HomePage() {
       <section className="app-stats-section">
         <div className="container">
           <div className="app-stats-grid">
-            {stats.map((stat, index) => (
+            {homeStats.map((stat, index) => (
               <div key={index} className="app-stat-card">
                 <div className="app-stat-value">{stat.value}</div>
                 <div className="app-stat-label">{stat.label}</div>

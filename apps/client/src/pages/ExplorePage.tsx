@@ -2,92 +2,13 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import { HiMagnifyingGlass, HiUsers, HiChartBar } from 'react-icons/hi2'
+import { exploreCategories as categories, exploreTabs as tabs, projects } from '../data/mockData'
 
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState('all')
   const [sortBy, setSortBy] = useState('trending')
 
-  const categories = ['All', 'DeFi', 'DAO', 'NFT', 'Open Source', 'Infrastructure', 'Gaming']
-  const tabs = [
-    { id: 'all', label: 'All Projects', count: 6 },
-    { id: 'trending', label: 'Trending', count: null },
-    { id: 'new', label: 'New', count: null }
-  ]
 
-  const projects = [
-    {
-      id: 1,
-      category: 'Infrastructure',
-      verified: true,
-      active: true,
-      title: 'Decentralized Storage Network',
-      description: 'Building a secure and efficient decentralized storage solution for Web3',
-      raised: 12000,
-      goal: 150000,
-      contributors: 28,
-      milestones: 1
-    },
-    {
-      id: 2,
-      category: 'Gaming',
-      verified: true,
-      active: true,
-      title: 'Blockchain Gaming Engine',
-      description: 'Open-source game engine optimized for blockchain gaming with built-in NFT and token',
-      raised: 45000,
-      goal: 120000,
-      contributors: 103,
-      milestones: 1
-    },
-    {
-      id: 3,
-      category: 'NFT',
-      verified: true,
-      active: true,
-      title: 'NFT Marketplace Platform',
-      description: 'A next-generation NFT marketplace with advanced features for creators and',
-      raised: 35000,
-      goal: 80000,
-      contributors: 67,
-      milestones: 3
-    },
-    {
-      id: 4,
-      category: 'Open Source',
-      verified: true,
-      active: true,
-      title: 'Open Source Analytics Tools',
-      description: 'Privacy-focused analytics platform for Web3 applications.',
-      raised: 28000,
-      goal: 30000,
-      contributors: 45,
-      milestones: 2
-    },
-    {
-      id: 5,
-      category: 'DeFi',
-      verified: true,
-      active: true,
-      title: 'DeFi Lending Protocol',
-      description: 'A decentralized lending platform that allows users to lend and borrow cryptocurrencies with',
-      raised: 75000,
-      goal: 100000,
-      contributors: 156,
-      milestones: 3
-    },
-    {
-      id: 6,
-      category: 'DAO',
-      verified: true,
-      active: false,
-      title: 'Community DAO Governance',
-      description: 'Building a transparent and efficient DAO governance system for community-driven',
-      raised: 52000,
-      goal: 50000,
-      contributors: 89,
-      milestones: 2
-    }
-  ]
 
   return (
     <div className="app-container">
