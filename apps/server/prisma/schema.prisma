@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -48,6 +48,7 @@ model User {
   githubHandle  String?
 
   isVerified Boolean  @default(false)
+  nonce      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -71,8 +72,11 @@ model Campaign {
   website   String?
   githubUrl String?
 
-  contractAddress String?
-  transactionHash String?
+  contractAddress  String?
+  transactionHash  String?
+  onChainId        Int?     @unique
+  isAdminApproved  Boolean  @default(false)
+  ipfsHash         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -95,11 +99,12 @@ model Milestone {
   amount      Decimal         @db.Decimal(18, 2)
   status      MilestoneStatus @default(PENDING)
 
-  proofUrl String?
+  proofUrl      String?
+  onChainId     Int?      @unique
+  votingEndTime DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 
   campaignId String
   campaign   Campaign @relation(fields: [campaignId], references: [id])
@@ -111,6 +116,8 @@ model Contribution {
   amount          Decimal  @db.Decimal(18, 2)
   transactionHash String   @unique
   timestamp       DateTime @default(now())
+
+  refunded      Boolean  @default(false)
 
   contributorId String
   contributor   User     @relation(fields: [contributorId], references: [id])
@@ -159,4 +166,10 @@ model Message {
   forum   Forum  @relation(fields: [forumId], references: [id])
   userId  String
   user    User   @relation(fields: [userId], references: [id])
+}
+
+model IndexerState {
+  id        String   @id @default("singleton")
+  lastBlock Int      @default(0)
+  updatedAt DateTime @updatedAt
 }

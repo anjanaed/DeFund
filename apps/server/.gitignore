@@ -2,7 +2,10 @@
 /dist
 /node_modules
 /build
-/prisma/migrations
+
+# Prisma generated client (regenerated via `prisma generate`)
+/generated/
+/src/generated/
 
 # Logs
 logs

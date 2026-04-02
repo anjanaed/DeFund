@@ -132,6 +132,7 @@ exports.Prisma.UserScalarFieldEnum = {
   discordHandle: 'discordHandle',
   githubHandle: 'githubHandle',
   isVerified: 'isVerified',
+  nonce: 'nonce',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -149,6 +150,9 @@ exports.Prisma.CampaignScalarFieldEnum = {
   githubUrl: 'githubUrl',
   contractAddress: 'contractAddress',
   transactionHash: 'transactionHash',
+  onChainId: 'onChainId',
+  isAdminApproved: 'isAdminApproved',
+  ipfsHash: 'ipfsHash',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   creatorId: 'creatorId'
@@ -161,6 +165,8 @@ exports.Prisma.MilestoneScalarFieldEnum = {
   amount: 'amount',
   status: 'status',
   proofUrl: 'proofUrl',
+  onChainId: 'onChainId',
+  votingEndTime: 'votingEndTime',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   campaignId: 'campaignId'
@@ -171,6 +177,7 @@ exports.Prisma.ContributionScalarFieldEnum = {
   amount: 'amount',
   transactionHash: 'transactionHash',
   timestamp: 'timestamp',
+  refunded: 'refunded',
   contributorId: 'contributorId',
   campaignId: 'campaignId'
 };
@@ -202,6 +209,12 @@ exports.Prisma.MessageScalarFieldEnum = {
   createdAt: 'createdAt',
   forumId: 'forumId',
   userId: 'userId'
+};
+
+exports.Prisma.IndexerStateScalarFieldEnum = {
+  id: 'id',
+  lastBlock: 'lastBlock',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -247,7 +260,8 @@ exports.Prisma.ModelName = {
   Vote: 'Vote',
   Update: 'Update',
   Forum: 'Forum',
-  Message: 'Message'
+  Message: 'Message',
+  IndexerState: 'IndexerState'
 };
 
 /**

@@ -53,6 +53,11 @@ export type Forum = $Result.DefaultSelection<Prisma.$ForumPayload>
  * 
  */
 export type Message = $Result.DefaultSelection<Prisma.$MessagePayload>
+/**
+ * Model IndexerState
+ * 
+ */
+export type IndexerState = $Result.DefaultSelection<Prisma.$IndexerStatePayload>
 
 /**
  * Enums
@@ -297,6 +302,16 @@ export class PrismaClient<
     * ```
     */
   get message(): Prisma.MessageDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.indexerState`: Exposes CRUD operations for the **IndexerState** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more IndexerStates
+    * const indexerStates = await prisma.indexerState.findMany()
+    * ```
+    */
+  get indexerState(): Prisma.IndexerStateDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -738,7 +753,8 @@ export namespace Prisma {
     Vote: 'Vote',
     Update: 'Update',
     Forum: 'Forum',
-    Message: 'Message'
+    Message: 'Message',
+    IndexerState: 'IndexerState'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -754,7 +770,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "campaign" | "milestone" | "contribution" | "vote" | "update" | "forum" | "message"
+      modelProps: "user" | "campaign" | "milestone" | "contribution" | "vote" | "update" | "forum" | "message" | "indexerState"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1350,6 +1366,80 @@ export namespace Prisma {
           }
         }
       }
+      IndexerState: {
+        payload: Prisma.$IndexerStatePayload<ExtArgs>
+        fields: Prisma.IndexerStateFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.IndexerStateFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.IndexerStateFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>
+          }
+          findFirst: {
+            args: Prisma.IndexerStateFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.IndexerStateFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>
+          }
+          findMany: {
+            args: Prisma.IndexerStateFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>[]
+          }
+          create: {
+            args: Prisma.IndexerStateCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>
+          }
+          createMany: {
+            args: Prisma.IndexerStateCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.IndexerStateCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>[]
+          }
+          delete: {
+            args: Prisma.IndexerStateDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>
+          }
+          update: {
+            args: Prisma.IndexerStateUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>
+          }
+          deleteMany: {
+            args: Prisma.IndexerStateDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.IndexerStateUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.IndexerStateUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>[]
+          }
+          upsert: {
+            args: Prisma.IndexerStateUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$IndexerStatePayload>
+          }
+          aggregate: {
+            args: Prisma.IndexerStateAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateIndexerState>
+          }
+          groupBy: {
+            args: Prisma.IndexerStateGroupByArgs<ExtArgs>
+            result: $Utils.Optional<IndexerStateGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.IndexerStateCountArgs<ExtArgs>
+            result: $Utils.Optional<IndexerStateCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1466,6 +1556,7 @@ export namespace Prisma {
     update?: UpdateOmit
     forum?: ForumOmit
     message?: MessageOmit
+    indexerState?: IndexerStateOmit
   }
 
   /* Types for Logging */
@@ -1736,6 +1827,7 @@ export namespace Prisma {
     discordHandle: string | null
     githubHandle: string | null
     isVerified: boolean | null
+    nonce: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -1752,6 +1844,7 @@ export namespace Prisma {
     discordHandle: string | null
     githubHandle: string | null
     isVerified: boolean | null
+    nonce: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -1768,6 +1861,7 @@ export namespace Prisma {
     discordHandle: number
     githubHandle: number
     isVerified: number
+    nonce: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -1786,6 +1880,7 @@ export namespace Prisma {
     discordHandle?: true
     githubHandle?: true
     isVerified?: true
+    nonce?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -1802,6 +1897,7 @@ export namespace Prisma {
     discordHandle?: true
     githubHandle?: true
     isVerified?: true
+    nonce?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -1818,6 +1914,7 @@ export namespace Prisma {
     discordHandle?: true
     githubHandle?: true
     isVerified?: true
+    nonce?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -1907,6 +2004,7 @@ export namespace Prisma {
     discordHandle: string | null
     githubHandle: string | null
     isVerified: boolean
+    nonce: string | null
     createdAt: Date
     updatedAt: Date
     _count: UserCountAggregateOutputType | null
@@ -1940,6 +2038,7 @@ export namespace Prisma {
     discordHandle?: boolean
     githubHandle?: boolean
     isVerified?: boolean
+    nonce?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     createdCampaigns?: boolean | User$createdCampaignsArgs<ExtArgs>
@@ -1961,6 +2060,7 @@ export namespace Prisma {
     discordHandle?: boolean
     githubHandle?: boolean
     isVerified?: boolean
+    nonce?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -1977,6 +2077,7 @@ export namespace Prisma {
     discordHandle?: boolean
     githubHandle?: boolean
     isVerified?: boolean
+    nonce?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -1993,11 +2094,12 @@ export namespace Prisma {
     discordHandle?: boolean
     githubHandle?: boolean
     isVerified?: boolean
+    nonce?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "walletAddress" | "name" | "email" | "avatar" | "bio" | "role" | "twitterHandle" | "discordHandle" | "githubHandle" | "isVerified" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "walletAddress" | "name" | "email" | "avatar" | "bio" | "role" | "twitterHandle" | "discordHandle" | "githubHandle" | "isVerified" | "nonce" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     createdCampaigns?: boolean | User$createdCampaignsArgs<ExtArgs>
     contributions?: boolean | User$contributionsArgs<ExtArgs>
@@ -2028,6 +2130,7 @@ export namespace Prisma {
       discordHandle: string | null
       githubHandle: string | null
       isVerified: boolean
+      nonce: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["user"]>
@@ -2468,6 +2571,7 @@ export namespace Prisma {
     readonly discordHandle: FieldRef<"User", 'String'>
     readonly githubHandle: FieldRef<"User", 'String'>
     readonly isVerified: FieldRef<"User", 'Boolean'>
+    readonly nonce: FieldRef<"User", 'String'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
   }
@@ -2987,11 +3091,13 @@ export namespace Prisma {
   export type CampaignAvgAggregateOutputType = {
     goalAmount: Decimal | null
     raisedAmount: Decimal | null
+    onChainId: number | null
   }
 
   export type CampaignSumAggregateOutputType = {
     goalAmount: Decimal | null
     raisedAmount: Decimal | null
+    onChainId: number | null
   }
 
   export type CampaignMinAggregateOutputType = {
@@ -3007,6 +3113,9 @@ export namespace Prisma {
     githubUrl: string | null
     contractAddress: string | null
     transactionHash: string | null
+    onChainId: number | null
+    isAdminApproved: boolean | null
+    ipfsHash: string | null
     createdAt: Date | null
     updatedAt: Date | null
     creatorId: string | null
@@ -3025,6 +3134,9 @@ export namespace Prisma {
     githubUrl: string | null
     contractAddress: string | null
     transactionHash: string | null
+    onChainId: number | null
+    isAdminApproved: boolean | null
+    ipfsHash: string | null
     createdAt: Date | null
     updatedAt: Date | null
     creatorId: string | null
@@ -3043,6 +3155,9 @@ export namespace Prisma {
     githubUrl: number
     contractAddress: number
     transactionHash: number
+    onChainId: number
+    isAdminApproved: number
+    ipfsHash: number
     createdAt: number
     updatedAt: number
     creatorId: number
@@ -3053,11 +3168,13 @@ export namespace Prisma {
   export type CampaignAvgAggregateInputType = {
     goalAmount?: true
     raisedAmount?: true
+    onChainId?: true
   }
 
   export type CampaignSumAggregateInputType = {
     goalAmount?: true
     raisedAmount?: true
+    onChainId?: true
   }
 
   export type CampaignMinAggregateInputType = {
@@ -3073,6 +3190,9 @@ export namespace Prisma {
     githubUrl?: true
     contractAddress?: true
     transactionHash?: true
+    onChainId?: true
+    isAdminApproved?: true
+    ipfsHash?: true
     createdAt?: true
     updatedAt?: true
     creatorId?: true
@@ -3091,6 +3211,9 @@ export namespace Prisma {
     githubUrl?: true
     contractAddress?: true
     transactionHash?: true
+    onChainId?: true
+    isAdminApproved?: true
+    ipfsHash?: true
     createdAt?: true
     updatedAt?: true
     creatorId?: true
@@ -3109,6 +3232,9 @@ export namespace Prisma {
     githubUrl?: true
     contractAddress?: true
     transactionHash?: true
+    onChainId?: true
+    isAdminApproved?: true
+    ipfsHash?: true
     createdAt?: true
     updatedAt?: true
     creatorId?: true
@@ -3214,6 +3340,9 @@ export namespace Prisma {
     githubUrl: string | null
     contractAddress: string | null
     transactionHash: string | null
+    onChainId: number | null
+    isAdminApproved: boolean
+    ipfsHash: string | null
     createdAt: Date
     updatedAt: Date
     creatorId: string
@@ -3251,6 +3380,9 @@ export namespace Prisma {
     githubUrl?: boolean
     contractAddress?: boolean
     transactionHash?: boolean
+    onChainId?: boolean
+    isAdminApproved?: boolean
+    ipfsHash?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     creatorId?: boolean
@@ -3275,6 +3407,9 @@ export namespace Prisma {
     githubUrl?: boolean
     contractAddress?: boolean
     transactionHash?: boolean
+    onChainId?: boolean
+    isAdminApproved?: boolean
+    ipfsHash?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     creatorId?: boolean
@@ -3294,6 +3429,9 @@ export namespace Prisma {
     githubUrl?: boolean
     contractAddress?: boolean
     transactionHash?: boolean
+    onChainId?: boolean
+    isAdminApproved?: boolean
+    ipfsHash?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     creatorId?: boolean
@@ -3313,12 +3451,15 @@ export namespace Prisma {
     githubUrl?: boolean
     contractAddress?: boolean
     transactionHash?: boolean
+    onChainId?: boolean
+    isAdminApproved?: boolean
+    ipfsHash?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     creatorId?: boolean
   }
 
-  export type CampaignOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "category" | "goalAmount" | "raisedAmount" | "status" | "deadline" | "website" | "githubUrl" | "contractAddress" | "transactionHash" | "createdAt" | "updatedAt" | "creatorId", ExtArgs["result"]["campaign"]>
+  export type CampaignOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "category" | "goalAmount" | "raisedAmount" | "status" | "deadline" | "website" | "githubUrl" | "contractAddress" | "transactionHash" | "onChainId" | "isAdminApproved" | "ipfsHash" | "createdAt" | "updatedAt" | "creatorId", ExtArgs["result"]["campaign"]>
   export type CampaignInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     creator?: boolean | UserDefaultArgs<ExtArgs>
     milestones?: boolean | Campaign$milestonesArgs<ExtArgs>
@@ -3356,6 +3497,9 @@ export namespace Prisma {
       githubUrl: string | null
       contractAddress: string | null
       transactionHash: string | null
+      onChainId: number | null
+      isAdminApproved: boolean
+      ipfsHash: string | null
       createdAt: Date
       updatedAt: Date
       creatorId: string
@@ -3799,6 +3943,9 @@ export namespace Prisma {
     readonly githubUrl: FieldRef<"Campaign", 'String'>
     readonly contractAddress: FieldRef<"Campaign", 'String'>
     readonly transactionHash: FieldRef<"Campaign", 'String'>
+    readonly onChainId: FieldRef<"Campaign", 'Int'>
+    readonly isAdminApproved: FieldRef<"Campaign", 'Boolean'>
+    readonly ipfsHash: FieldRef<"Campaign", 'String'>
     readonly createdAt: FieldRef<"Campaign", 'DateTime'>
     readonly updatedAt: FieldRef<"Campaign", 'DateTime'>
     readonly creatorId: FieldRef<"Campaign", 'String'>
@@ -4321,10 +4468,12 @@ export namespace Prisma {
 
   export type MilestoneAvgAggregateOutputType = {
     amount: Decimal | null
+    onChainId: number | null
   }
 
   export type MilestoneSumAggregateOutputType = {
     amount: Decimal | null
+    onChainId: number | null
   }
 
   export type MilestoneMinAggregateOutputType = {
@@ -4334,6 +4483,8 @@ export namespace Prisma {
     amount: Decimal | null
     status: $Enums.MilestoneStatus | null
     proofUrl: string | null
+    onChainId: number | null
+    votingEndTime: Date | null
     createdAt: Date | null
     updatedAt: Date | null
     campaignId: string | null
@@ -4346,6 +4497,8 @@ export namespace Prisma {
     amount: Decimal | null
     status: $Enums.MilestoneStatus | null
     proofUrl: string | null
+    onChainId: number | null
+    votingEndTime: Date | null
     createdAt: Date | null
     updatedAt: Date | null
     campaignId: string | null
@@ -4358,6 +4511,8 @@ export namespace Prisma {
     amount: number
     status: number
     proofUrl: number
+    onChainId: number
+    votingEndTime: number
     createdAt: number
     updatedAt: number
     campaignId: number
@@ -4367,10 +4522,12 @@ export namespace Prisma {
 
   export type MilestoneAvgAggregateInputType = {
     amount?: true
+    onChainId?: true
   }
 
   export type MilestoneSumAggregateInputType = {
     amount?: true
+    onChainId?: true
   }
 
   export type MilestoneMinAggregateInputType = {
@@ -4380,6 +4537,8 @@ export namespace Prisma {
     amount?: true
     status?: true
     proofUrl?: true
+    onChainId?: true
+    votingEndTime?: true
     createdAt?: true
     updatedAt?: true
     campaignId?: true
@@ -4392,6 +4551,8 @@ export namespace Prisma {
     amount?: true
     status?: true
     proofUrl?: true
+    onChainId?: true
+    votingEndTime?: true
     createdAt?: true
     updatedAt?: true
     campaignId?: true
@@ -4404,6 +4565,8 @@ export namespace Prisma {
     amount?: true
     status?: true
     proofUrl?: true
+    onChainId?: true
+    votingEndTime?: true
     createdAt?: true
     updatedAt?: true
     campaignId?: true
@@ -4503,6 +4666,8 @@ export namespace Prisma {
     amount: Decimal
     status: $Enums.MilestoneStatus
     proofUrl: string | null
+    onChainId: number | null
+    votingEndTime: Date | null
     createdAt: Date
     updatedAt: Date
     campaignId: string
@@ -4534,6 +4699,8 @@ export namespace Prisma {
     amount?: boolean
     status?: boolean
     proofUrl?: boolean
+    onChainId?: boolean
+    votingEndTime?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     campaignId?: boolean
@@ -4549,6 +4716,8 @@ export namespace Prisma {
     amount?: boolean
     status?: boolean
     proofUrl?: boolean
+    onChainId?: boolean
+    votingEndTime?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     campaignId?: boolean
@@ -4562,6 +4731,8 @@ export namespace Prisma {
     amount?: boolean
     status?: boolean
     proofUrl?: boolean
+    onChainId?: boolean
+    votingEndTime?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     campaignId?: boolean
@@ -4575,12 +4746,14 @@ export namespace Prisma {
     amount?: boolean
     status?: boolean
     proofUrl?: boolean
+    onChainId?: boolean
+    votingEndTime?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     campaignId?: boolean
   }
 
-  export type MilestoneOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "amount" | "status" | "proofUrl" | "createdAt" | "updatedAt" | "campaignId", ExtArgs["result"]["milestone"]>
+  export type MilestoneOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "amount" | "status" | "proofUrl" | "onChainId" | "votingEndTime" | "createdAt" | "updatedAt" | "campaignId", ExtArgs["result"]["milestone"]>
   export type MilestoneInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     campaign?: boolean | CampaignDefaultArgs<ExtArgs>
     votes?: boolean | Milestone$votesArgs<ExtArgs>
@@ -4606,6 +4779,8 @@ export namespace Prisma {
       amount: Prisma.Decimal
       status: $Enums.MilestoneStatus
       proofUrl: string | null
+      onChainId: number | null
+      votingEndTime: Date | null
       createdAt: Date
       updatedAt: Date
       campaignId: string
@@ -5040,6 +5215,8 @@ export namespace Prisma {
     readonly amount: FieldRef<"Milestone", 'Decimal'>
     readonly status: FieldRef<"Milestone", 'MilestoneStatus'>
     readonly proofUrl: FieldRef<"Milestone", 'String'>
+    readonly onChainId: FieldRef<"Milestone", 'Int'>
+    readonly votingEndTime: FieldRef<"Milestone", 'DateTime'>
     readonly createdAt: FieldRef<"Milestone", 'DateTime'>
     readonly updatedAt: FieldRef<"Milestone", 'DateTime'>
     readonly campaignId: FieldRef<"Milestone", 'String'>
@@ -5506,6 +5683,7 @@ export namespace Prisma {
     amount: Decimal | null
     transactionHash: string | null
     timestamp: Date | null
+    refunded: boolean | null
     contributorId: string | null
     campaignId: string | null
   }
@@ -5515,6 +5693,7 @@ export namespace Prisma {
     amount: Decimal | null
     transactionHash: string | null
     timestamp: Date | null
+    refunded: boolean | null
     contributorId: string | null
     campaignId: string | null
   }
@@ -5524,6 +5703,7 @@ export namespace Prisma {
     amount: number
     transactionHash: number
     timestamp: number
+    refunded: number
     contributorId: number
     campaignId: number
     _all: number
@@ -5543,6 +5723,7 @@ export namespace Prisma {
     amount?: true
     transactionHash?: true
     timestamp?: true
+    refunded?: true
     contributorId?: true
     campaignId?: true
   }
@@ -5552,6 +5733,7 @@ export namespace Prisma {
     amount?: true
     transactionHash?: true
     timestamp?: true
+    refunded?: true
     contributorId?: true
     campaignId?: true
   }
@@ -5561,6 +5743,7 @@ export namespace Prisma {
     amount?: true
     transactionHash?: true
     timestamp?: true
+    refunded?: true
     contributorId?: true
     campaignId?: true
     _all?: true
@@ -5657,6 +5840,7 @@ export namespace Prisma {
     amount: Decimal
     transactionHash: string
     timestamp: Date
+    refunded: boolean
     contributorId: string
     campaignId: string
     _count: ContributionCountAggregateOutputType | null
@@ -5685,6 +5869,7 @@ export namespace Prisma {
     amount?: boolean
     transactionHash?: boolean
     timestamp?: boolean
+    refunded?: boolean
     contributorId?: boolean
     campaignId?: boolean
     contributor?: boolean | UserDefaultArgs<ExtArgs>
@@ -5696,6 +5881,7 @@ export namespace Prisma {
     amount?: boolean
     transactionHash?: boolean
     timestamp?: boolean
+    refunded?: boolean
     contributorId?: boolean
     campaignId?: boolean
     contributor?: boolean | UserDefaultArgs<ExtArgs>
@@ -5707,6 +5893,7 @@ export namespace Prisma {
     amount?: boolean
     transactionHash?: boolean
     timestamp?: boolean
+    refunded?: boolean
     contributorId?: boolean
     campaignId?: boolean
     contributor?: boolean | UserDefaultArgs<ExtArgs>
@@ -5718,11 +5905,12 @@ export namespace Prisma {
     amount?: boolean
     transactionHash?: boolean
     timestamp?: boolean
+    refunded?: boolean
     contributorId?: boolean
     campaignId?: boolean
   }
 
-  export type ContributionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "amount" | "transactionHash" | "timestamp" | "contributorId" | "campaignId", ExtArgs["result"]["contribution"]>
+  export type ContributionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "amount" | "transactionHash" | "timestamp" | "refunded" | "contributorId" | "campaignId", ExtArgs["result"]["contribution"]>
   export type ContributionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     contributor?: boolean | UserDefaultArgs<ExtArgs>
     campaign?: boolean | CampaignDefaultArgs<ExtArgs>
@@ -5747,6 +5935,7 @@ export namespace Prisma {
       amount: Prisma.Decimal
       transactionHash: string
       timestamp: Date
+      refunded: boolean
       contributorId: string
       campaignId: string
     }, ExtArgs["result"]["contribution"]>
@@ -6178,6 +6367,7 @@ export namespace Prisma {
     readonly amount: FieldRef<"Contribution", 'Decimal'>
     readonly transactionHash: FieldRef<"Contribution", 'String'>
     readonly timestamp: FieldRef<"Contribution", 'DateTime'>
+    readonly refunded: FieldRef<"Contribution", 'Boolean'>
     readonly contributorId: FieldRef<"Contribution", 'String'>
     readonly campaignId: FieldRef<"Contribution", 'String'>
   }
@@ -10834,6 +11024,1009 @@ export namespace Prisma {
 
 
   /**
+   * Model IndexerState
+   */
+
+  export type AggregateIndexerState = {
+    _count: IndexerStateCountAggregateOutputType | null
+    _avg: IndexerStateAvgAggregateOutputType | null
+    _sum: IndexerStateSumAggregateOutputType | null
+    _min: IndexerStateMinAggregateOutputType | null
+    _max: IndexerStateMaxAggregateOutputType | null
+  }
+
+  export type IndexerStateAvgAggregateOutputType = {
+    lastBlock: number | null
+  }
+
+  export type IndexerStateSumAggregateOutputType = {
+    lastBlock: number | null
+  }
+
+  export type IndexerStateMinAggregateOutputType = {
+    id: string | null
+    lastBlock: number | null
+    updatedAt: Date | null
+  }
+
+  export type IndexerStateMaxAggregateOutputType = {
+    id: string | null
+    lastBlock: number | null
+    updatedAt: Date | null
+  }
+
+  export type IndexerStateCountAggregateOutputType = {
+    id: number
+    lastBlock: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type IndexerStateAvgAggregateInputType = {
+    lastBlock?: true
+  }
+
+  export type IndexerStateSumAggregateInputType = {
+    lastBlock?: true
+  }
+
+  export type IndexerStateMinAggregateInputType = {
+    id?: true
+    lastBlock?: true
+    updatedAt?: true
+  }
+
+  export type IndexerStateMaxAggregateInputType = {
+    id?: true
+    lastBlock?: true
+    updatedAt?: true
+  }
+
+  export type IndexerStateCountAggregateInputType = {
+    id?: true
+    lastBlock?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type IndexerStateAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which IndexerState to aggregate.
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of IndexerStates to fetch.
+     */
+    orderBy?: IndexerStateOrderByWithRelationInput | IndexerStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: IndexerStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` IndexerStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` IndexerStates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned IndexerStates
+    **/
+    _count?: true | IndexerStateCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: IndexerStateAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: IndexerStateSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: IndexerStateMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: IndexerStateMaxAggregateInputType
+  }
+
+  export type GetIndexerStateAggregateType<T extends IndexerStateAggregateArgs> = {
+        [P in keyof T & keyof AggregateIndexerState]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateIndexerState[P]>
+      : GetScalarType<T[P], AggregateIndexerState[P]>
+  }
+
+
+
+
+  export type IndexerStateGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: IndexerStateWhereInput
+    orderBy?: IndexerStateOrderByWithAggregationInput | IndexerStateOrderByWithAggregationInput[]
+    by: IndexerStateScalarFieldEnum[] | IndexerStateScalarFieldEnum
+    having?: IndexerStateScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: IndexerStateCountAggregateInputType | true
+    _avg?: IndexerStateAvgAggregateInputType
+    _sum?: IndexerStateSumAggregateInputType
+    _min?: IndexerStateMinAggregateInputType
+    _max?: IndexerStateMaxAggregateInputType
+  }
+
+  export type IndexerStateGroupByOutputType = {
+    id: string
+    lastBlock: number
+    updatedAt: Date
+    _count: IndexerStateCountAggregateOutputType | null
+    _avg: IndexerStateAvgAggregateOutputType | null
+    _sum: IndexerStateSumAggregateOutputType | null
+    _min: IndexerStateMinAggregateOutputType | null
+    _max: IndexerStateMaxAggregateOutputType | null
+  }
+
+  type GetIndexerStateGroupByPayload<T extends IndexerStateGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<IndexerStateGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof IndexerStateGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], IndexerStateGroupByOutputType[P]>
+            : GetScalarType<T[P], IndexerStateGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type IndexerStateSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    lastBlock?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["indexerState"]>
+
+  export type IndexerStateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    lastBlock?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["indexerState"]>
+
+  export type IndexerStateSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    lastBlock?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["indexerState"]>
+
+  export type IndexerStateSelectScalar = {
+    id?: boolean
+    lastBlock?: boolean
+    updatedAt?: boolean
+  }
+
+  export type IndexerStateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "lastBlock" | "updatedAt", ExtArgs["result"]["indexerState"]>
+
+  export type $IndexerStatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "IndexerState"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      lastBlock: number
+      updatedAt: Date
+    }, ExtArgs["result"]["indexerState"]>
+    composites: {}
+  }
+
+  type IndexerStateGetPayload<S extends boolean | null | undefined | IndexerStateDefaultArgs> = $Result.GetResult<Prisma.$IndexerStatePayload, S>
+
+  type IndexerStateCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<IndexerStateFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: IndexerStateCountAggregateInputType | true
+    }
+
+  export interface IndexerStateDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['IndexerState'], meta: { name: 'IndexerState' } }
+    /**
+     * Find zero or one IndexerState that matches the filter.
+     * @param {IndexerStateFindUniqueArgs} args - Arguments to find a IndexerState
+     * @example
+     * // Get one IndexerState
+     * const indexerState = await prisma.indexerState.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends IndexerStateFindUniqueArgs>(args: SelectSubset<T, IndexerStateFindUniqueArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one IndexerState that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {IndexerStateFindUniqueOrThrowArgs} args - Arguments to find a IndexerState
+     * @example
+     * // Get one IndexerState
+     * const indexerState = await prisma.indexerState.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends IndexerStateFindUniqueOrThrowArgs>(args: SelectSubset<T, IndexerStateFindUniqueOrThrowArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first IndexerState that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateFindFirstArgs} args - Arguments to find a IndexerState
+     * @example
+     * // Get one IndexerState
+     * const indexerState = await prisma.indexerState.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends IndexerStateFindFirstArgs>(args?: SelectSubset<T, IndexerStateFindFirstArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first IndexerState that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateFindFirstOrThrowArgs} args - Arguments to find a IndexerState
+     * @example
+     * // Get one IndexerState
+     * const indexerState = await prisma.indexerState.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends IndexerStateFindFirstOrThrowArgs>(args?: SelectSubset<T, IndexerStateFindFirstOrThrowArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more IndexerStates that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all IndexerStates
+     * const indexerStates = await prisma.indexerState.findMany()
+     * 
+     * // Get first 10 IndexerStates
+     * const indexerStates = await prisma.indexerState.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const indexerStateWithIdOnly = await prisma.indexerState.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends IndexerStateFindManyArgs>(args?: SelectSubset<T, IndexerStateFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a IndexerState.
+     * @param {IndexerStateCreateArgs} args - Arguments to create a IndexerState.
+     * @example
+     * // Create one IndexerState
+     * const IndexerState = await prisma.indexerState.create({
+     *   data: {
+     *     // ... data to create a IndexerState
+     *   }
+     * })
+     * 
+     */
+    create<T extends IndexerStateCreateArgs>(args: SelectSubset<T, IndexerStateCreateArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many IndexerStates.
+     * @param {IndexerStateCreateManyArgs} args - Arguments to create many IndexerStates.
+     * @example
+     * // Create many IndexerStates
+     * const indexerState = await prisma.indexerState.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends IndexerStateCreateManyArgs>(args?: SelectSubset<T, IndexerStateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many IndexerStates and returns the data saved in the database.
+     * @param {IndexerStateCreateManyAndReturnArgs} args - Arguments to create many IndexerStates.
+     * @example
+     * // Create many IndexerStates
+     * const indexerState = await prisma.indexerState.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many IndexerStates and only return the `id`
+     * const indexerStateWithIdOnly = await prisma.indexerState.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends IndexerStateCreateManyAndReturnArgs>(args?: SelectSubset<T, IndexerStateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a IndexerState.
+     * @param {IndexerStateDeleteArgs} args - Arguments to delete one IndexerState.
+     * @example
+     * // Delete one IndexerState
+     * const IndexerState = await prisma.indexerState.delete({
+     *   where: {
+     *     // ... filter to delete one IndexerState
+     *   }
+     * })
+     * 
+     */
+    delete<T extends IndexerStateDeleteArgs>(args: SelectSubset<T, IndexerStateDeleteArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one IndexerState.
+     * @param {IndexerStateUpdateArgs} args - Arguments to update one IndexerState.
+     * @example
+     * // Update one IndexerState
+     * const indexerState = await prisma.indexerState.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends IndexerStateUpdateArgs>(args: SelectSubset<T, IndexerStateUpdateArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more IndexerStates.
+     * @param {IndexerStateDeleteManyArgs} args - Arguments to filter IndexerStates to delete.
+     * @example
+     * // Delete a few IndexerStates
+     * const { count } = await prisma.indexerState.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends IndexerStateDeleteManyArgs>(args?: SelectSubset<T, IndexerStateDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more IndexerStates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many IndexerStates
+     * const indexerState = await prisma.indexerState.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends IndexerStateUpdateManyArgs>(args: SelectSubset<T, IndexerStateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more IndexerStates and returns the data updated in the database.
+     * @param {IndexerStateUpdateManyAndReturnArgs} args - Arguments to update many IndexerStates.
+     * @example
+     * // Update many IndexerStates
+     * const indexerState = await prisma.indexerState.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more IndexerStates and only return the `id`
+     * const indexerStateWithIdOnly = await prisma.indexerState.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends IndexerStateUpdateManyAndReturnArgs>(args: SelectSubset<T, IndexerStateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one IndexerState.
+     * @param {IndexerStateUpsertArgs} args - Arguments to update or create a IndexerState.
+     * @example
+     * // Update or create a IndexerState
+     * const indexerState = await prisma.indexerState.upsert({
+     *   create: {
+     *     // ... data to create a IndexerState
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the IndexerState we want to update
+     *   }
+     * })
+     */
+    upsert<T extends IndexerStateUpsertArgs>(args: SelectSubset<T, IndexerStateUpsertArgs<ExtArgs>>): Prisma__IndexerStateClient<$Result.GetResult<Prisma.$IndexerStatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of IndexerStates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateCountArgs} args - Arguments to filter IndexerStates to count.
+     * @example
+     * // Count the number of IndexerStates
+     * const count = await prisma.indexerState.count({
+     *   where: {
+     *     // ... the filter for the IndexerStates we want to count
+     *   }
+     * })
+    **/
+    count<T extends IndexerStateCountArgs>(
+      args?: Subset<T, IndexerStateCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], IndexerStateCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a IndexerState.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends IndexerStateAggregateArgs>(args: Subset<T, IndexerStateAggregateArgs>): Prisma.PrismaPromise<GetIndexerStateAggregateType<T>>
+
+    /**
+     * Group by IndexerState.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {IndexerStateGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends IndexerStateGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: IndexerStateGroupByArgs['orderBy'] }
+        : { orderBy?: IndexerStateGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, IndexerStateGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetIndexerStateGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the IndexerState model
+   */
+  readonly fields: IndexerStateFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for IndexerState.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__IndexerStateClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the IndexerState model
+   */
+  interface IndexerStateFieldRefs {
+    readonly id: FieldRef<"IndexerState", 'String'>
+    readonly lastBlock: FieldRef<"IndexerState", 'Int'>
+    readonly updatedAt: FieldRef<"IndexerState", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * IndexerState findUnique
+   */
+  export type IndexerStateFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * Filter, which IndexerState to fetch.
+     */
+    where: IndexerStateWhereUniqueInput
+  }
+
+  /**
+   * IndexerState findUniqueOrThrow
+   */
+  export type IndexerStateFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * Filter, which IndexerState to fetch.
+     */
+    where: IndexerStateWhereUniqueInput
+  }
+
+  /**
+   * IndexerState findFirst
+   */
+  export type IndexerStateFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * Filter, which IndexerState to fetch.
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of IndexerStates to fetch.
+     */
+    orderBy?: IndexerStateOrderByWithRelationInput | IndexerStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for IndexerStates.
+     */
+    cursor?: IndexerStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` IndexerStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` IndexerStates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of IndexerStates.
+     */
+    distinct?: IndexerStateScalarFieldEnum | IndexerStateScalarFieldEnum[]
+  }
+
+  /**
+   * IndexerState findFirstOrThrow
+   */
+  export type IndexerStateFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * Filter, which IndexerState to fetch.
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of IndexerStates to fetch.
+     */
+    orderBy?: IndexerStateOrderByWithRelationInput | IndexerStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for IndexerStates.
+     */
+    cursor?: IndexerStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` IndexerStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` IndexerStates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of IndexerStates.
+     */
+    distinct?: IndexerStateScalarFieldEnum | IndexerStateScalarFieldEnum[]
+  }
+
+  /**
+   * IndexerState findMany
+   */
+  export type IndexerStateFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * Filter, which IndexerStates to fetch.
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of IndexerStates to fetch.
+     */
+    orderBy?: IndexerStateOrderByWithRelationInput | IndexerStateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing IndexerStates.
+     */
+    cursor?: IndexerStateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` IndexerStates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` IndexerStates.
+     */
+    skip?: number
+    distinct?: IndexerStateScalarFieldEnum | IndexerStateScalarFieldEnum[]
+  }
+
+  /**
+   * IndexerState create
+   */
+  export type IndexerStateCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * The data needed to create a IndexerState.
+     */
+    data: XOR<IndexerStateCreateInput, IndexerStateUncheckedCreateInput>
+  }
+
+  /**
+   * IndexerState createMany
+   */
+  export type IndexerStateCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many IndexerStates.
+     */
+    data: IndexerStateCreateManyInput | IndexerStateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * IndexerState createManyAndReturn
+   */
+  export type IndexerStateCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * The data used to create many IndexerStates.
+     */
+    data: IndexerStateCreateManyInput | IndexerStateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * IndexerState update
+   */
+  export type IndexerStateUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * The data needed to update a IndexerState.
+     */
+    data: XOR<IndexerStateUpdateInput, IndexerStateUncheckedUpdateInput>
+    /**
+     * Choose, which IndexerState to update.
+     */
+    where: IndexerStateWhereUniqueInput
+  }
+
+  /**
+   * IndexerState updateMany
+   */
+  export type IndexerStateUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update IndexerStates.
+     */
+    data: XOR<IndexerStateUpdateManyMutationInput, IndexerStateUncheckedUpdateManyInput>
+    /**
+     * Filter which IndexerStates to update
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * Limit how many IndexerStates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * IndexerState updateManyAndReturn
+   */
+  export type IndexerStateUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * The data used to update IndexerStates.
+     */
+    data: XOR<IndexerStateUpdateManyMutationInput, IndexerStateUncheckedUpdateManyInput>
+    /**
+     * Filter which IndexerStates to update
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * Limit how many IndexerStates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * IndexerState upsert
+   */
+  export type IndexerStateUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * The filter to search for the IndexerState to update in case it exists.
+     */
+    where: IndexerStateWhereUniqueInput
+    /**
+     * In case the IndexerState found by the `where` argument doesn't exist, create a new IndexerState with this data.
+     */
+    create: XOR<IndexerStateCreateInput, IndexerStateUncheckedCreateInput>
+    /**
+     * In case the IndexerState was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<IndexerStateUpdateInput, IndexerStateUncheckedUpdateInput>
+  }
+
+  /**
+   * IndexerState delete
+   */
+  export type IndexerStateDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+    /**
+     * Filter which IndexerState to delete.
+     */
+    where: IndexerStateWhereUniqueInput
+  }
+
+  /**
+   * IndexerState deleteMany
+   */
+  export type IndexerStateDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which IndexerStates to delete
+     */
+    where?: IndexerStateWhereInput
+    /**
+     * Limit how many IndexerStates to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * IndexerState without action
+   */
+  export type IndexerStateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the IndexerState
+     */
+    select?: IndexerStateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the IndexerState
+     */
+    omit?: IndexerStateOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -10859,6 +12052,7 @@ export namespace Prisma {
     discordHandle: 'discordHandle',
     githubHandle: 'githubHandle',
     isVerified: 'isVerified',
+    nonce: 'nonce',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -10879,6 +12073,9 @@ export namespace Prisma {
     githubUrl: 'githubUrl',
     contractAddress: 'contractAddress',
     transactionHash: 'transactionHash',
+    onChainId: 'onChainId',
+    isAdminApproved: 'isAdminApproved',
+    ipfsHash: 'ipfsHash',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     creatorId: 'creatorId'
@@ -10894,6 +12091,8 @@ export namespace Prisma {
     amount: 'amount',
     status: 'status',
     proofUrl: 'proofUrl',
+    onChainId: 'onChainId',
+    votingEndTime: 'votingEndTime',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     campaignId: 'campaignId'
@@ -10907,6 +12106,7 @@ export namespace Prisma {
     amount: 'amount',
     transactionHash: 'transactionHash',
     timestamp: 'timestamp',
+    refunded: 'refunded',
     contributorId: 'contributorId',
     campaignId: 'campaignId'
   };
@@ -10953,6 +12153,15 @@ export namespace Prisma {
   };
 
   export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
+
+
+  export const IndexerStateScalarFieldEnum: {
+    id: 'id',
+    lastBlock: 'lastBlock',
+    updatedAt: 'updatedAt'
+  };
+
+  export type IndexerStateScalarFieldEnum = (typeof IndexerStateScalarFieldEnum)[keyof typeof IndexerStateScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -11062,6 +12271,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Int'
+   */
+  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+  /**
+   * Reference to a field of type 'Int[]'
+   */
+  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+  /**
    * Reference to a field of type 'MilestoneStatus'
    */
   export type EnumMilestoneStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MilestoneStatus'>
@@ -11076,16 +12299,16 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'Int'
+   * Reference to a field of type 'Float'
    */
-  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+  export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
     
 
 
   /**
-   * Reference to a field of type 'Int[]'
+   * Reference to a field of type 'Float[]'
    */
-  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+  export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
     
   /**
    * Deep Input Types
@@ -11107,6 +12330,7 @@ export namespace Prisma {
     discordHandle?: StringNullableFilter<"User"> | string | null
     githubHandle?: StringNullableFilter<"User"> | string | null
     isVerified?: BoolFilter<"User"> | boolean
+    nonce?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     createdCampaigns?: CampaignListRelationFilter
@@ -11127,6 +12351,7 @@ export namespace Prisma {
     discordHandle?: SortOrderInput | SortOrder
     githubHandle?: SortOrderInput | SortOrder
     isVerified?: SortOrder
+    nonce?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     createdCampaigns?: CampaignOrderByRelationAggregateInput
@@ -11150,6 +12375,7 @@ export namespace Prisma {
     discordHandle?: StringNullableFilter<"User"> | string | null
     githubHandle?: StringNullableFilter<"User"> | string | null
     isVerified?: BoolFilter<"User"> | boolean
+    nonce?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     createdCampaigns?: CampaignListRelationFilter
@@ -11170,6 +12396,7 @@ export namespace Prisma {
     discordHandle?: SortOrderInput | SortOrder
     githubHandle?: SortOrderInput | SortOrder
     isVerified?: SortOrder
+    nonce?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: UserCountOrderByAggregateInput
@@ -11192,6 +12419,7 @@ export namespace Prisma {
     discordHandle?: StringNullableWithAggregatesFilter<"User"> | string | null
     githubHandle?: StringNullableWithAggregatesFilter<"User"> | string | null
     isVerified?: BoolWithAggregatesFilter<"User"> | boolean
+    nonce?: StringNullableWithAggregatesFilter<"User"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
   }
@@ -11212,6 +12440,9 @@ export namespace Prisma {
     githubUrl?: StringNullableFilter<"Campaign"> | string | null
     contractAddress?: StringNullableFilter<"Campaign"> | string | null
     transactionHash?: StringNullableFilter<"Campaign"> | string | null
+    onChainId?: IntNullableFilter<"Campaign"> | number | null
+    isAdminApproved?: BoolFilter<"Campaign"> | boolean
+    ipfsHash?: StringNullableFilter<"Campaign"> | string | null
     createdAt?: DateTimeFilter<"Campaign"> | Date | string
     updatedAt?: DateTimeFilter<"Campaign"> | Date | string
     creatorId?: StringFilter<"Campaign"> | string
@@ -11235,6 +12466,9 @@ export namespace Prisma {
     githubUrl?: SortOrderInput | SortOrder
     contractAddress?: SortOrderInput | SortOrder
     transactionHash?: SortOrderInput | SortOrder
+    onChainId?: SortOrderInput | SortOrder
+    isAdminApproved?: SortOrder
+    ipfsHash?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     creatorId?: SortOrder
@@ -11247,6 +12481,7 @@ export namespace Prisma {
 
   export type CampaignWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    onChainId?: number
     AND?: CampaignWhereInput | CampaignWhereInput[]
     OR?: CampaignWhereInput[]
     NOT?: CampaignWhereInput | CampaignWhereInput[]
@@ -11261,6 +12496,8 @@ export namespace Prisma {
     githubUrl?: StringNullableFilter<"Campaign"> | string | null
     contractAddress?: StringNullableFilter<"Campaign"> | string | null
     transactionHash?: StringNullableFilter<"Campaign"> | string | null
+    isAdminApproved?: BoolFilter<"Campaign"> | boolean
+    ipfsHash?: StringNullableFilter<"Campaign"> | string | null
     createdAt?: DateTimeFilter<"Campaign"> | Date | string
     updatedAt?: DateTimeFilter<"Campaign"> | Date | string
     creatorId?: StringFilter<"Campaign"> | string
@@ -11269,7 +12506,7 @@ export namespace Prisma {
     contributions?: ContributionListRelationFilter
     updates?: UpdateListRelationFilter
     forum?: XOR<ForumNullableScalarRelationFilter, ForumWhereInput> | null
-  }, "id">
+  }, "id" | "onChainId">
 
   export type CampaignOrderByWithAggregationInput = {
     id?: SortOrder
@@ -11284,6 +12521,9 @@ export namespace Prisma {
     githubUrl?: SortOrderInput | SortOrder
     contractAddress?: SortOrderInput | SortOrder
     transactionHash?: SortOrderInput | SortOrder
+    onChainId?: SortOrderInput | SortOrder
+    isAdminApproved?: SortOrder
+    ipfsHash?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     creatorId?: SortOrder
@@ -11310,6 +12550,9 @@ export namespace Prisma {
     githubUrl?: StringNullableWithAggregatesFilter<"Campaign"> | string | null
     contractAddress?: StringNullableWithAggregatesFilter<"Campaign"> | string | null
     transactionHash?: StringNullableWithAggregatesFilter<"Campaign"> | string | null
+    onChainId?: IntNullableWithAggregatesFilter<"Campaign"> | number | null
+    isAdminApproved?: BoolWithAggregatesFilter<"Campaign"> | boolean
+    ipfsHash?: StringNullableWithAggregatesFilter<"Campaign"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Campaign"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Campaign"> | Date | string
     creatorId?: StringWithAggregatesFilter<"Campaign"> | string
@@ -11325,6 +12568,8 @@ export namespace Prisma {
     amount?: DecimalFilter<"Milestone"> | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFilter<"Milestone"> | $Enums.MilestoneStatus
     proofUrl?: StringNullableFilter<"Milestone"> | string | null
+    onChainId?: IntNullableFilter<"Milestone"> | number | null
+    votingEndTime?: DateTimeNullableFilter<"Milestone"> | Date | string | null
     createdAt?: DateTimeFilter<"Milestone"> | Date | string
     updatedAt?: DateTimeFilter<"Milestone"> | Date | string
     campaignId?: StringFilter<"Milestone"> | string
@@ -11339,6 +12584,8 @@ export namespace Prisma {
     amount?: SortOrder
     status?: SortOrder
     proofUrl?: SortOrderInput | SortOrder
+    onChainId?: SortOrderInput | SortOrder
+    votingEndTime?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     campaignId?: SortOrder
@@ -11348,6 +12595,7 @@ export namespace Prisma {
 
   export type MilestoneWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    onChainId?: number
     AND?: MilestoneWhereInput | MilestoneWhereInput[]
     OR?: MilestoneWhereInput[]
     NOT?: MilestoneWhereInput | MilestoneWhereInput[]
@@ -11356,12 +12604,13 @@ export namespace Prisma {
     amount?: DecimalFilter<"Milestone"> | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFilter<"Milestone"> | $Enums.MilestoneStatus
     proofUrl?: StringNullableFilter<"Milestone"> | string | null
+    votingEndTime?: DateTimeNullableFilter<"Milestone"> | Date | string | null
     createdAt?: DateTimeFilter<"Milestone"> | Date | string
     updatedAt?: DateTimeFilter<"Milestone"> | Date | string
     campaignId?: StringFilter<"Milestone"> | string
     campaign?: XOR<CampaignScalarRelationFilter, CampaignWhereInput>
     votes?: VoteListRelationFilter
-  }, "id">
+  }, "id" | "onChainId">
 
   export type MilestoneOrderByWithAggregationInput = {
     id?: SortOrder
@@ -11370,6 +12619,8 @@ export namespace Prisma {
     amount?: SortOrder
     status?: SortOrder
     proofUrl?: SortOrderInput | SortOrder
+    onChainId?: SortOrderInput | SortOrder
+    votingEndTime?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     campaignId?: SortOrder
@@ -11390,6 +12641,8 @@ export namespace Prisma {
     amount?: DecimalWithAggregatesFilter<"Milestone"> | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusWithAggregatesFilter<"Milestone"> | $Enums.MilestoneStatus
     proofUrl?: StringNullableWithAggregatesFilter<"Milestone"> | string | null
+    onChainId?: IntNullableWithAggregatesFilter<"Milestone"> | number | null
+    votingEndTime?: DateTimeNullableWithAggregatesFilter<"Milestone"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Milestone"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Milestone"> | Date | string
     campaignId?: StringWithAggregatesFilter<"Milestone"> | string
@@ -11403,6 +12656,7 @@ export namespace Prisma {
     amount?: DecimalFilter<"Contribution"> | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFilter<"Contribution"> | string
     timestamp?: DateTimeFilter<"Contribution"> | Date | string
+    refunded?: BoolFilter<"Contribution"> | boolean
     contributorId?: StringFilter<"Contribution"> | string
     campaignId?: StringFilter<"Contribution"> | string
     contributor?: XOR<UserScalarRelationFilter, UserWhereInput>
@@ -11414,6 +12668,7 @@ export namespace Prisma {
     amount?: SortOrder
     transactionHash?: SortOrder
     timestamp?: SortOrder
+    refunded?: SortOrder
     contributorId?: SortOrder
     campaignId?: SortOrder
     contributor?: UserOrderByWithRelationInput
@@ -11428,6 +12683,7 @@ export namespace Prisma {
     NOT?: ContributionWhereInput | ContributionWhereInput[]
     amount?: DecimalFilter<"Contribution"> | Decimal | DecimalJsLike | number | string
     timestamp?: DateTimeFilter<"Contribution"> | Date | string
+    refunded?: BoolFilter<"Contribution"> | boolean
     contributorId?: StringFilter<"Contribution"> | string
     campaignId?: StringFilter<"Contribution"> | string
     contributor?: XOR<UserScalarRelationFilter, UserWhereInput>
@@ -11439,6 +12695,7 @@ export namespace Prisma {
     amount?: SortOrder
     transactionHash?: SortOrder
     timestamp?: SortOrder
+    refunded?: SortOrder
     contributorId?: SortOrder
     campaignId?: SortOrder
     _count?: ContributionCountOrderByAggregateInput
@@ -11456,6 +12713,7 @@ export namespace Prisma {
     amount?: DecimalWithAggregatesFilter<"Contribution"> | Decimal | DecimalJsLike | number | string
     transactionHash?: StringWithAggregatesFilter<"Contribution"> | string
     timestamp?: DateTimeWithAggregatesFilter<"Contribution"> | Date | string
+    refunded?: BoolWithAggregatesFilter<"Contribution"> | boolean
     contributorId?: StringWithAggregatesFilter<"Contribution"> | string
     campaignId?: StringWithAggregatesFilter<"Contribution"> | string
   }
@@ -11675,6 +12933,50 @@ export namespace Prisma {
     userId?: StringWithAggregatesFilter<"Message"> | string
   }
 
+  export type IndexerStateWhereInput = {
+    AND?: IndexerStateWhereInput | IndexerStateWhereInput[]
+    OR?: IndexerStateWhereInput[]
+    NOT?: IndexerStateWhereInput | IndexerStateWhereInput[]
+    id?: StringFilter<"IndexerState"> | string
+    lastBlock?: IntFilter<"IndexerState"> | number
+    updatedAt?: DateTimeFilter<"IndexerState"> | Date | string
+  }
+
+  export type IndexerStateOrderByWithRelationInput = {
+    id?: SortOrder
+    lastBlock?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type IndexerStateWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: IndexerStateWhereInput | IndexerStateWhereInput[]
+    OR?: IndexerStateWhereInput[]
+    NOT?: IndexerStateWhereInput | IndexerStateWhereInput[]
+    lastBlock?: IntFilter<"IndexerState"> | number
+    updatedAt?: DateTimeFilter<"IndexerState"> | Date | string
+  }, "id">
+
+  export type IndexerStateOrderByWithAggregationInput = {
+    id?: SortOrder
+    lastBlock?: SortOrder
+    updatedAt?: SortOrder
+    _count?: IndexerStateCountOrderByAggregateInput
+    _avg?: IndexerStateAvgOrderByAggregateInput
+    _max?: IndexerStateMaxOrderByAggregateInput
+    _min?: IndexerStateMinOrderByAggregateInput
+    _sum?: IndexerStateSumOrderByAggregateInput
+  }
+
+  export type IndexerStateScalarWhereWithAggregatesInput = {
+    AND?: IndexerStateScalarWhereWithAggregatesInput | IndexerStateScalarWhereWithAggregatesInput[]
+    OR?: IndexerStateScalarWhereWithAggregatesInput[]
+    NOT?: IndexerStateScalarWhereWithAggregatesInput | IndexerStateScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"IndexerState"> | string
+    lastBlock?: IntWithAggregatesFilter<"IndexerState"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"IndexerState"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     walletAddress: string
@@ -11687,6 +12989,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignCreateNestedManyWithoutCreatorInput
@@ -11707,6 +13010,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignUncheckedCreateNestedManyWithoutCreatorInput
@@ -11727,6 +13031,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUpdateManyWithoutCreatorNestedInput
@@ -11747,6 +13052,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUncheckedUpdateManyWithoutCreatorNestedInput
@@ -11767,6 +13073,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -11783,6 +13090,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -11799,6 +13107,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -11816,6 +13125,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creator: UserCreateNestedOneWithoutCreatedCampaignsInput
@@ -11838,6 +13150,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creatorId: string
@@ -11860,6 +13175,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creator?: UserUpdateOneRequiredWithoutCreatedCampaignsNestedInput
@@ -11882,6 +13200,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creatorId?: StringFieldUpdateOperationsInput | string
@@ -11904,6 +13225,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creatorId: string
@@ -11922,6 +13246,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -11939,6 +13266,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creatorId?: StringFieldUpdateOperationsInput | string
@@ -11951,6 +13281,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     campaign: CampaignCreateNestedOneWithoutMilestonesInput
@@ -11964,6 +13296,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     campaignId: string
@@ -11977,6 +13311,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaign?: CampaignUpdateOneRequiredWithoutMilestonesNestedInput
@@ -11990,6 +13326,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaignId?: StringFieldUpdateOperationsInput | string
@@ -12003,6 +13341,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     campaignId: string
@@ -12015,6 +13355,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -12026,6 +13368,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaignId?: StringFieldUpdateOperationsInput | string
@@ -12036,6 +13380,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     contributor: UserCreateNestedOneWithoutContributionsInput
     campaign: CampaignCreateNestedOneWithoutContributionsInput
   }
@@ -12045,6 +13390,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     contributorId: string
     campaignId: string
   }
@@ -12054,6 +13400,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     contributor?: UserUpdateOneRequiredWithoutContributionsNestedInput
     campaign?: CampaignUpdateOneRequiredWithoutContributionsNestedInput
   }
@@ -12063,6 +13410,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     contributorId?: StringFieldUpdateOperationsInput | string
     campaignId?: StringFieldUpdateOperationsInput | string
   }
@@ -12072,6 +13420,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     contributorId: string
     campaignId: string
   }
@@ -12081,6 +13430,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type ContributionUncheckedUpdateManyInput = {
@@ -12088,6 +13438,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     contributorId?: StringFieldUpdateOperationsInput | string
     campaignId?: StringFieldUpdateOperationsInput | string
   }
@@ -12293,6 +13644,48 @@ export namespace Prisma {
     userId?: StringFieldUpdateOperationsInput | string
   }
 
+  export type IndexerStateCreateInput = {
+    id?: string
+    lastBlock?: number
+    updatedAt?: Date | string
+  }
+
+  export type IndexerStateUncheckedCreateInput = {
+    id?: string
+    lastBlock?: number
+    updatedAt?: Date | string
+  }
+
+  export type IndexerStateUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lastBlock?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type IndexerStateUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lastBlock?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type IndexerStateCreateManyInput = {
+    id?: string
+    lastBlock?: number
+    updatedAt?: Date | string
+  }
+
+  export type IndexerStateUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lastBlock?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type IndexerStateUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lastBlock?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -12403,6 +13796,7 @@ export namespace Prisma {
     discordHandle?: SortOrder
     githubHandle?: SortOrder
     isVerified?: SortOrder
+    nonce?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -12419,6 +13813,7 @@ export namespace Prisma {
     discordHandle?: SortOrder
     githubHandle?: SortOrder
     isVerified?: SortOrder
+    nonce?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -12435,6 +13830,7 @@ export namespace Prisma {
     discordHandle?: SortOrder
     githubHandle?: SortOrder
     isVerified?: SortOrder
+    nonce?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -12536,6 +13932,17 @@ export namespace Prisma {
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
   }
 
+  export type IntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
   export type UserScalarRelationFilter = {
     is?: UserWhereInput
     isNot?: UserWhereInput
@@ -12579,6 +13986,9 @@ export namespace Prisma {
     githubUrl?: SortOrder
     contractAddress?: SortOrder
     transactionHash?: SortOrder
+    onChainId?: SortOrder
+    isAdminApproved?: SortOrder
+    ipfsHash?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     creatorId?: SortOrder
@@ -12587,6 +13997,7 @@ export namespace Prisma {
   export type CampaignAvgOrderByAggregateInput = {
     goalAmount?: SortOrder
     raisedAmount?: SortOrder
+    onChainId?: SortOrder
   }
 
   export type CampaignMaxOrderByAggregateInput = {
@@ -12602,6 +14013,9 @@ export namespace Prisma {
     githubUrl?: SortOrder
     contractAddress?: SortOrder
     transactionHash?: SortOrder
+    onChainId?: SortOrder
+    isAdminApproved?: SortOrder
+    ipfsHash?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     creatorId?: SortOrder
@@ -12620,6 +14034,9 @@ export namespace Prisma {
     githubUrl?: SortOrder
     contractAddress?: SortOrder
     transactionHash?: SortOrder
+    onChainId?: SortOrder
+    isAdminApproved?: SortOrder
+    ipfsHash?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     creatorId?: SortOrder
@@ -12628,6 +14045,7 @@ export namespace Prisma {
   export type CampaignSumOrderByAggregateInput = {
     goalAmount?: SortOrder
     raisedAmount?: SortOrder
+    onChainId?: SortOrder
   }
 
   export type DecimalWithAggregatesFilter<$PrismaModel = never> = {
@@ -12670,6 +14088,22 @@ export namespace Prisma {
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
+  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
   export type EnumMilestoneStatusFilter<$PrismaModel = never> = {
     equals?: $Enums.MilestoneStatus | EnumMilestoneStatusFieldRefInput<$PrismaModel>
     in?: $Enums.MilestoneStatus[] | ListEnumMilestoneStatusFieldRefInput<$PrismaModel>
@@ -12689,6 +14123,8 @@ export namespace Prisma {
     amount?: SortOrder
     status?: SortOrder
     proofUrl?: SortOrder
+    onChainId?: SortOrder
+    votingEndTime?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     campaignId?: SortOrder
@@ -12696,6 +14132,7 @@ export namespace Prisma {
 
   export type MilestoneAvgOrderByAggregateInput = {
     amount?: SortOrder
+    onChainId?: SortOrder
   }
 
   export type MilestoneMaxOrderByAggregateInput = {
@@ -12705,6 +14142,8 @@ export namespace Prisma {
     amount?: SortOrder
     status?: SortOrder
     proofUrl?: SortOrder
+    onChainId?: SortOrder
+    votingEndTime?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     campaignId?: SortOrder
@@ -12717,6 +14156,8 @@ export namespace Prisma {
     amount?: SortOrder
     status?: SortOrder
     proofUrl?: SortOrder
+    onChainId?: SortOrder
+    votingEndTime?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     campaignId?: SortOrder
@@ -12724,6 +14165,7 @@ export namespace Prisma {
 
   export type MilestoneSumOrderByAggregateInput = {
     amount?: SortOrder
+    onChainId?: SortOrder
   }
 
   export type EnumMilestoneStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -12741,6 +14183,7 @@ export namespace Prisma {
     amount?: SortOrder
     transactionHash?: SortOrder
     timestamp?: SortOrder
+    refunded?: SortOrder
     contributorId?: SortOrder
     campaignId?: SortOrder
   }
@@ -12754,6 +14197,7 @@ export namespace Prisma {
     amount?: SortOrder
     transactionHash?: SortOrder
     timestamp?: SortOrder
+    refunded?: SortOrder
     contributorId?: SortOrder
     campaignId?: SortOrder
   }
@@ -12763,6 +14207,7 @@ export namespace Prisma {
     amount?: SortOrder
     transactionHash?: SortOrder
     timestamp?: SortOrder
+    refunded?: SortOrder
     contributorId?: SortOrder
     campaignId?: SortOrder
   }
@@ -12871,6 +14316,59 @@ export namespace Prisma {
     createdAt?: SortOrder
     forumId?: SortOrder
     userId?: SortOrder
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type IndexerStateCountOrderByAggregateInput = {
+    id?: SortOrder
+    lastBlock?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type IndexerStateAvgOrderByAggregateInput = {
+    lastBlock?: SortOrder
+  }
+
+  export type IndexerStateMaxOrderByAggregateInput = {
+    id?: SortOrder
+    lastBlock?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type IndexerStateMinOrderByAggregateInput = {
+    id?: SortOrder
+    lastBlock?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type IndexerStateSumOrderByAggregateInput = {
+    lastBlock?: SortOrder
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
   }
 
   export type CampaignCreateNestedManyWithoutCreatorInput = {
@@ -13135,6 +14633,14 @@ export namespace Prisma {
 
   export type NullableDateTimeFieldUpdateOperationsInput = {
     set?: Date | string | null
+  }
+
+  export type NullableIntFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
   }
 
   export type UserUpdateOneRequiredWithoutCreatedCampaignsNestedInput = {
@@ -13463,6 +14969,14 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutMessagesInput, UserUpdateWithoutMessagesInput>, UserUncheckedUpdateWithoutMessagesInput>
   }
 
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -13671,6 +15185,33 @@ export namespace Prisma {
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
+  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
   export type NestedEnumMilestoneStatusFilter<$PrismaModel = never> = {
     equals?: $Enums.MilestoneStatus | EnumMilestoneStatusFieldRefInput<$PrismaModel>
     in?: $Enums.MilestoneStatus[] | ListEnumMilestoneStatusFieldRefInput<$PrismaModel>
@@ -13688,6 +15229,33 @@ export namespace Prisma {
     _max?: NestedEnumMilestoneStatusFilter<$PrismaModel>
   }
 
+  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type NestedFloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
   export type CampaignCreateWithoutCreatorInput = {
     id?: string
     title: string
@@ -13701,6 +15269,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     milestones?: MilestoneCreateNestedManyWithoutCampaignInput
@@ -13722,6 +15293,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     milestones?: MilestoneUncheckedCreateNestedManyWithoutCampaignInput
@@ -13745,6 +15319,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     campaign: CampaignCreateNestedOneWithoutContributionsInput
   }
 
@@ -13753,6 +15328,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     campaignId: string
   }
 
@@ -13846,6 +15422,9 @@ export namespace Prisma {
     githubUrl?: StringNullableFilter<"Campaign"> | string | null
     contractAddress?: StringNullableFilter<"Campaign"> | string | null
     transactionHash?: StringNullableFilter<"Campaign"> | string | null
+    onChainId?: IntNullableFilter<"Campaign"> | number | null
+    isAdminApproved?: BoolFilter<"Campaign"> | boolean
+    ipfsHash?: StringNullableFilter<"Campaign"> | string | null
     createdAt?: DateTimeFilter<"Campaign"> | Date | string
     updatedAt?: DateTimeFilter<"Campaign"> | Date | string
     creatorId?: StringFilter<"Campaign"> | string
@@ -13875,6 +15454,7 @@ export namespace Prisma {
     amount?: DecimalFilter<"Contribution"> | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFilter<"Contribution"> | string
     timestamp?: DateTimeFilter<"Contribution"> | Date | string
+    refunded?: BoolFilter<"Contribution"> | boolean
     contributorId?: StringFilter<"Contribution"> | string
     campaignId?: StringFilter<"Contribution"> | string
   }
@@ -13945,6 +15525,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     contributions?: ContributionCreateNestedManyWithoutContributorInput
@@ -13964,6 +15545,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     contributions?: ContributionUncheckedCreateNestedManyWithoutContributorInput
@@ -13983,6 +15565,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     votes?: VoteCreateNestedManyWithoutMilestoneInput
@@ -13995,6 +15579,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     votes?: VoteUncheckedCreateNestedManyWithoutMilestoneInput
@@ -14015,6 +15601,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     contributor: UserCreateNestedOneWithoutContributionsInput
   }
 
@@ -14023,6 +15610,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     contributorId: string
   }
 
@@ -14098,6 +15686,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     contributions?: ContributionUpdateManyWithoutContributorNestedInput
@@ -14117,6 +15706,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     contributions?: ContributionUncheckedUpdateManyWithoutContributorNestedInput
@@ -14150,6 +15740,8 @@ export namespace Prisma {
     amount?: DecimalFilter<"Milestone"> | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFilter<"Milestone"> | $Enums.MilestoneStatus
     proofUrl?: StringNullableFilter<"Milestone"> | string | null
+    onChainId?: IntNullableFilter<"Milestone"> | number | null
+    votingEndTime?: DateTimeNullableFilter<"Milestone"> | Date | string | null
     createdAt?: DateTimeFilter<"Milestone"> | Date | string
     updatedAt?: DateTimeFilter<"Milestone"> | Date | string
     campaignId?: StringFilter<"Milestone"> | string
@@ -14232,6 +15824,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creator: UserCreateNestedOneWithoutCreatedCampaignsInput
@@ -14253,6 +15848,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creatorId: string
@@ -14314,6 +15912,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creator?: UserUpdateOneRequiredWithoutCreatedCampaignsNestedInput
@@ -14335,6 +15936,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creatorId?: StringFieldUpdateOperationsInput | string
@@ -14371,6 +15975,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignCreateNestedManyWithoutCreatorInput
@@ -14390,6 +15995,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignUncheckedCreateNestedManyWithoutCreatorInput
@@ -14415,6 +16021,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creator: UserCreateNestedOneWithoutCreatedCampaignsInput
@@ -14436,6 +16045,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creatorId: string
@@ -14472,6 +16084,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUpdateManyWithoutCreatorNestedInput
@@ -14491,6 +16104,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUncheckedUpdateManyWithoutCreatorNestedInput
@@ -14522,6 +16136,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creator?: UserUpdateOneRequiredWithoutCreatedCampaignsNestedInput
@@ -14543,6 +16160,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creatorId?: StringFieldUpdateOperationsInput | string
@@ -14563,6 +16183,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignCreateNestedManyWithoutCreatorInput
@@ -14582,6 +16203,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignUncheckedCreateNestedManyWithoutCreatorInput
@@ -14601,6 +16223,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     campaign: CampaignCreateNestedOneWithoutMilestonesInput
@@ -14613,6 +16237,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     campaignId: string
@@ -14646,6 +16272,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUpdateManyWithoutCreatorNestedInput
@@ -14665,6 +16292,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUncheckedUpdateManyWithoutCreatorNestedInput
@@ -14690,6 +16318,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaign?: CampaignUpdateOneRequiredWithoutMilestonesNestedInput
@@ -14702,6 +16332,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaignId?: StringFieldUpdateOperationsInput | string
@@ -14720,6 +16352,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creator: UserCreateNestedOneWithoutCreatedCampaignsInput
@@ -14741,6 +16376,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creatorId: string
@@ -14778,6 +16416,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creator?: UserUpdateOneRequiredWithoutCreatedCampaignsNestedInput
@@ -14799,6 +16440,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creatorId?: StringFieldUpdateOperationsInput | string
@@ -14820,6 +16464,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creator: UserCreateNestedOneWithoutCreatedCampaignsInput
@@ -14841,6 +16488,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     creatorId: string
@@ -14902,6 +16552,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creator?: UserUpdateOneRequiredWithoutCreatedCampaignsNestedInput
@@ -14923,6 +16576,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     creatorId?: StringFieldUpdateOperationsInput | string
@@ -14974,6 +16630,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignCreateNestedManyWithoutCreatorInput
@@ -14993,6 +16650,7 @@ export namespace Prisma {
     discordHandle?: string | null
     githubHandle?: string | null
     isVerified?: boolean
+    nonce?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     createdCampaigns?: CampaignUncheckedCreateNestedManyWithoutCreatorInput
@@ -15049,6 +16707,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUpdateManyWithoutCreatorNestedInput
@@ -15068,6 +16727,7 @@ export namespace Prisma {
     discordHandle?: NullableStringFieldUpdateOperationsInput | string | null
     githubHandle?: NullableStringFieldUpdateOperationsInput | string | null
     isVerified?: BoolFieldUpdateOperationsInput | boolean
+    nonce?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdCampaigns?: CampaignUncheckedUpdateManyWithoutCreatorNestedInput
@@ -15088,6 +16748,9 @@ export namespace Prisma {
     githubUrl?: string | null
     contractAddress?: string | null
     transactionHash?: string | null
+    onChainId?: number | null
+    isAdminApproved?: boolean
+    ipfsHash?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -15097,6 +16760,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     campaignId: string
   }
 
@@ -15127,6 +16791,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     milestones?: MilestoneUpdateManyWithoutCampaignNestedInput
@@ -15148,6 +16815,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     milestones?: MilestoneUncheckedUpdateManyWithoutCampaignNestedInput
@@ -15169,6 +16839,9 @@ export namespace Prisma {
     githubUrl?: NullableStringFieldUpdateOperationsInput | string | null
     contractAddress?: NullableStringFieldUpdateOperationsInput | string | null
     transactionHash?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    isAdminApproved?: BoolFieldUpdateOperationsInput | boolean
+    ipfsHash?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -15178,6 +16851,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     campaign?: CampaignUpdateOneRequiredWithoutContributionsNestedInput
   }
 
@@ -15186,6 +16860,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     campaignId?: StringFieldUpdateOperationsInput | string
   }
 
@@ -15194,6 +16869,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     campaignId?: StringFieldUpdateOperationsInput | string
   }
 
@@ -15246,6 +16922,8 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     status?: $Enums.MilestoneStatus
     proofUrl?: string | null
+    onChainId?: number | null
+    votingEndTime?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -15255,6 +16933,7 @@ export namespace Prisma {
     amount: Decimal | DecimalJsLike | number | string
     transactionHash: string
     timestamp?: Date | string
+    refunded?: boolean
     contributorId: string
   }
 
@@ -15272,6 +16951,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     votes?: VoteUpdateManyWithoutMilestoneNestedInput
@@ -15284,6 +16965,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     votes?: VoteUncheckedUpdateManyWithoutMilestoneNestedInput
@@ -15296,6 +16979,8 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     status?: EnumMilestoneStatusFieldUpdateOperationsInput | $Enums.MilestoneStatus
     proofUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    onChainId?: NullableIntFieldUpdateOperationsInput | number | null
+    votingEndTime?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -15305,6 +16990,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     contributor?: UserUpdateOneRequiredWithoutContributionsNestedInput
   }
 
@@ -15313,6 +16999,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     contributorId?: StringFieldUpdateOperationsInput | string
   }
 
@@ -15321,6 +17008,7 @@ export namespace Prisma {
     amount?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     transactionHash?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    refunded?: BoolFieldUpdateOperationsInput | boolean
     contributorId?: StringFieldUpdateOperationsInput | string
   }
 
