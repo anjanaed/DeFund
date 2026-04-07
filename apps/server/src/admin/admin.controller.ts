@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { FlagCampaignDto } from './dto/flag-campaign.dto';
+import { SetUserRoleDto } from './dto/set-user-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -81,6 +82,16 @@ export class AdminController {
     return this.admin.blockCampaign(id);
   }
 
+  @Post('projects/:id/propose-refund')
+  proposeRefund(@Param('id') id: string) {
+    return this.admin.proposeRefund(id);
+  }
+
+  @Post('projects/:id/approve-refund')
+  approveRefund(@Param('id') id: string) {
+    return this.admin.approveRefund(id);
+  }
+
   @Get('milestones')
   getMilestones(
     @Query('page') page?: string,
@@ -100,5 +111,10 @@ export class AdminController {
   @Post('milestones/:id/notify-release')
   notifyMilestoneRelease(@Param('id') id: string) {
     return this.admin.notifyMilestoneRelease(id);
+  }
+
+  @Post('users/:id/set-role')
+  setUserRole(@Param('id') id: string, @Body() dto: SetUserRoleDto) {
+    return this.admin.setUserRole(id, dto.role);
   }
 }

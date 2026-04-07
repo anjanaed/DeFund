@@ -60,6 +60,13 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         uint256 votesAgainst; // Total contribution amount voting against
         uint256 votingEndTime;
         bool fundsReleased;
+        // Snapshot of campaign.raisedAmount at the moment voting starts.
+        // Using a snapshot prevents late contributions from raising the quorum
+        // threshold mid-vote, which would make existing votes retroactively invalid.
+        uint256 raisedAmountAtVotingStart;
+        // Tracks how many times this milestone has been submitted for voting.
+        // Creators get at most 2 attempts; a second rejection is final.
+        uint8 submissionCount;
     }
 
     struct Contribution {
@@ -528,8 +535,13 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         Campaign storage campaign = campaigns[milestone.campaignId];
 
         require(
-            milestone.status == MilestoneStatus.Pending,
-            "Milestone not in pending status"
+            milestone.status == MilestoneStatus.Pending ||
+                milestone.status == MilestoneStatus.Rejected,
+            "Milestone not eligible for submission"
+        );
+        require(
+            milestone.submissionCount < 2,
+            "Maximum submission attempts reached"
         );
         require(bytes(_proofIpfsHash).length > 0, "Proof required");
 
@@ -549,9 +561,15 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             }
         }
 
+        // Reset votes for the new submission round
+        milestone.votesFor = 0;
+        milestone.votesAgainst = 0;
         milestone.ipfsHash = _proofIpfsHash;
         milestone.status = MilestoneStatus.Voting;
         milestone.votingEndTime = block.timestamp + VOTING_PERIOD;
+        milestone.submissionCount += 1;
+        // Snapshot raised amount so quorum threshold stays fixed during the voting window
+        milestone.raisedAmountAtVotingStart = campaign.raisedAmount;
 
         emit MilestoneSubmittedForVoting(
             _milestoneId,
@@ -622,7 +640,9 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         );
 
         uint256 totalVotes = milestone.votesFor + milestone.votesAgainst;
-        uint256 quorumRequired = (campaign.raisedAmount *
+        // Use the snapshotted raised amount so contributions made after voting
+        // started do not raise the quorum bar for already-cast votes.
+        uint256 quorumRequired = (milestone.raisedAmountAtVotingStart *
             MIN_QUORUM_PERCENTAGE) / 100;
 
         bool quorumMet = totalVotes >= quorumRequired;

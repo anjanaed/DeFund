@@ -27,8 +27,12 @@ export class UsersService {
       (sum, c) => sum + Number(c.amount),
       0,
     );
+    // Locked = funds in campaigns that are active or fully funded but not yet completed
     const lockedFunds = contributions
-      .filter((c) => c.campaign.status === CampaignStatus.ACTIVE)
+      .filter((c) =>
+        c.campaign.status === CampaignStatus.ACTIVE ||
+        c.campaign.status === CampaignStatus.FUNDED,
+      )
       .reduce((sum, c) => sum + Number(c.amount), 0);
     const releasedFunds = contributions
       .filter((c) => c.campaign.status === CampaignStatus.COMPLETED)
@@ -113,6 +117,7 @@ export class UsersService {
         refunded: false,
         campaign: {
           status: { in: [CampaignStatus.FLAGGED, CampaignStatus.FAILED] },
+          fundsReclaimed: true,
         },
       },
       include: {
@@ -122,6 +127,7 @@ export class UsersService {
             title: true,
             status: true,
             raisedAmount: true,
+            onChainId: true,
           },
         },
       },

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -41,7 +42,10 @@ export class CampaignsService {
 
     if (sort === 'trending') {
       const campaigns = await this.prisma.campaign.findMany({
-        where: { ...where, status: CampaignStatus.ACTIVE },
+        where: {
+          ...where,
+          status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] },
+        },
         include: campaignInclude,
       });
       const sorted = campaigns.sort((a, b) => {
@@ -78,7 +82,7 @@ export class CampaignsService {
 
   async findTrending() {
     const campaigns = await this.prisma.campaign.findMany({
-      where: { status: CampaignStatus.ACTIVE },
+      where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } },
       include: campaignInclude,
     });
     return campaigns
@@ -120,13 +124,16 @@ export class CampaignsService {
   }
 
   async createCampaign(userId: string, dto: CreateCampaignDto) {
-    const { milestones, deadline, ...rest } = dto;
+    const { milestones, deadline, onChainId, transactionHash, paymentToken, ...rest } = dto;
     return this.prisma.campaign.create({
       data: {
         ...rest,
         deadline: deadline ? new Date(deadline) : undefined,
         creatorId: userId,
         status: CampaignStatus.PENDING,
+        onChainId: onChainId ?? null,
+        transactionHash: transactionHash ?? null,
+        paymentToken: paymentToken ?? 'ETH',
         milestones: { create: milestones },
         forum: { create: {} },
       },
@@ -141,6 +148,12 @@ export class CampaignsService {
       throw new ForbiddenException('Can only edit PENDING campaigns');
     }
     const { deadline, ...rest } = dto;
+    if (deadline !== undefined) {
+      const newDeadline = new Date(deadline);
+      if (newDeadline <= new Date()) {
+        throw new BadRequestException('Deadline must be in the future');
+      }
+    }
     return this.prisma.campaign.update({
       where: { id },
       data: {
@@ -155,10 +168,37 @@ export class CampaignsService {
       where: { creatorId: userId },
       include: {
         _count: { select: { milestones: true, contributions: true } },
-        milestones: { select: { id: true, title: true, status: true, amount: true } },
+        milestones: {
+          select: { id: true, title: true, status: true, amount: true, onChainId: true, proofUrl: true, submissionCount: true },
+          orderBy: { createdAt: 'asc' as const },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getPublicStats() {
+    const [totalRaisedAgg, activeCampaigns, completedCampaigns, finishedCampaigns, totalContributors] =
+      await Promise.all([
+        this.prisma.campaign.aggregate({ _sum: { raisedAmount: true } }),
+        this.prisma.campaign.count({
+          where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } },
+        }),
+        this.prisma.campaign.count({ where: { status: CampaignStatus.COMPLETED } }),
+        this.prisma.campaign.count({
+          where: {
+            status: { in: [CampaignStatus.COMPLETED, CampaignStatus.FAILED, CampaignStatus.FLAGGED] },
+          },
+        }),
+        this.prisma.user.count({ where: { contributions: { some: {} } } }),
+      ]);
+
+    return {
+      totalRaised: Number(totalRaisedAgg._sum.raisedAmount ?? 0),
+      activeCampaigns,
+      totalContributors,
+      successRate: finishedCampaigns > 0 ? Math.round((completedCampaigns / finishedCampaigns) * 100) : 0,
+    };
   }
 
   private async ensureExists(id: string) {

@@ -13,16 +13,18 @@ import { QueryCampaignsDto } from './dto/query-campaigns.dto';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { UserRole } from '../generated/prisma';
 
 @Controller()
 export class CampaignsController {
   constructor(private readonly campaigns: CampaignsService) {}
 
   // ── Public ────────────────────────────────────────────────────────────────
+
+  @Get('stats')
+  getPublicStats() {
+    return this.campaigns.getPublicStats();
+  }
 
   @Get('projects')
   findAll(@Query() query: QueryCampaignsDto) {
@@ -52,8 +54,7 @@ export class CampaignsController {
   // ── Creator ───────────────────────────────────────────────────────────────
 
   @Post('projects')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   createCampaign(
     @CurrentUser() user: any,
     @Body() dto: CreateCampaignDto,
@@ -62,8 +63,7 @@ export class CampaignsController {
   }
 
   @Put('projects/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   updateCampaign(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -73,8 +73,7 @@ export class CampaignsController {
   }
 
   @Get('creator/projects')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CREATOR, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   getCreatorProjects(@CurrentUser() user: any) {
     return this.campaigns.findCreatorProjects(user.userId);
   }

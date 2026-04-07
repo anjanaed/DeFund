@@ -1,183 +1,140 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AppNavbar from '../components/layout/AppNavbar'
 import CreateCampaignModal from '../components/modals/CreateCampaignModal'
-import { HiCurrencyDollar, HiChartBar, HiUsers, HiCheckCircle, HiClock, HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray } from 'react-icons/hi2'
+import SubmitProofModal from '../components/modals/SubmitProofModal'
 import ProofModal from '../components/common/ProofModal'
+import {
+  HiCurrencyDollar, HiChartBar, HiUsers, HiCheckCircle, HiClock,
+  HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray,
+  HiBanknotes, HiNoSymbol,
+} from 'react-icons/hi2'
+import { useWriteContract } from 'wagmi'
+import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
+import { useAuth } from '../context/AuthContext'
+import { apiFetch } from '../lib/api'
+
+interface Milestone {
+  id: string; title: string; status: string; amount: string
+  onChainId: number | null; proofUrl: string | null; submissionCount: number
+}
+interface CreatorCampaign {
+  id: string; title: string; description: string; category: string; status: string
+  raisedAmount: string; goalAmount: string; paymentToken: string
+  _count: { milestones: number; contributions: number }
+  milestones: Milestone[]
+}
+
+const fmt = (n: number) => `$${Number(n).toLocaleString()}`
+
+const STATUS_ICON: Record<string, any> = {
+  APPROVED: HiCheckCircle, COMPLETED: HiCheckCircle,
+  VOTING: HiClock, REJECTED: HiXCircle,
+  PENDING: HiInformationCircle,
+}
+const STATUS_COLOR: Record<string, string> = {
+  APPROVED: 'success', COMPLETED: 'success',
+  VOTING: 'warning', REJECTED: 'error', PENDING: 'neutral',
+}
 
 export default function CreatorStudioPage() {
+  const { token } = useAuth()
   const [activeTab, setActiveTab] = useState('active')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showProofModal, setShowProofModal] = useState(false)
-  const [selectedProof, setSelectedProof] = useState<{title: string, content: string} | null>(null)
+  const [selectedProof, setSelectedProof] = useState<{ title: string; content: string } | null>(null)
+  const [proofModal, setProofModal] = useState<{ milestoneId: string; onChainId: number | null; title: string; isResubmission: boolean } | null>(null)
+
+  const [campaigns, setCampaigns] = useState<CreatorCampaign[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [releasingId, setReleasingId] = useState<string | null>(null)
+  const [releasedIds, setReleasedIds] = useState<Set<string>>(new Set())
+  const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set())
+
+  const { writeContractAsync } = useWriteContract()
+
+  const loadCampaigns = () => {
+    if (!token) return
+    setLoading(true)
+    apiFetch('/creator/projects', {}, token)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setCampaigns(data); setLoading(false) })
+  }
+
+  useEffect(() => { loadCampaigns() }, [token])
+
+  const handleReleaseFunds = async (milestone: Milestone) => {
+    if (!milestone.onChainId) { alert('Milestone not yet on-chain.'); return }
+    setReleasingId(milestone.id)
+    try {
+      await writeContractAsync({
+        address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
+        functionName: 'releaseMilestoneFunds', args: [BigInt(milestone.onChainId)],
+      })
+      setReleasedIds(prev => new Set(prev).add(milestone.id))
+    } catch (err: any) {
+      alert(err?.shortMessage || err?.message || 'Transaction failed')
+    } finally {
+      setReleasingId(null)
+    }
+  }
+
+  const handleSubmitProof = async (proofIpfsHash: string) => {
+    if (!proofModal?.onChainId) throw new Error('Milestone not yet on-chain.')
+    await writeContractAsync({
+      address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
+      functionName: 'submitMilestoneForVoting',
+      args: [BigInt(proofModal.onChainId), proofIpfsHash],
+    })
+    setSubmittedIds(prev => new Set(prev).add(proofModal.milestoneId))
+    setProofModal(null)
+  }
+
+  const isActive = (c: CreatorCampaign) => ['ACTIVE', 'FUNDED'].includes(c.status)
+  const filteredCampaigns = activeTab === 'all' ? campaigns
+    : campaigns.filter(c => activeTab === 'active' ? isActive(c) : !isActive(c))
+
+  // Creator stats derived from campaigns
+  const totalRaised = campaigns.reduce((s, c) => s + Number(c.raisedAmount), 0)
+  const activeCampaigns = campaigns.filter(isActive).length
+  const totalContributors = campaigns.reduce((s, c) => s + c._count.contributions, 0)
+  const completedMilestones = campaigns.flatMap(c => c.milestones).filter(m => m.status === 'COMPLETED' || m.status === 'APPROVED').length
 
   const stats = [
-    {
-      label: 'Total Raised',
-      value: '$127,000',
-      subtitle: 'Across all projects',
-      icon: HiCurrencyDollar
-    },
-    {
-      label: 'Active Projects',
-      value: '1',
-      subtitle: 'Currently funding',
-      icon: HiChartBar
-    },
-    {
-      label: 'Total Contributors',
-      value: '245',
-      subtitle: 'Community supporters',
-      icon: HiUsers
-    },
-    {
-      label: 'Milestones Completed',
-      value: '3',
-      subtitle: 'Successfully approved',
-      icon: HiCheckCircle
-    }
+    { label: 'Total Raised', value: fmt(totalRaised), subtitle: 'Across all projects', icon: HiCurrencyDollar },
+    { label: 'Active Projects', value: `${activeCampaigns}`, subtitle: 'Currently funding', icon: HiChartBar },
+    { label: 'Total Contributors', value: `${totalContributors}`, subtitle: 'Community supporters', icon: HiUsers },
+    { label: 'Milestones Completed', value: `${completedMilestones}`, subtitle: 'Successfully approved', icon: HiCheckCircle },
   ]
 
-  const projects = [
-    {
-      id: 1,
-      category: 'DeFi',
-      verified: true,
-      active: true,
-      title: 'DeFi Lending Protocol',
-      description: 'A decentralized lending platform that allows users to lend and borrow cryptocurrencies with minimal fees and maximum security.',
-      raised: 75000,
-      goal: 100000,
-      contributors: 156,
-      progress: 75,
-      milestones: [
-        {
-          number: 1,
-          status: 'Approved',
-          title: 'Smart Contract Development',
-          description: 'Complete core smart contract architecture and security audits',
-          amount: 30000,
-          icon: HiCheckCircle,
-          iconColor: 'success',
-          proof: 'Smart contracts deployed to mainnet: 0x742d35Cc6634C0532925a3b844Bc454e4438f44e. Audit report attached.'
-        },
-        {
-          number: 2,
-          status: 'Active',
-          title: 'Frontend Development',
-          description: 'Build user interface and integrate with smart contracts',
-          amount: 25000,
-          icon: HiClock,
-          iconColor: 'warning',
-          action: 'Submit Proof'
-        },
-        {
-          number: 3,
-          status: 'Pending',
-          title: 'Security Audit & Launch',
-          description: 'Complete third-party security audit and mainnet deployment',
-          amount: 45000,
-          icon: HiInformationCircle,
-          iconColor: 'neutral'
-        }
-      ]
-    },
-    {
-      id: 2,
-      category: 'Gaming',
-      verified: true,
-      active: true,
-      title: 'Blockchain RPG Game',
-      description: 'An immersive RPG game built on blockchain where players own their assets.',
-      raised: 45000,
-      goal: 150000,
-      contributors: 89,
-      progress: 30,
-      milestones: [
-        {
-          number: 1,
-          status: 'Rejected',
-          title: 'Game Engine Core',
-          description: 'Develop the core game engine and physics system',
-          amount: 40000,
-          icon: HiXCircle,
-          iconColor: 'error',
-          proof: 'Initial engine build v0.1. Physics system implemented but found buggy by community.'
-        },
-        {
-          number: 2,
-          status: 'Pending',
-          title: 'Character Design',
-          description: 'Design and model main characters',
-          amount: 30000,
-          icon: HiInformationCircle,
-          iconColor: 'neutral'
-        }
-      ]
-    },
-    {
-      id: 3,
-      category: 'Education',
-      verified: false,
-      active: false,
-      title: 'Decentralized Academy',
-      description: 'A platform for learning about blockchain technology.',
-      raised: 0,
-      goal: 50000,
-      contributors: 0,
-      progress: 0,
-      milestones: [
-        {
-          number: 1,
-          status: 'Pending',
-          title: 'Curriculum Design',
-          description: 'Create the course structure and initial content',
-          amount: 10000,
-          icon: HiInformationCircle,
-          iconColor: 'neutral'
-        }
-      ]
-    }
-  ]
-
-  const tabs = [
-    { id: 'active', label: 'Active Projects' },
-    { id: 'pending', label: 'Pending Projects' },
-    { id: 'all', label: 'All Projects' }
-  ]
-
-  const filteredProjects = activeTab === 'all' 
-    ? projects 
-    : projects.filter(p => activeTab === 'active' ? p.active : !p.active)
+  if (loading) return (
+    <div className="app-container"><AppNavbar />
+      <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--color-text-secondary)' }}>Loading...</div>
+    </div>
+  )
 
   return (
     <div className="app-container">
       <AppNavbar />
-      
       <div className="creator-studio-page">
         <div className="container">
-          {/* Header */}
           <div className="creator-studio-header">
             <div>
               <h1 className="creator-studio-title">Creator Studio</h1>
               <p className="creator-studio-subtitle">Manage your campaigns and milestones</p>
             </div>
-            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-              + New Campaign
-            </button>
+            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>+ New Campaign</button>
           </div>
 
-          {/* Stats Grid */}
+          {/* Stats */}
           <div className="creator-stats-grid">
-            {stats.map((stat, index) => {
+            {stats.map((stat, i) => {
               const Icon = stat.icon
               return (
-                <div key={index} className="creator-stat-card">
+                <div key={i} className="creator-stat-card">
                   <div className="creator-stat-label">{stat.label}</div>
                   <div className="creator-stat-value">{stat.value}</div>
-                  <div className="creator-stat-subtitle">
-                    <Icon className="creator-stat-icon" />
-                    {stat.subtitle}
-                  </div>
+                  <div className="creator-stat-subtitle"><Icon className="creator-stat-icon" />{stat.subtitle}</div>
                 </div>
               )
             })}
@@ -185,109 +142,135 @@ export default function CreatorStudioPage() {
 
           {/* Tabs */}
           <div className="creator-tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={`creator-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
+            {[{ id: 'active', label: 'Active Projects' }, { id: 'pending', label: 'Pending Projects' }, { id: 'all', label: 'All Projects' }].map(tab => (
+              <button key={tab.id} className={`creator-tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
                 {tab.label}
               </button>
             ))}
           </div>
 
-          {/* Projects List */}
+          {/* Projects */}
           <div className="creator-projects-list">
-            {filteredProjects.length === 0 ? (
+            {filteredCampaigns.length === 0 ? (
               <div className="empty-state" style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                 <p>No projects found in this category.</p>
               </div>
-            ) : (
-              filteredProjects.map((project) => (
-                <div key={project.id} className="creator-project-card" style={{ marginBottom: '2rem' }}>
+            ) : filteredCampaigns.map(project => (
+              <div key={project.id} className="creator-project-card" style={{ marginBottom: '2rem' }}>
                 <div className="creator-project-header">
                   <div className="creator-project-info">
                     <div className="creator-project-badges">
                       <span className="creator-category-badge">{project.category}</span>
-                      <span className={`creator-status-badge ${project.active ? 'active' : 'pending'}`}>
-                        {project.active ? 'Active' : 'Pending Validation'}
+                      <span className={`creator-status-badge ${isActive(project) ? 'active' : 'pending'}`}>
+                        {project.status}
                       </span>
                     </div>
                     <h2 className="creator-project-title">{project.title}</h2>
                     <p className="creator-project-description">{project.description}</p>
                   </div>
                   <button className="creator-view-project-btn">
-                    <HiArrowDownTray style={{ marginRight: '8px' }} /> Download Report
+                    <HiArrowDownTray style={{ marginRight: 8 }} /> Download Report
                   </button>
                 </div>
 
-                {/* Project Stats */}
                 <div className="creator-project-stats">
                   <div className="creator-project-stat">
                     <div className="creator-project-stat-label">Raised</div>
                     <div className="creator-project-stat-value">
-                      ${project.raised.toLocaleString()} <span style={{fontSize: '0.6em', fontWeight: '600', opacity: 0.8}}>of ${project.goal.toLocaleString()}</span>
+                      {fmt(Number(project.raisedAmount))} <span style={{ fontSize: '0.6em', fontWeight: 600, opacity: 0.8 }}>of {fmt(Number(project.goalAmount))}</span>
                     </div>
                   </div>
                   <div className="creator-project-stat">
                     <div className="creator-project-stat-label">Contributors</div>
-                    <div className="creator-project-stat-value">{project.contributors}</div>
+                    <div className="creator-project-stat-value">{project._count.contributions}</div>
                   </div>
                   <div className="creator-project-stat">
-                    <div className="creator-project-stat-label">Progress</div>
-                    <div className="creator-project-stat-value">{project.progress}%</div>
+                    <div className="creator-project-stat-label">Token</div>
+                    <div className="creator-project-stat-value">{project.paymentToken}</div>
                   </div>
                 </div>
 
                 {/* Milestones */}
                 <div className="creator-milestones-section">
                   <h3 className="creator-milestones-title">Milestones</h3>
-                  
                   <div className="creator-milestones-list">
-                    {project.milestones.map((milestone, index) => {
-                      const Icon = milestone.icon
+                    {project.milestones.map((m, idx) => {
+                      const Icon = STATUS_ICON[m.status] || HiInformationCircle
+                      const isApproved = m.status === 'APPROVED' || m.status === 'COMPLETED'
+                      const isRejected = m.status === 'REJECTED'
+                      const canSubmit = (m.status === 'PENDING') && !submittedIds.has(m.id)
+                      const canResubmit = isRejected && m.submissionCount < 2 && !submittedIds.has(m.id)
+                      const permanentlyRejected = isRejected && m.submissionCount >= 2
+
                       return (
-                        <div key={index} className="creator-milestone-card">
+                        <div key={m.id} className="creator-milestone-card">
                           <div className="creator-milestone-header">
                             <div className="creator-milestone-info">
                               <div className="creator-milestone-number-status">
-                                <span className="creator-milestone-number">Milestone {milestone.number}</span>
-                                <span className={`creator-milestone-status ${milestone.status.toLowerCase()}`}>
-                                  {milestone.status}
-                                </span>
+                                <span className="creator-milestone-number">Milestone {idx + 1}</span>
+                                <span className={`creator-milestone-status ${m.status.toLowerCase()}`}>{m.status}</span>
                               </div>
-                              <h4 className="creator-milestone-title">{milestone.title}</h4>
-                              <p className="creator-milestone-description">{milestone.description}</p>
+                              <h4 className="creator-milestone-title">{m.title}</h4>
                               <div className="creator-milestone-amount">
-                                ${milestone.amount.toLocaleString()} <span className="required-text">required</span>
+                                {fmt(Number(m.amount))} <span className="required-text">required</span>
                               </div>
                             </div>
-                            
+
                             <div className="creator-milestone-action">
-                              {(milestone.status === 'Approved' || milestone.status === 'Rejected') && milestone.proof && (
-                                <button 
-                                  className="creator-submit-proof-btn"
-                                  onClick={() => {
-                                    setSelectedProof({
-                                      title: `${milestone.title} - ${milestone.status === 'Rejected' ? 'Rejected Proof' : 'Approved Proof'}`,
-                                      content: milestone.proof
-                                    })
-                                    setShowProofModal(true)
-                                  }}
-                                  style={{ marginRight: '8px', background: 'transparent', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-                                >
+                              {/* View proof */}
+                              {(isApproved || isRejected) && m.proofUrl && (
+                                <button className="creator-submit-proof-btn" onClick={() => { setSelectedProof({ title: `${m.title} — ${m.status}`, content: m.proofUrl! }); setShowProofModal(true) }}
+                                  style={{ marginRight: 8, background: 'transparent', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
                                   <HiEye /> View Proof
                                 </button>
                               )}
-                              
-                              {milestone.action ? (
-                                <button className="creator-submit-proof-btn">
-                                  <HiArrowUpTray /> {milestone.action}
+
+                              {/* Release funds */}
+                              {isApproved && !releasedIds.has(m.id) && m.status !== 'COMPLETED' && (
+                                <button className="creator-submit-proof-btn" onClick={() => handleReleaseFunds(m)}
+                                  disabled={releasingId === m.id}
+                                  style={{ background: 'var(--color-success)', borderColor: 'var(--color-success)', color: '#fff', opacity: releasingId === m.id ? 0.7 : 1 }}>
+                                  <HiBanknotes />{releasingId === m.id ? 'Confirming...' : 'Release Funds'}
                                 </button>
-                              ) : (
-                                <div className={`creator-milestone-icon ${milestone.iconColor}`}>
-                                  <Icon />
-                                </div>
+                              )}
+                              {releasedIds.has(m.id) && (
+                                <span style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <HiCheckCircle /> Funds Released
+                                </span>
+                              )}
+
+                              {/* Submit proof (first time) */}
+                              {canSubmit && (
+                                <button className="creator-submit-proof-btn" onClick={() => setProofModal({ milestoneId: m.id, onChainId: m.onChainId, title: m.title, isResubmission: false })}>
+                                  <HiArrowUpTray /> Submit Proof
+                                </button>
+                              )}
+
+                              {/* Resubmit proof */}
+                              {canResubmit && (
+                                <button className="creator-submit-proof-btn" onClick={() => setProofModal({ milestoneId: m.id, onChainId: m.onChainId, title: m.title, isResubmission: true })}
+                                  style={{ background: 'var(--color-warning, #eab308)', borderColor: 'var(--color-warning, #eab308)', color: '#000' }}>
+                                  <HiArrowUpTray /> Resubmit Proof
+                                </button>
+                              )}
+
+                              {/* Permanently rejected */}
+                              {permanentlyRejected && (
+                                <span style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <HiNoSymbol /> Max attempts reached
+                                </span>
+                              )}
+
+                              {/* Submitted confirmation */}
+                              {submittedIds.has(m.id) && (
+                                <span style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <HiCheckCircle /> Submitted for voting
+                                </span>
+                              )}
+
+                              {/* Default icon for VOTING or COMPLETED */}
+                              {!canSubmit && !canResubmit && !permanentlyRejected && !submittedIds.has(m.id) && !isApproved && !isRejected && (
+                                <div className={`creator-milestone-icon ${STATUS_COLOR[m.status] || 'neutral'}`}><Icon /></div>
                               )}
                             </div>
                           </div>
@@ -297,21 +280,16 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
               </div>
-              ))
-            )}
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Create Campaign Modal */}
-      <CreateCampaignModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      
-      <ProofModal 
-        isOpen={showProofModal}
-        onClose={() => setShowProofModal(false)}
-        title={selectedProof?.title || ''}
-        proofContent={selectedProof?.content || ''}
-      />
+      <CreateCampaignModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={loadCampaigns} />
+      <ProofModal isOpen={showProofModal} onClose={() => setShowProofModal(false)} title={selectedProof?.title || ''} proofContent={selectedProof?.content || ''} />
+      {proofModal && (
+        <SubmitProofModal isOpen onClose={() => setProofModal(null)} milestoneTitle={proofModal.title} isResubmission={proofModal.isResubmission} onSubmit={handleSubmitProof} />
+      )}
     </div>
   )
 }

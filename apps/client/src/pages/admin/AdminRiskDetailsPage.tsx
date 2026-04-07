@@ -1,11 +1,56 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { HiArrowLeft, HiShieldCheck, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText } from 'react-icons/hi2'
+import { HiArrowLeft, HiShieldCheck, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiExclamationTriangle } from 'react-icons/hi2'
 import { FaGithub, FaTwitter, FaDiscord } from 'react-icons/fa6'
 import '../../Admin.css'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 export default function AdminRiskDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [refundStatus, setRefundStatus] = useState<'idle' | 'proposing' | 'approving' | 'proposed' | 'approved' | 'error'>('idle')
+  const [refundError, setRefundError] = useState('')
+
+  const handleProposeRefund = async () => {
+    setRefundStatus('proposing')
+    setRefundError('')
+    try {
+      const token = localStorage.getItem('authToken')
+      const res = await fetch(`${API_BASE}/admin/projects/${id}/propose-refund`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || 'Failed to propose refund')
+      }
+      setRefundStatus('proposed')
+    } catch (err: any) {
+      setRefundError(err.message || 'Failed to propose refund')
+      setRefundStatus('error')
+    }
+  }
+
+  const handleApproveRefund = async () => {
+    setRefundStatus('approving')
+    setRefundError('')
+    try {
+      const token = localStorage.getItem('authToken')
+      const res = await fetch(`${API_BASE}/admin/projects/${id}/approve-refund`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || 'Failed to approve refund')
+      }
+      setRefundStatus('approved')
+    } catch (err: any) {
+      setRefundError(err.message || 'Failed to approve refund')
+      setRefundStatus('error')
+    }
+  }
 
 
   const project = {
@@ -207,19 +252,74 @@ export default function AdminRiskDetailsPage() {
             </div>
           </div>
           
-          {/* Admin Actions */}
+          {/* Refund Actions */}
           <div className="admin-table-card" style={{ padding: '24px', background: 'var(--color-bg-subtle)' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text-primary)' }}>Admin Actions</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px', color: 'var(--color-text-primary)' }}>Refund Management</h3>
+            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '20px', lineHeight: '1.5' }}>
+              Refunds require two-admin approval. First admin proposes; a second admin must approve before contributors can claim.
+            </p>
+
+            {/* Status indicator */}
+            {refundStatus === 'proposed' && (
+              <div style={{ padding: '10px 12px', borderRadius: '6px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', color: '#ca8a04', fontSize: '13px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <HiExclamationTriangle /> Refund proposed — awaiting second admin approval.
+              </div>
+            )}
+            {refundStatus === 'approved' && (
+              <div style={{ padding: '10px 12px', borderRadius: '6px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#15803d', fontSize: '13px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <HiCheckCircle /> Refund approved. Contributors can now claim their funds.
+              </div>
+            )}
+            {refundStatus === 'error' && (
+              <div style={{ padding: '10px 12px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', fontSize: '13px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <HiXCircle /> {refundError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button className="btn" style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'white', border: '1px solid var(--color-border)', borderRadius: '6px', fontWeight: '500' }}>
-                Download Audit Report
-              </button>
-              <button className="btn" style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'white', border: '1px solid #3B82F6', color: '#3B82F6', borderRadius: '6px', fontWeight: '600' }}>
-                Flag Project
-              </button>
-              <button className="btn" style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', borderRadius: '6px', fontWeight: '600' }}>
-                Block Project
-              </button>
+              {/* Step 1 — Propose */}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Step 1 — First Admin
+                </div>
+                <button
+                  className="btn"
+                  onClick={handleProposeRefund}
+                  disabled={refundStatus === 'proposing' || refundStatus === 'proposed' || refundStatus === 'approved'}
+                  style={{
+                    width: '100%', padding: '10px', fontSize: '14px',
+                    background: 'white', border: '1px solid #f59e0b', color: '#d97706',
+                    borderRadius: '6px', fontWeight: '600',
+                    opacity: (refundStatus === 'proposing' || refundStatus === 'proposed' || refundStatus === 'approved') ? 0.5 : 1,
+                    cursor: (refundStatus === 'proposing' || refundStatus === 'proposed' || refundStatus === 'approved') ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {refundStatus === 'proposing' ? 'Proposing...' : refundStatus === 'proposed' ? 'Refund Proposed ✓' : 'Propose Refund'}
+                </button>
+              </div>
+
+              {/* Step 2 — Approve */}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Step 2 — Second Admin
+                </div>
+                <button
+                  className="btn"
+                  onClick={handleApproveRefund}
+                  disabled={refundStatus !== 'proposed' || refundStatus === 'approving'}
+                  style={{
+                    width: '100%', padding: '10px', fontSize: '14px',
+                    background: refundStatus === 'proposed' ? 'var(--color-error)' : 'white',
+                    border: '1px solid var(--color-error)',
+                    color: refundStatus === 'proposed' ? '#fff' : 'var(--color-error)',
+                    borderRadius: '6px', fontWeight: '600',
+                    opacity: refundStatus !== 'proposed' ? 0.4 : 1,
+                    cursor: refundStatus !== 'proposed' ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {refundStatus === 'approving' ? 'Approving...' : refundStatus === 'approved' ? 'Refund Approved ✓' : 'Approve Refund'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

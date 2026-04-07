@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -46,6 +47,18 @@ export class CreateCampaignDto {
   @IsOptional()
   @IsString()
   githubUrl?: string;
+
+  @IsOptional()
+  @IsInt()
+  onChainId?: number;
+
+  @IsOptional()
+  @IsString()
+  transactionHash?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentToken?: string;
 
   @IsArray()
   @ArrayMinSize(1)

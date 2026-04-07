@@ -22,6 +22,7 @@ enum UserRole {
 enum CampaignStatus {
   PENDING
   ACTIVE
+  FUNDED
   COMPLETED
   FAILED
   FLAGGED
@@ -32,6 +33,7 @@ enum MilestoneStatus {
   VOTING
   APPROVED
   REJECTED
+  COMPLETED
 }
 
 model User {
@@ -64,8 +66,10 @@ model Campaign {
   description String
   category    String
 
-  goalAmount   Decimal @db.Decimal(18, 2)
-  raisedAmount Decimal @default(0) @db.Decimal(18, 2)
+  goalAmount      Decimal @db.Decimal(18, 2)
+  raisedAmount    Decimal @default(0) @db.Decimal(18, 2)
+  releasedAmount  Decimal @default(0) @db.Decimal(18, 2)
+  paymentToken    String  @default("ETH")
 
   status    CampaignStatus @default(PENDING)
   deadline  DateTime?
@@ -76,6 +80,7 @@ model Campaign {
   transactionHash  String?
   onChainId        Int?     @unique
   isAdminApproved  Boolean  @default(false)
+  fundsReclaimed   Boolean  @default(false)
   ipfsHash         String?
 
   createdAt DateTime @default(now())
@@ -99,9 +104,10 @@ model Milestone {
   amount      Decimal         @db.Decimal(18, 2)
   status      MilestoneStatus @default(PENDING)
 
-  proofUrl      String?
-  onChainId     Int?      @unique
-  votingEndTime DateTime?
+  proofUrl        String?
+  onChainId       Int?      @unique
+  votingEndTime   DateTime?
+  submissionCount Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

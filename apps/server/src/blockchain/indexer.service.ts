@@ -5,14 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from './blockchain.service';
 import { CampaignStatus, MilestoneStatus } from '../generated/prisma';
 
-// On-chain CampaignStatus enum (matches Solidity order)
+// Maps on-chain CampaignStatus enum (Solidity order) to DB enum
 const ON_CHAIN_STATUS: CampaignStatus[] = [
-  CampaignStatus.PENDING,   // 0
-  CampaignStatus.ACTIVE,    // 1
-  CampaignStatus.ACTIVE,    // 2 = Funded → treat as ACTIVE
-  CampaignStatus.COMPLETED, // 3
-  CampaignStatus.FAILED,    // 4 = Cancelled
-  CampaignStatus.FLAGGED,   // 5
+  CampaignStatus.PENDING,   // 0 – Pending
+  CampaignStatus.ACTIVE,    // 1 – Active
+  CampaignStatus.FUNDED,    // 2 – Funded (goal reached, not yet completed)
+  CampaignStatus.COMPLETED, // 3 – Completed
+  CampaignStatus.FAILED,    // 4 – Cancelled
+  CampaignStatus.FLAGGED,   // 5 – Flagged
 ];
 
 @Injectable()
@@ -28,7 +28,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    // Start polling after a short delay to let the app fully boot
     setTimeout(() => this.poll(), 5_000);
     this.timer = setInterval(() => this.poll(), 12_000);
   }
@@ -52,7 +51,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
   private async processEvents() {
     const startBlock = this.config.get<number>('startBlock') ?? 0;
 
-    let state = await this.prisma.indexerState.findUnique({
+    const state = await this.prisma.indexerState.findUnique({
       where: { id: 'singleton' },
     });
 
@@ -72,7 +71,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    // Upsert IndexerState
     await this.prisma.indexerState.upsert({
       where: { id: 'singleton' },
       create: { id: 'singleton', lastBlock: currentBlock },
@@ -82,17 +80,48 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     if (logs.length > 0) {
       this.logger.log(`Indexed ${logs.length} events up to block ${currentBlock}`);
     }
+
+    // Auto-finalize any milestones whose voting period has expired on-chain
+    await this.finalizeExpiredVoting();
+  }
+
+  private async finalizeExpiredVoting() {
+    const privateKey = this.config.get<string>('adminPrivateKey');
+    if (!privateKey) return;
+
+    const expired = await this.prisma.milestone.findMany({
+      where: {
+        status: MilestoneStatus.VOTING,
+        votingEndTime: { lt: new Date() },
+        onChainId: { not: null },
+      },
+      select: { id: true, onChainId: true },
+    });
+
+    if (expired.length === 0) return;
+
+    const contract = this.blockchain.getContractWithSigner(privateKey);
+    for (const m of expired) {
+      try {
+        const tx = await contract.finalizeMilestoneVoting(m.onChainId);
+        await tx.wait();
+        this.logger.log(`Finalized voting for milestone onChainId=${m.onChainId}`);
+      } catch (err) {
+        this.logger.warn(`Could not finalize milestone onChainId=${m.onChainId}`, err);
+      }
+    }
   }
 
   private async handleEvent(log: ethers.EventLog) {
-    const name = log.eventName;
-
-    switch (name) {
+    switch (log.eventName) {
       case 'CampaignCreated':
         await this.onCampaignCreated(log);
         break;
       case 'CampaignApproved':
         await this.onCampaignApproved(log);
+        break;
+      case 'CampaignStatusChanged':
+        await this.onCampaignStatusChanged(log);
         break;
       case 'CampaignFlagged':
         await this.onStatusChange(log.args[0] as bigint, CampaignStatus.FLAGGED);
@@ -118,11 +147,13 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       case 'MilestoneFundsReleased':
         await this.onFundsReleased(log);
         break;
+      case 'RefundApproved':
+        await this.onRefundApproved(log);
+        break;
       case 'RefundClaimed':
         await this.onRefundClaimed(log);
         break;
       default:
-        // ignore RoleGranted, Paused, etc.
         break;
     }
   }
@@ -131,7 +162,13 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     const campaignId = Number(log.args[0] as bigint);
     const creator = (log.args[1] as string).toLowerCase();
 
-    // Find a DB campaign where creator.walletAddress matches, isAdminApproved=true, onChainId is null
+    // If the campaign was already registered in DB with this onChainId, skip
+    const existing = await this.prisma.campaign.findFirst({
+      where: { onChainId: campaignId },
+    });
+    if (existing) return;
+
+    // Try to link to an approved-but-not-yet-deployed DB campaign for this creator
     const campaign = await this.prisma.campaign.findFirst({
       where: {
         onChainId: null,
@@ -148,23 +185,39 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const ipfsHash = log.args[5] ? String(log.args[5]) : undefined;
-
     await this.prisma.campaign.update({
       where: { id: campaign.id },
-      data: {
-        onChainId: campaignId,
-        ...(ipfsHash && { ipfsHash }),
-      },
+      data: { onChainId: campaignId },
     });
   }
 
   private async onCampaignApproved(log: ethers.EventLog) {
     const onChainId = Number(log.args[0] as bigint);
+    // Only activate campaigns that are still PENDING — don't override an admin rejection
     await this.prisma.campaign.updateMany({
-      where: { onChainId },
-      data: { status: CampaignStatus.ACTIVE },
+      where: { onChainId, status: CampaignStatus.PENDING },
+      data: { status: CampaignStatus.ACTIVE, isAdminApproved: true },
     });
+  }
+
+  /** Handles the generic CampaignStatusChanged event emitted for all transitions */
+  private async onCampaignStatusChanged(log: ethers.EventLog) {
+    const onChainId = Number(log.args[0] as bigint);
+    const onChainStatusIndex = Number(log.args[1] as bigint);
+    const dbStatus = ON_CHAIN_STATUS[onChainStatusIndex];
+    if (!dbStatus) return;
+
+    // Don't overwrite an admin-rejected campaign (FAILED with isAdminApproved=false)
+    const campaign = await this.prisma.campaign.findFirst({ where: { onChainId } });
+    if (
+      campaign &&
+      campaign.status === CampaignStatus.FAILED &&
+      !campaign.isAdminApproved
+    ) {
+      return;
+    }
+
+    await this.prisma.campaign.updateMany({ where: { onChainId }, data: { status: dbStatus } });
   }
 
   private async onStatusChange(onChainIdBig: bigint, status: CampaignStatus) {
@@ -177,15 +230,13 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     const contributorAddress = (log.args[2] as string).toLowerCase();
     const amountRaw = log.args[3] as bigint;
     const token = Number(log.args[4]); // 0=ETH, 1=USDC
+    const txHash = log.transactionHash;
 
     const amount =
       token === 0
         ? parseFloat(ethers.formatEther(amountRaw))
         : parseFloat(ethers.formatUnits(amountRaw, 6));
 
-    const txHash = log.transactionHash;
-
-    // Upsert user by wallet address
     const user = await this.prisma.user.upsert({
       where: { walletAddress: contributorAddress },
       create: { walletAddress: contributorAddress },
@@ -197,7 +248,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     });
     if (!campaign) return;
 
-    // Idempotent upsert by transactionHash
     const existing = await this.prisma.contribution.findUnique({
       where: { transactionHash: txHash },
     });
@@ -210,7 +260,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
           campaignId: campaign.id,
         },
       });
-      // Update campaign raisedAmount
       await this.prisma.campaign.update({
         where: { id: campaign.id },
         data: { raisedAmount: { increment: amount } },
@@ -229,6 +278,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
         status: MilestoneStatus.VOTING,
         proofUrl: proofHash,
         votingEndTime: new Date(votingEndTimestamp * 1000),
+        submissionCount: { increment: 1 },
       },
     });
   }
@@ -249,7 +299,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
     if (!milestone) return;
 
-    // Idempotent upsert
     await this.prisma.vote.upsert({
       where: { voterId_milestoneId: { voterId: voter.id, milestoneId: milestone.id } },
       create: { choice: approve, voterId: voter.id, milestoneId: milestone.id },
@@ -273,14 +322,36 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
     const milestone = await this.prisma.milestone.findFirst({
       where: { onChainId: milestoneOnChainId },
+      include: { campaign: { select: { id: true, paymentToken: true } } },
     });
     if (!milestone) return;
 
-    // Decrement campaign raisedAmount to reflect funds leaving the contract
-    const amount = parseFloat(ethers.formatEther(amountRaw));
-    await this.prisma.campaign.update({
-      where: { id: milestone.campaignId },
-      data: { raisedAmount: { decrement: amount } },
+    // Format amount according to campaign payment token
+    const isUsdc = milestone.campaign.paymentToken === 'USDC';
+    const amount = isUsdc
+      ? parseFloat(ethers.formatUnits(amountRaw, 6))
+      : parseFloat(ethers.formatEther(amountRaw));
+
+    // Mark milestone as COMPLETED (funds have been released to creator)
+    // Increment campaign's releasedAmount — do NOT touch raisedAmount
+    await Promise.all([
+      this.prisma.milestone.update({
+        where: { id: milestone.id },
+        data: { status: MilestoneStatus.COMPLETED },
+      }),
+      this.prisma.campaign.update({
+        where: { id: milestone.campaignId },
+        data: { releasedAmount: { increment: amount } },
+      }),
+    ]);
+  }
+
+  private async onRefundApproved(log: ethers.EventLog) {
+    // args: (proposalId, campaignId, approver)
+    const campaignOnChainId = Number(log.args[1] as bigint);
+    await this.prisma.campaign.updateMany({
+      where: { onChainId: campaignOnChainId },
+      data: { fundsReclaimed: true },
     });
   }
 

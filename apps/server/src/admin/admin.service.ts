@@ -112,7 +112,6 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Flagged campaigns first
     return campaigns.sort((a, b) => {
       if (a.status === CampaignStatus.FLAGGED && b.status !== CampaignStatus.FLAGGED) return -1;
       if (b.status === CampaignStatus.FLAGGED && a.status !== CampaignStatus.FLAGGED) return 1;
@@ -147,9 +146,8 @@ export class AdminService {
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
-    const withdrawnAmount = campaign.milestones
-      .filter((m) => m.status === MilestoneStatus.APPROVED)
-      .reduce((sum, m) => sum + Number(m.amount), 0);
+    // Use the tracked releasedAmount field (incremented by indexer on MilestoneFundsReleased)
+    const releasedAmount = Number(campaign.releasedAmount);
 
     const milestoneBreakdown = campaign.milestones.map((m) => ({
       id: m.id,
@@ -161,8 +159,8 @@ export class AdminService {
     return {
       raisedAmount: Number(campaign.raisedAmount),
       goalAmount: Number(campaign.goalAmount),
-      withdrawnAmount,
-      remainingAmount: Number(campaign.raisedAmount) - withdrawnAmount,
+      releasedAmount,
+      remainingAmount: Number(campaign.raisedAmount) - releasedAmount,
       milestoneBreakdown,
     };
   }
@@ -171,20 +169,22 @@ export class AdminService {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
-    if (campaign.onChainId !== null) {
-      const privateKey = this.config.get<string>('adminPrivateKey');
-      if (!privateKey) throw new BadRequestException('Admin private key not configured');
-      const contract = this.blockchain.getContractWithSigner(privateKey);
-      await contract.approveCampaign(campaign.onChainId);
-      return this.prisma.campaign.update({
-        where: { id },
-        data: { isAdminApproved: true, status: CampaignStatus.ACTIVE },
-      });
+    if (campaign.onChainId === null) {
+      throw new BadRequestException(
+        'Campaign has not been deployed on-chain yet. The creator must call createCampaign() first.',
+      );
     }
 
+    const privateKey = this.config.get<string>('adminPrivateKey');
+    if (!privateKey) throw new BadRequestException('Admin private key not configured');
+
+    const contract = this.blockchain.getContractWithSigner(privateKey);
+    await contract.approveCampaign(campaign.onChainId);
+
+    // Indexer will also catch the CampaignApproved event, but update DB immediately for responsiveness
     return this.prisma.campaign.update({
       where: { id },
-      data: { isAdminApproved: true },
+      data: { isAdminApproved: true, status: CampaignStatus.ACTIVE },
     });
   }
 
@@ -214,6 +214,45 @@ export class AdminService {
 
   async blockCampaign(id: string) {
     return this.flagCampaign(id, 'blocked');
+  }
+
+  /** First admin proposes a refund for a flagged/cancelled campaign */
+  async proposeRefund(id: string) {
+    const campaign = await this.ensureExists(id);
+
+    if (campaign.onChainId === null) {
+      throw new BadRequestException('Campaign is not on-chain');
+    }
+
+    const privateKey = this.config.get<string>('adminPrivateKey');
+    if (!privateKey) throw new BadRequestException('Admin private key not configured');
+
+    const contract = this.blockchain.getContractWithSigner(privateKey);
+    const tx = await contract.proposeRefund(campaign.onChainId);
+    await tx.wait();
+
+    return { message: 'Refund proposed on-chain. A second admin must now approve it.' };
+  }
+
+  /** Second admin approves the refund proposal (must be a different key) */
+  async approveRefund(id: string) {
+    const campaign = await this.ensureExists(id);
+
+    if (campaign.onChainId === null) {
+      throw new BadRequestException('Campaign is not on-chain');
+    }
+
+    const privateKey = this.config.get<string>('adminPrivateKey');
+    if (!privateKey) throw new BadRequestException('Admin private key not configured');
+
+    const contract = this.blockchain.getContractWithSigner(privateKey);
+    const tx = await contract.approveRefund(campaign.onChainId);
+    await tx.wait();
+
+    return {
+      message:
+        'Refund approved on-chain. Contributors can now call claimRefund() to recover their funds.',
+    };
   }
 
   async getMilestones(page = 1, limit = 20) {
@@ -265,13 +304,17 @@ export class AdminService {
     if (milestone.status !== MilestoneStatus.APPROVED) {
       throw new BadRequestException('Milestone is not approved');
     }
-    // releaseMilestoneFunds is creator-only on the contract — we cannot call it.
-    // Return instruction for the creator to call it from the frontend.
     return {
-      message: 'Notify the campaign creator to call releaseMilestoneFunds() on-chain.',
+      message: 'The campaign creator should call releaseMilestoneFunds() from the Creator Studio.',
       creatorWallet: milestone.campaign.creator.walletAddress,
       milestoneOnChainId: milestone.onChainId,
     };
+  }
+
+  async setUserRole(userId: string, role: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    return this.prisma.user.update({ where: { id: userId }, data: { role: role as any } });
   }
 
   private async ensureExists(id: string) {

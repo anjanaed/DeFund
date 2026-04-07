@@ -7,6 +7,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { config } from './config/wagmi'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/common/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
 import HomePage from './pages/HomePage'
 import ExplorePage from './pages/ExplorePage'
@@ -29,31 +31,42 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <Router>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/project/:id" element={<ProjectDetailPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/creator-studio" element={<CreatorStudioPage />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<AdminDashboardPage />} />
-              <Route path="verification" element={<AdminVerificationPage />} />
-              <Route path="verification/:id" element={<AdminProjectReviewPage />} />
-              <Route path="risk" element={<AdminRiskPage />} />
-              <Route path="risk/:id" element={<AdminRiskDetailsPage />} />
-              <Route path="milestones" element={<AdminMilestonePage />} />
-              <Route path="milestones/:id" element={<AdminMilestoneDetailsPage />} />
-            </Route>
+        <AuthProvider>
+          <Router>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/project/:id" element={<ProjectDetailPage />} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
+              {/* Protected user routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/creator-studio" element={<CreatorStudioPage />} />
+              </Route>
+
+              {/* Admin login — public */}
+              <Route path="/admin/login" element={<AdminLoginPage />} />
+
+              {/* Protected admin routes */}
+              <Route element={<ProtectedRoute requireAdmin />}>
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                  <Route path="dashboard" element={<AdminDashboardPage />} />
+                  <Route path="verification" element={<AdminVerificationPage />} />
+                  <Route path="verification/:id" element={<AdminProjectReviewPage />} />
+                  <Route path="risk" element={<AdminRiskPage />} />
+                  <Route path="risk/:id" element={<AdminRiskDetailsPage />} />
+                  <Route path="milestones" element={<AdminMilestonePage />} />
+                  <Route path="milestones/:id" element={<AdminMilestoneDetailsPage />} />
+                </Route>
+              </Route>
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </AuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
   )
