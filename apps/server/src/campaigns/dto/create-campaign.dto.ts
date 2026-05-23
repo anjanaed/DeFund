@@ -60,6 +60,10 @@ export class CreateCampaignDto {
   @IsString()
   paymentToken?: string;
 
+  @IsOptional()
+  @IsString()
+  ipfsHash?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

@@ -55,16 +55,22 @@ export class AuthService {
       throw new UnauthorizedException('Signature does not match wallet address');
     }
 
-    // Clear nonce to prevent replay attacks
+    // Derive role from the contract — DEFAULT_ADMIN_ROLE on-chain is the source of truth.
+    const contract = this.blockchain.getContract();
+    const DEFAULT_ADMIN_ROLE = await contract.DEFAULT_ADMIN_ROLE();
+    const isOnChainAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, user.walletAddress);
+    const role = isOnChainAdmin ? 'ADMIN' : user.role;
+
+    // Clear nonce to prevent replay attacks and sync DB role with contract.
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { nonce: null },
+      data: { nonce: null, role: role as any },
     });
 
     const accessToken = this.jwt.sign({
       sub: user.id,
       walletAddress: user.walletAddress,
-      role: user.role,
+      role,
     });
 
     return { accessToken };

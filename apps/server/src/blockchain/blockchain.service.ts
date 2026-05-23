@@ -34,7 +34,6 @@ export class BlockchainService {
   }
 
   getContractWithSigner(privateKey: string): ethers.Contract {
-    // TODO: replace with hardware wallet/multisig in production
     const wallet = new ethers.Wallet(privateKey, this.provider);
     return new ethers.Contract(this.contractAddress, this.abi, wallet);
   }

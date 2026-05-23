@@ -24,6 +24,8 @@ import AdminMilestonePage from './pages/admin/AdminMilestonePage'
 import AdminProjectReviewPage from './pages/admin/AdminProjectReviewPage'
 import AdminRiskDetailsPage from './pages/admin/AdminRiskDetailsPage'
 import AdminMilestoneDetailsPage from './pages/admin/AdminMilestoneDetailsPage'
+import AdminRefundProposalsPage from './pages/admin/AdminRefundProposalsPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
 
 const queryClient = new QueryClient()
 
@@ -60,6 +62,8 @@ function App() {
                   <Route path="risk/:id" element={<AdminRiskDetailsPage />} />
                   <Route path="milestones" element={<AdminMilestonePage />} />
                   <Route path="milestones/:id" element={<AdminMilestoneDetailsPage />} />
+                  <Route path="refund-proposals" element={<AdminRefundProposalsPage />} />
+                  <Route path="users" element={<AdminUsersPage />} />
                 </Route>
               </Route>
 

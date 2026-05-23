@@ -1,61 +1,130 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HiClock, HiFlag, HiChartBar, HiXCircle, HiMagnifyingGlass } from 'react-icons/hi2'
+import { useAuth } from '../../context/AuthContext'
+import { apiFetch } from '../../lib/api'
+import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
 
+interface AdminStats {
+  pending: number
+  flagged: number
+  rejected: number
+  totalRaised: number
+}
+
+interface ActivityItem {
+  type: 'campaign' | 'milestone'
+  id: string
+  title: string
+  status: string
+  updatedAt: string
+  creator?: { walletAddress: string; name?: string }
+  campaign?: { id: string; title: string }
+}
+
+interface Transaction {
+  id: string
+  amount: number | string
+  transactionHash: string | null
+  timestamp: string
+  refunded: boolean
+  campaign: { id: string; title: string; paymentToken: string }
+  contributor: { walletAddress: string; name?: string }
+}
+
+interface TransactionsPage {
+  items: Transaction[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diffMs / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min${m === 1 ? '' : 's'} ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`
+  const d = Math.floor(h / 24)
+  return `${d} day${d === 1 ? '' : 's'} ago`
+}
+
+function shortHash(hash: string | null): string {
+  if (!hash) return '—'
+  return `${hash.slice(0, 6)}…${hash.slice(-4)}`
+}
+
+function activityStatusColor(status: string): 'success' | 'warning' | 'error' | 'info' {
+  switch (status) {
+    case 'ACTIVE':
+    case 'FUNDED':
+    case 'APPROVED':
+    case 'COMPLETED':
+      return 'success'
+    case 'PENDING':
+    case 'VOTING':
+      return 'warning'
+    case 'FAILED':
+    case 'REJECTED':
+    case 'FLAGGED':
+      return 'error'
+    default:
+      return 'info'
+  }
+}
+
 export default function AdminDashboardPage() {
+  const { token } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  const stats = [
-    { label: 'Pending Verification', value: '12', subtitle: 'Projects awaiting approval', icon: HiClock, trend: 'neutral' },
-    { label: 'Flagged Projects', value: '3', subtitle: 'Require attention', icon: HiFlag, trend: 'negative' },
-    { label: 'Total Contributions', value: '342.5 ETH', subtitle: '+12.5% from last month', icon: HiChartBar, trend: 'positive' },
-    { label: 'Rejected Projects', value: '8', subtitle: 'Declined submissions', icon: HiXCircle, trend: 'neutral' }
-  ]
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [txPage, setTxPage] = useState<TransactionsPage | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const recentActivity = [
-    { title: 'DeFi Protocol X approved', time: '2 hours ago', status: 'success' },
-    { title: 'NFT Marketplace flagged for review', time: '5 hours ago', status: 'warning' },
-    { title: 'New project submitted: Web3 Gaming Platform', time: '1 day ago', status: 'info' },
-    { title: 'Crypto Payment Gateway rejected', time: '1 day ago', status: 'error' }
-  ]
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    setLoading(true)
+    Promise.all([
+      apiFetch('/admin/stats', {}, token).then((r) => r.json()),
+      apiFetch('/admin/activity', {}, token).then((r) => r.json()),
+      apiFetch(`/admin/transactions?page=${currentPage}&limit=${itemsPerPage}`, {}, token).then((r) => r.json()),
+    ])
+      .then(([statsData, activityData, txData]) => {
+        if (cancelled) return
+        setStats(statsData)
+        setActivity(Array.isArray(activityData) ? activityData : [])
+        setTxPage(txData)
+      })
+      .catch(() => !cancelled && setError('Failed to load dashboard data'))
+      .finally(() => !cancelled && setLoading(false))
+    return () => { cancelled = true }
+  }, [token, currentPage])
 
-  const systemStatus = [
-    { name: 'Blockchain Network Status', status: 'Operational', color: 'success' },
-    { name: 'API Gateway', status: 'Operational', color: 'success' }
-  ]
-
-  const allTransactions = [
-    { id: 'tx-001', project: 'DeFi Protocol X', type: 'Milestone Release', amount: '30.0 ETH', time: '10 mins ago', status: 'Success', hash: '0x7a...9f2' },
-    { id: 'tx-002', project: 'NFT Marketplace Builder', type: 'Funding', amount: '5.4 ETH', time: '45 mins ago', status: 'Success', hash: '0xb2...1c4' },
-    { id: 'tx-003', project: 'DAO Governance Tool', type: 'Withdrawal', amount: '12.0 ETH', time: '2 hours ago', status: 'Pending', hash: '0x8d...3e1' },
-    { id: 'tx-004', project: 'Web3 Gaming Platform', type: 'Funding', amount: '2.5 ETH', time: '3 hours ago', status: 'Success', hash: '0x4f...5a9' },
-    { id: 'tx-005', project: 'Crypto Payment Gateway', type: 'Refund', amount: '0.8 ETH', time: '5 hours ago', status: 'Success', hash: '0x1c...9b3' },
-    { id: 'tx-006', project: 'DeFi Protocol X', type: 'Funding', amount: '100.0 ETH', time: '1 day ago', status: 'Success', hash: '0x9e...2d8' },
-    { id: 'tx-007', project: 'NFT Marketplace Builder', type: 'Staking', amount: '50.0 ETH', time: '1 day ago', status: 'Success', hash: '0x3f...1a2' },
-    { id: 'tx-008', project: 'DeFi Protocol X', type: 'Withdrawal', amount: '5.0 ETH', time: '2 days ago', status: 'Success', hash: '0x2b...8c9' },
-    { id: 'tx-009', project: 'DAO Governance Tool', type: 'Funding', amount: '15.0 ETH', time: '2 days ago', status: 'Success', hash: '0x5d...4e7' },
-    { id: 'tx-010', project: 'Web3 Gaming Platform', type: 'Milestone Release', amount: '10.0 ETH', time: '3 days ago', status: 'Pending', hash: '0x1a...6b4' },
-    { id: 'tx-011', project: 'Crypto Payment Gateway', type: 'Funding', amount: '20.0 ETH', time: '3 days ago', status: 'Success', hash: '0x8e...9f1' },
-    { id: 'tx-012', project: 'DeFi Protocol X', type: 'Withdrawal', amount: '2.0 ETH', time: '4 days ago', status: 'Success', hash: '0x4c...3d2' }
-  ]
-
-  const filteredTransactions = allTransactions.filter(tx => {
-    const matchesSearch = tx.project.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          tx.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          tx.hash.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'All' || tx.status === statusFilter
-    
+  const filteredTransactions = (txPage?.items ?? []).filter((tx) => {
+    const q = searchTerm.toLowerCase()
+    const matchesSearch =
+      tx.campaign.title.toLowerCase().includes(q) ||
+      (tx.transactionHash ?? '').toLowerCase().includes(q) ||
+      tx.contributor.walletAddress.toLowerCase().includes(q)
+    const status = tx.refunded ? 'Refunded' : 'Success'
+    const matchesStatus = statusFilter === 'All' || status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage)
-  const paginatedTransactions = filteredTransactions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const statCards = [
+    { label: 'Pending Verification', value: stats?.pending ?? '—', subtitle: 'Projects awaiting approval', icon: HiClock, trend: 'neutral' },
+    { label: 'Flagged Projects', value: stats?.flagged ?? '—', subtitle: 'Require attention', icon: HiFlag, trend: 'negative' },
+    { label: 'Total Raised', value: stats ? `${stats.totalRaised.toFixed(2)}` : '—', subtitle: 'Across all campaigns', icon: HiChartBar, trend: 'positive' },
+    { label: 'Failed Projects', value: stats?.rejected ?? '—', subtitle: 'Rejected or expired', icon: HiXCircle, trend: 'neutral' },
+  ]
 
   return (
     <div>
@@ -64,57 +133,68 @@ export default function AdminDashboardPage() {
         <p className="admin-page-subtitle">Manage and monitor platform activity</p>
       </div>
 
+      {error && (
+        <div style={{ padding: '12px 16px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', marginBottom: '24px', fontSize: '14px' }}>
+          {error}
+        </div>
+      )}
+
       <div className="admin-stats-grid">
-        {stats.map((stat, index) => {
+        {statCards.map((stat, index) => {
           const Icon = stat.icon
           return (
             <div key={index} className="admin-stat-card">
               <Icon className="admin-stat-icon" />
               <div className="admin-stat-label">{stat.label}</div>
-              <div className="admin-stat-value">{stat.value}</div>
-              <div className={`admin-stat-trend ${stat.trend}`}>
-                {stat.subtitle}
-              </div>
+              <div className="admin-stat-value">{loading ? '…' : stat.value}</div>
+              <div className={`admin-stat-trend ${stat.trend}`}>{stat.subtitle}</div>
             </div>
           )
         })}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px', marginBottom: '32px' }}>
-        {/* Recent Activity */}
         <div className="admin-table-card">
           <div className="admin-table-header">
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Recent Activity</h3>
           </div>
           <div style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {recentActivity.map((activity, index) => (
-                <div key={index} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                  <div style={{ 
-                    width: '8px', 
-                    height: '8px', 
-                    borderRadius: '50%', 
-                    marginTop: '6px',
-                    background: `var(--color-${activity.status})` 
-                  }} />
-                  <div>
-                    <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '4px' }}>{activity.title}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>{activity.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {loading ? (
+              <Spinner label="Loading activity…" />
+            ) : activity.length === 0 ? (
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>No recent activity.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {activity.slice(0, 8).map((item) => {
+                  const label = item.type === 'campaign'
+                    ? `${item.title} → ${item.status}`
+                    : `Milestone "${item.title}" (${item.campaign?.title ?? 'campaign'}) → ${item.status}`
+                  return (
+                    <div key={`${item.type}-${item.id}`} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', marginTop: '6px', background: `var(--color-${activityStatusColor(item.status)})` }} />
+                      <div>
+                        <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '4px' }}>{label}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>{timeAgo(item.updatedAt)}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* System Status Updated */}
         <div className="admin-table-card">
           <div className="admin-table-header">
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>System Status</h3>
           </div>
           <div style={{ padding: '24px' }}>
+            {/* TODO: wire to a real GET /api/health endpoint that pings RPC + DB */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {systemStatus.map((item, index) => (
+              {[
+                { name: 'Blockchain Network Status', status: 'Operational', color: 'success' },
+                { name: 'API Gateway', status: 'Operational', color: 'success' },
+              ].map((item, index) => (
                 <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>{item.name}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -128,34 +208,27 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Recent Transactions Section (Moved to Bottom) */}
       <div className="admin-table-card" style={{ marginBottom: '32px' }}>
         <div className="admin-table-header">
           <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Recent Transactions</h3>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             <div className="admin-search">
-               <HiMagnifyingGlass color="var(--color-text-tertiary)" />
-               <input 
-                 type="text" 
-                 placeholder="Search by project, type, or hash..." 
-                 value={searchTerm}
-                 onChange={(e) => {
-                   setSearchTerm(e.target.value)
-                   setCurrentPage(1) // Reset to page 1 on search
-                 }}
-               />
+              <HiMagnifyingGlass color="var(--color-text-tertiary)" />
+              <input
+                type="text"
+                placeholder="Search by project, hash, or wallet..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <select 
-              value={statusFilter} 
-              onChange={(e) => {
-                setStatusFilter(e.target.value)
-                setCurrentPage(1)
-              }}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
               style={{ border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '14px', cursor: 'pointer', outline: 'none' }}
             >
               <option value="All">All Status</option>
               <option value="Success">Success</option>
-              <option value="Pending">Pending</option>
+              <option value="Refunded">Refunded</option>
             </select>
           </div>
         </div>
@@ -164,49 +237,55 @@ export default function AdminDashboardPage() {
             <tr>
               <th>Tx Hash</th>
               <th>Project</th>
-              <th>Type</th>
+              <th>Contributor</th>
               <th>Amount</th>
               <th>Time</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedTransactions.map((tx) => (
+            {loading ? (
+              <tr><td colSpan={6} style={{ padding: 0 }}><Spinner label="Loading transactions…" /></td></tr>
+            ) : filteredTransactions.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No transactions found.</td></tr>
+            ) : filteredTransactions.map((tx) => (
               <tr key={tx.id}>
-                <td style={{ fontFamily: 'monospace', color: 'var(--color-primary)' }}>{tx.hash}</td>
-                <td style={{ fontWeight: '500' }}>{tx.project}</td>
-                <td>{tx.type}</td>
-                <td style={{ fontWeight: '600' }}>{tx.amount}</td>
-                <td style={{ color: 'var(--color-text-secondary)' }}>{tx.time}</td>
+                <td style={{ fontFamily: 'monospace', color: 'var(--color-primary)' }}>{shortHash(tx.transactionHash)}</td>
+                <td style={{ fontWeight: '500' }}>{tx.campaign.title}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                  {tx.contributor.walletAddress.slice(0, 8)}…{tx.contributor.walletAddress.slice(-4)}
+                </td>
+                <td style={{ fontWeight: '600' }}>{Number(tx.amount).toFixed(4)} {tx.campaign.paymentToken}</td>
+                <td style={{ color: 'var(--color-text-secondary)' }}>{timeAgo(tx.timestamp)}</td>
                 <td>
-                   <span className={`admin-badge ${tx.status === 'Success' ? 'success' : tx.status === 'Pending' ? 'warning' : 'error'}`}>
-                     {tx.status}
-                   </span>
+                  <span className={`admin-badge ${tx.refunded ? 'warning' : 'success'}`}>
+                    {tx.refunded ? 'Refunded' : 'Success'}
+                  </span>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {/* Pagination UI */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid var(--color-border)' }}>
           <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-            Showing {paginatedTransactions.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-
-            {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+            {txPage
+              ? `Showing ${(txPage.page - 1) * txPage.limit + (txPage.items.length > 0 ? 1 : 0)}-${(txPage.page - 1) * txPage.limit + txPage.items.length} of ${txPage.total} transactions`
+              : '—'}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              className="btn" 
-              style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: currentPage === 1 ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }} 
+            <button
+              className="btn"
+              style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: currentPage === 1 ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => p - 1)}
+              onClick={() => setCurrentPage((p) => p - 1)}
             >
               Previous
             </button>
-            <button 
-              className="btn" 
-              style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: currentPage === totalPages ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage(p => p + 1)}
+            <button
+              className="btn"
+              style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: txPage && currentPage >= txPage.totalPages ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: txPage && currentPage >= txPage.totalPages ? 'not-allowed' : 'pointer' }}
+              disabled={!txPage || currentPage >= txPage.totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
             >
               Next
             </button>

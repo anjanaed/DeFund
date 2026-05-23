@@ -113,6 +113,9 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         public campaignContributions; // campaignId => contributor => amount
     mapping(uint256 => mapping(address => bool)) public hasVoted; // milestoneId => voter => hasVoted
     mapping(uint256 => uint256) public campaignRefundProposal; // campaignId => refundProposalId
+    // Tracks every address that voted on a milestone so hasVoted can be cleared when the
+    // milestone is resubmitted for a second round of voting.
+    mapping(uint256 => address[]) private _milestoneVoters;
 
     uint256[] public campaignIds;
 
@@ -272,7 +275,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         uint256 _fundGoal,
         uint256 _deadline,
         MilestoneData[] memory _milestones
-    ) external whenNotPaused returns (uint256) {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused returns (uint256) {
         require(bytes(_ipfsHash).length > 0, "IPFS hash required");
         require(_fundGoal > 0, "Fund goal must be positive");
         require(_deadline > block.timestamp, "Deadline must be in future");
@@ -304,7 +307,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         campaign.campaignId = newCampaignId;
         campaign.creator = msg.sender;
         campaign.ipfsHash = _ipfsHash;
-        campaign.status = CampaignStatus.Pending;
+        campaign.status = CampaignStatus.Active;
         campaign.paymentToken = _paymentToken;
         campaign.fundGoal = _fundGoal;
         campaign.deadline = _deadline;
@@ -335,6 +338,10 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             _deadline,
             _milestones.length
         );
+        // Admin creating == admin approving — emit approval events so the indexer
+        // sets isAdminApproved and status=ACTIVE in the database.
+        emit CampaignApproved(newCampaignId, msg.sender);
+        emit CampaignStatusChanged(newCampaignId, CampaignStatus.Active);
 
         return newCampaignId;
     }
@@ -406,6 +413,36 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
 
         emit CampaignCancelled(_campaignId, msg.sender);
         emit CampaignStatusChanged(_campaignId, CampaignStatus.Cancelled);
+    }
+
+    /**
+     * @notice Permissionless deadline check — transitions Active campaigns past
+     *         their deadline to Funded (goal met) or Cancelled (goal unmet).
+     *         Contributors can then propose a refund if goal was unmet.
+     * @param _campaignId Campaign ID to check
+     */
+    function checkCampaignDeadline(
+        uint256 _campaignId
+    ) external validCampaign(_campaignId) {
+        Campaign storage campaign = campaigns[_campaignId];
+
+        require(
+            campaign.status == CampaignStatus.Active,
+            "Campaign not active"
+        );
+        require(
+            block.timestamp >= campaign.deadline,
+            "Deadline not reached"
+        );
+
+        if (campaign.raisedAmount >= campaign.fundGoal) {
+            campaign.status = CampaignStatus.Funded;
+            emit CampaignStatusChanged(_campaignId, CampaignStatus.Funded);
+        } else {
+            campaign.status = CampaignStatus.Cancelled;
+            emit CampaignCancelled(_campaignId, msg.sender);
+            emit CampaignStatusChanged(_campaignId, CampaignStatus.Cancelled);
+        }
     }
 
     /**
@@ -544,6 +581,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             "Maximum submission attempts reached"
         );
         require(bytes(_proofIpfsHash).length > 0, "Proof required");
+        require(campaign.raisedAmount > 0, "No contributions yet");
 
         // Sequential milestone check: previous milestone must be completed
         uint256[] memory campaignMilestones = campaign.milestoneIds;
@@ -561,7 +599,14 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             }
         }
 
-        // Reset votes for the new submission round
+        // Clear hasVoted for every voter from the previous round so they can vote again.
+        address[] storage prevVoters = _milestoneVoters[_milestoneId];
+        for (uint256 i = 0; i < prevVoters.length; i++) {
+            hasVoted[_milestoneId][prevVoters[i]] = false;
+        }
+        delete _milestoneVoters[_milestoneId];
+
+        // Reset vote tallies for the new submission round
         milestone.votesFor = 0;
         milestone.votesAgainst = 0;
         milestone.ipfsHash = _proofIpfsHash;
@@ -610,6 +655,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         require(voteWeight > 0, "No contribution found");
 
         hasVoted[_milestoneId][msg.sender] = true;
+        _milestoneVoters[_milestoneId].push(msg.sender);
 
         if (_approve) {
             milestone.votesFor += voteWeight;
@@ -683,6 +729,11 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         require(
             milestone.status == MilestoneStatus.Approved,
             "Milestone not approved"
+        );
+        require(
+            campaign.status == CampaignStatus.Active ||
+                campaign.status == CampaignStatus.Funded,
+            "Campaign not eligible for release"
         );
         require(!milestone.fundsReleased, "Funds already released");
         require(

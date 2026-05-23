@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import { HiMagnifyingGlass, HiUsers, HiChartBar } from 'react-icons/hi2'
 import { apiFetch } from '../lib/api'
+import LoadingScreen from '../components/common/LoadingScreen'
 
 const CATEGORIES = ['All', 'DeFi', 'Gaming', 'NFT', 'DAO', 'Education', 'Infrastructure', 'Open Source']
 const SORT_OPTIONS = [
@@ -120,9 +121,7 @@ export default function ExplorePage() {
 
           {/* Projects Grid */}
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--color-text-secondary)' }}>
-              Loading...
-            </div>
+            <LoadingScreen message="Loading projects" />
           ) : projects.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--color-text-secondary)' }}>
               No projects found.

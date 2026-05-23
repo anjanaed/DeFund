@@ -11,6 +11,7 @@ import { ForumModule } from './forum/forum.module';
 import { StatsModule } from './stats/stats.module';
 import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
+import { SocialAuthModule } from './social-auth/social-auth.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -28,6 +29,7 @@ import configuration from './config/configuration';
     StatsModule,
     UsersModule,
     AdminModule,
+    SocialAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

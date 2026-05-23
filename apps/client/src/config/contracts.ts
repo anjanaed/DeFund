@@ -1,6 +1,32 @@
 export const CAMPAIGN_FACTORY_ADDRESS =
   (import.meta.env.VITE_CONTRACT_ADDRESS as `0x${string}`) || '0x0000000000000000000000000000000000000000'
 
+export const USDC_ADDRESS =
+  (import.meta.env.VITE_USDC_ADDRESS as `0x${string}`) || '0x0000000000000000000000000000000000000000'
+
+export const ERC20_APPROVE_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const
+
 // Minimal ABI — only the functions the frontend needs to call directly
 export const CAMPAIGN_FACTORY_ABI = [
   // createCampaign(ipfsHash, paymentToken, fundGoal, deadline, milestones[])
@@ -24,6 +50,15 @@ export const CAMPAIGN_FACTORY_ABI = [
       },
     ],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+
+  // cancelCampaign(campaignId) — creator or admin
+  {
+    name: 'cancelCampaign',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [],
   },
 
   // voteOnMilestone(milestoneId, approve)
@@ -96,6 +131,79 @@ export const CAMPAIGN_FACTORY_ABI = [
     stateMutability: 'nonpayable',
     inputs: [{ name: '_milestoneId', type: 'uint256' }],
     outputs: [],
+  },
+
+  // approveCampaign(campaignId) — admin only
+  {
+    name: 'approveCampaign',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [],
+  },
+
+  // flagCampaign(campaignId, reason) — admin only
+  {
+    name: 'flagCampaign',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_campaignId', type: 'uint256' },
+      { name: '_reason', type: 'string' },
+    ],
+    outputs: [],
+  },
+
+  // proposeRefund(campaignId) — admin only, first step of two-admin refund
+  {
+    name: 'proposeRefund',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [],
+  },
+
+  // approveRefund(campaignId) — admin only, second step (different admin)
+  {
+    name: 'approveRefund',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [],
+  },
+
+  // milestones(uint256) — public getter for the milestones mapping (used by MilestoneVotingStatus)
+  {
+    name: 'milestones',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'milestoneId', type: 'uint256' },
+      { name: 'campaignId', type: 'uint256' },
+      { name: 'ipfsHash', type: 'string' },
+      { name: 'amountRequired', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'status', type: 'uint8' },
+      { name: 'votesFor', type: 'uint256' },
+      { name: 'votesAgainst', type: 'uint256' },
+      { name: 'votingEndTime', type: 'uint256' },
+      { name: 'fundsReleased', type: 'bool' },
+      { name: 'raisedAmountAtVotingStart', type: 'uint256' },
+      { name: 'submissionCount', type: 'uint8' },
+    ],
+  },
+
+  // hasVoted(milestoneId, voter) — public getter used by MilestoneVotingStatus
+  {
+    name: 'hasVoted',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: '', type: 'uint256' },
+      { name: '', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
   },
 
   // CampaignCreated event — used to extract on-chain campaign ID from receipt

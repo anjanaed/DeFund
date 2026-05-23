@@ -13,6 +13,7 @@ import { SetUserRoleDto } from './dto/set-user-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '../generated/prisma';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -63,8 +64,8 @@ export class AdminController {
   }
 
   @Post('projects/:id/approve')
-  approveCampaign(@Param('id') id: string) {
-    return this.admin.approveCampaign(id);
+  approveCampaign(@Param('id') id: string, @Body() body: { onChainId: number }) {
+    return this.admin.approveCampaign(id, body.onChainId);
   }
 
   @Post('projects/:id/reject')
@@ -92,6 +93,16 @@ export class AdminController {
     return this.admin.approveRefund(id);
   }
 
+  @Get('refund-proposals')
+  getRefundProposals() {
+    return this.admin.getRefundProposals();
+  }
+
+  @Get('projects/:id/refund-proposal')
+  getRefundProposalForCampaign(@Param('id') id: string) {
+    return this.admin.getRefundProposalForCampaign(id);
+  }
+
   @Get('milestones')
   getMilestones(
     @Query('page') page?: string,
@@ -114,7 +125,16 @@ export class AdminController {
   }
 
   @Post('users/:id/set-role')
-  setUserRole(@Param('id') id: string, @Body() dto: SetUserRoleDto) {
-    return this.admin.setUserRole(id, dto.role);
+  setUserRole(
+    @Param('id') id: string,
+    @Body() dto: SetUserRoleDto,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.admin.setUserRole(id, dto.role, user.userId);
+  }
+
+  @Get('users')
+  getUsers(@Query('search') search?: string) {
+    return this.admin.getUsers(search);
   }
 }

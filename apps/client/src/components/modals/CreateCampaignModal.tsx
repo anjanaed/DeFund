@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { HiXMark, HiPlus, HiCheckCircle, HiExclamationTriangle } from 'react-icons/hi2'
 import { FaXTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { parseEther, parseUnits, keccak256, toBytes, decodeEventLog } from 'viem'
-import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
+import { keccak256, toBytes } from 'viem'
+import { useAuth } from '../../context/AuthContext'
+import { apiFetch } from '../../lib/api'
 
 interface Milestone {
   title: string
@@ -17,11 +17,8 @@ interface CreateCampaignModalProps {
   onSuccess?: () => void
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-
 export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampaignModalProps) {
-  const { address } = useAccount()
-  const { writeContractAsync } = useWriteContract()
+  const { token, isAuthenticated } = useAuth()
 
   const [formData, setFormData] = useState({
     title: '',
@@ -43,21 +40,45 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     { title: '', description: '', amount: '' },
   ])
 
-  const [txStatus, setTxStatus] = useState<'idle' | 'signing' | 'confirming' | 'saving' | 'done' | 'error'>('idle')
+  const [txStatus, setTxStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
+  const [socialError, setSocialError] = useState<string | null>(null)
 
-  const { isLoading: isConfirming, data: receiptData } = useWaitForTransactionReceipt({
-    hash: undefined,
-  })
-
-  const handleConnect = (platform: 'twitter' | 'discord' | 'github') => {
-    if (socials[platform].connected) return
-    setTimeout(() => {
-      setSocials(prev => ({
-        ...prev,
-        [platform]: { connected: true, username: 'VerifiedUser' },
-      }))
-    }, 800)
+  const handleConnect = async (platform: 'twitter' | 'discord' | 'github') => {
+    if (socials[platform].connected || !token) return
+    setSocialError(null)
+    setConnectingPlatform(platform)
+    // Open popup synchronously inside the click handler — browsers block window.open after await
+    const popup = window.open('', `${platform}-oauth`, 'width=600,height=700,left=400,top=100')
+    try {
+      const res = await apiFetch(`/auth/${platform}/initiate`, {}, token)
+      if (!res.ok) {
+        popup?.close()
+        const err = await res.json().catch(() => ({}))
+        setSocialError(`Could not start ${platform} auth: ${err.message || res.status}`)
+        setConnectingPlatform(null)
+        return
+      }
+      const { url } = await res.json()
+      if (popup) popup.location.href = url
+      const handler = (e: MessageEvent) => {
+        if (e.data?.provider !== platform) return
+        window.removeEventListener('message', handler)
+        setConnectingPlatform(null)
+        popup?.close()
+        if (e.data.success) {
+          setSocials(prev => ({ ...prev, [platform]: { connected: true, username: e.data.username } }))
+        } else {
+          setSocialError(`${platform} verification failed: ${e.data.error || 'unknown error'}`)
+        }
+      }
+      window.addEventListener('message', handler)
+    } catch (err: any) {
+      popup?.close()
+      setConnectingPlatform(null)
+      setSocialError(`${platform} auth error: ${err.message}`)
+    }
   }
 
   const handleInputChange = (
@@ -90,8 +111,8 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     e.preventDefault()
     setErrorMsg('')
 
-    if (!address) {
-      setErrorMsg('Please connect your wallet first.')
+    if (!isAuthenticated || !token) {
+      setErrorMsg('Please sign in with your wallet first.')
       return
     }
     if (!formData.deadline) {
@@ -113,74 +134,14 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     }
 
     try {
-      // ── Step 1: Call contract.createCampaign() ──────────────────────────
-      setTxStatus('signing')
-
-      // Encode a lightweight ipfsHash from title+description for on-chain reference
+      // Compute a deterministic ipfsHash from title+description — stored in DB so
+      // the admin approval page can pass it to createCampaign() on-chain later.
       const ipfsHash = keccak256(toBytes(formData.title + formData.description))
 
-      const toWei = (val: string) =>
-        isUsdc ? parseUnits(val, 6) : parseEther(val)
-
-      const fundGoal = toWei(totalMilestoneAmount.toString())
-
-      const contractMilestones = milestones.map(m => ({
-        ipfsHash: keccak256(toBytes(m.title + m.description)),
-        amountRequired: toWei(m.amount),
-        deadline: BigInt(deadlineTs),
-      }))
-
-      const txHash = await writeContractAsync({
-        address: CAMPAIGN_FACTORY_ADDRESS,
-        abi: CAMPAIGN_FACTORY_ABI,
-        functionName: 'createCampaign',
-        args: [
-          ipfsHash,
-          Number(formData.paymentToken) as 0 | 1,
-          fundGoal,
-          BigInt(deadlineTs),
-          contractMilestones,
-        ],
-      })
-
-      setTxStatus('confirming')
-
-      // Wait for the transaction receipt to get the on-chain campaign ID
-      // We poll manually since we can't use the hook dynamically
-      const { createPublicClient, http } = await import('viem')
-      const { sepolia } = await import('viem/chains')
-      const publicClient = createPublicClient({ chain: sepolia, transport: http() })
-
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
-
-      // Parse the CampaignCreated event from the receipt logs
-      let onChainId: number | undefined
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: CAMPAIGN_FACTORY_ABI,
-            eventName: 'CampaignCreated',
-            data: log.data,
-            topics: log.topics,
-          })
-          onChainId = Number((decoded.args as any).campaignId)
-          break
-        } catch {
-          // not the event we're looking for
-        }
-      }
-
-      // ── Step 2: Register campaign in the backend ─────────────────────────
       setTxStatus('saving')
 
-      const stored = localStorage.getItem('defund_auth')
-      const token = stored ? JSON.parse(stored).token : null
-      const res = await fetch(`${API_BASE}/projects`, {
+      const res = await apiFetch('/projects', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           title: formData.title,
           description: formData.description,
@@ -190,19 +151,19 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
           website: formData.website || undefined,
           githubUrl: formData.githubUrl || undefined,
           paymentToken: isUsdc ? 'USDC' : 'ETH',
-          onChainId,
-          transactionHash: txHash,
+          ipfsHash,
           milestones: milestones.map(m => ({
             title: m.title,
             description: m.description,
             amount: parseFloat(m.amount),
           })),
         }),
-      })
+      }, token)
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.message || 'Failed to save campaign')
+        if (res.status === 401) throw new Error('Session expired — please sign in again.')
+        throw new Error(err.message || 'Failed to submit campaign')
       }
 
       setTxStatus('done')
@@ -216,21 +177,19 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     } catch (err: any) {
       console.error(err)
       setTxStatus('error')
-      setErrorMsg(err?.shortMessage || err?.message || 'Transaction failed')
+      setErrorMsg(err?.message || 'Submission failed')
     }
   }
 
   if (!isOpen) return null
 
-  const isSubmitting = txStatus === 'signing' || txStatus === 'confirming' || txStatus === 'saving'
+  const isSubmitting = txStatus === 'saving'
 
   const statusLabel: Record<typeof txStatus, string> = {
-    idle: 'Submit for Verification',
-    signing: 'Waiting for wallet signature...',
-    confirming: 'Confirming on-chain...',
-    saving: 'Saving to platform...',
-    done: 'Campaign Created!',
-    error: 'Submit for Verification',
+    idle: 'Submit for Review',
+    saving: 'Submitting...',
+    done: 'Submitted for Review!',
+    error: 'Submit for Review',
   }
 
   return (
@@ -322,22 +281,30 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
               <div className="form-group">
                 <label className="form-label">Social Verification</label>
                 <div className="social-connect-grid">
-                  <button type="button" className={`social-btn twitter ${socials.twitter.connected ? 'connected' : ''}`} onClick={() => handleConnect('twitter')}>
-                    <FaXTwitter />
-                    <span>{socials.twitter.connected ? '@VerifiedUser' : 'Connect X'}</span>
-                    {socials.twitter.connected && <HiCheckCircle className="verified-badge" />}
-                  </button>
-                  <button type="button" className={`social-btn discord ${socials.discord.connected ? 'connected' : ''}`} onClick={() => handleConnect('discord')}>
-                    <FaDiscord />
-                    <span>{socials.discord.connected ? 'User#1234' : 'Connect Discord'}</span>
-                    {socials.discord.connected && <HiCheckCircle className="verified-badge" />}
-                  </button>
-                  <button type="button" className={`social-btn github ${socials.github.connected ? 'connected' : ''}`} onClick={() => handleConnect('github')}>
-                    <FaGithub />
-                    <span>{socials.github.connected ? 'VerifiedDev' : 'Connect GitHub'}</span>
-                    {socials.github.connected && <HiCheckCircle className="verified-badge" />}
-                  </button>
+                  {(['twitter', 'discord', 'github'] as const).map((platform) => {
+                    const icons = { twitter: <FaXTwitter />, discord: <FaDiscord />, github: <FaGithub /> }
+                    const labels = { twitter: 'Connect X', discord: 'Connect Discord', github: 'Connect GitHub' }
+                    const connectedLabel = { twitter: `@${socials.twitter.username}`, discord: socials.discord.username, github: socials.github.username }
+                    const isConnecting = connectingPlatform === platform
+                    const isConnected = socials[platform].connected
+                    return (
+                      <button key={platform} type="button"
+                        className={`social-btn ${platform} ${isConnected ? 'connected' : ''}`}
+                        onClick={() => handleConnect(platform)}
+                        disabled={isConnecting || isConnected}
+                      >
+                        {icons[platform]}
+                        <span>{isConnecting ? 'Connecting…' : isConnected ? connectedLabel[platform] : labels[platform]}</span>
+                        {isConnected && <HiCheckCircle className="verified-badge" />}
+                      </button>
+                    )
+                  })}
                 </div>
+                {socialError && (
+                  <p style={{ fontSize: '12px', color: 'var(--color-error)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <HiExclamationTriangle /> {socialError}
+                  </p>
+                )}
               </div>
 
               <div className="form-group">
@@ -458,7 +425,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
             disabled={isSubmitting || txStatus === 'done'}
             style={{ opacity: isSubmitting ? 0.7 : 1 }}
           >
-            {txStatus === 'done' ? <><HiCheckCircle /> Campaign Created!</> : statusLabel[txStatus]}
+            {txStatus === 'done' ? <><HiCheckCircle /> Submitted for Review!</> : statusLabel[txStatus]}
           </button>
         </div>
       </div>

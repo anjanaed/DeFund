@@ -274,6 +274,18 @@
    PROJECT DETAIL PAGE
    ============================================ */
 
+.page-loading {
+  text-align: center;
+  padding: 6rem 0;
+  color: var(--color-text-secondary);
+}
+
+.empty-state-text {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  padding: var(--space-4) 0;
+}
+
 .project-detail-page {
   padding: var(--space-12) 0 var(--space-16);
 }
@@ -847,6 +859,148 @@
   .project-detail-title {
     font-size: var(--text-4xl);
   }
+}
+
+/* Project Tabs */
+.project-tabs {
+  display: flex;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.project-tab {
+  padding: var(--space-3) 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  margin-bottom: -1px;
+}
+
+.project-tab:hover,
+.project-tab.active {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* Project Creator line */
+.project-creator {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-4);
+}
+
+.project-creator span {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* Contribute section */
+.project-contribute {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.project-contribute-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Forum Messages */
+.project-forum {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.forum-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.forum-message {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.forum-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.forum-message-author {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.forum-message-content {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.forum-compose {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.forum-compose .form-input {
+  flex: 1;
+}
+
+/* Updates list */
+.project-updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.project-update-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-2);
+}
+
+/* Success state */
+.contribution-success {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-success);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.connect-wallet-note {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 /* Forum Styles */

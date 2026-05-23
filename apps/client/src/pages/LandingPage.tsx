@@ -1,11 +1,54 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HiShieldCheck, HiUserGroup, HiDocumentCheck, HiChartBar, HiLockClosed, HiBolt, HiArrowRight } from 'react-icons/hi2'
 import Navbar from '../components/layout/Navbar'
 import Footer from '../components/layout/Footer'
 import logo from '../assets/logo.png'
-import { landingStats as stats, landingSteps as steps } from '../data/mockData'
+import { landingSteps as steps } from '../data/mockData'
+import { apiFetch } from '../lib/api'
+
+interface HomeStats {
+  totalRaised: number
+  activeProjects: number
+  contributors: number
+  successRate: number
+}
+
+const compactCurrency = (n: number) => {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
+  return `$${n.toLocaleString()}`
+}
+
+const compactNumber = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return `${n}`
+}
 
 export default function LandingPage() {
+  const [homeStats, setHomeStats] = useState<HomeStats | null>(null)
+
+  useEffect(() => {
+    apiFetch('/stats/home')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setHomeStats(data) })
+      .catch(() => { /* keep placeholder */ })
+  }, [])
+
+  const stats = homeStats
+    ? [
+        { label: 'Total Raised', value: compactCurrency(homeStats.totalRaised) },
+        { label: 'Active Projects', value: compactNumber(homeStats.activeProjects) },
+        { label: 'Contributors', value: compactNumber(homeStats.contributors) },
+        { label: 'Success Rate', value: `${homeStats.successRate}%` },
+      ]
+    : [
+        { label: 'Total Raised', value: '—' },
+        { label: 'Active Projects', value: '—' },
+        { label: 'Contributors', value: '—' },
+        { label: 'Success Rate', value: '—' },
+      ]
 
 
   const features = [

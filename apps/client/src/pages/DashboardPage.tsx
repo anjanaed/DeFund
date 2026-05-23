@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import { HiChartBar, HiLockClosed, HiCheckCircle, HiClock, HiXCircle, HiEye } from 'react-icons/hi2'
 import ProofModal from '../components/common/ProofModal'
+import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
+import TxBanner from '../components/common/TxBanner'
+import LoadingScreen from '../components/common/LoadingScreen'
 import { useWriteContract } from 'wagmi'
-import { parseEther } from 'viem'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
@@ -17,7 +19,7 @@ interface Contribution {
 interface VotingMilestone {
   id: string; title: string; description: string; status: string
   onChainId: number | null; votingEndTime: string | null; proofUrl: string | null
-  campaign: { id: string; title: string }
+  campaign: { id: string; title: string; paymentToken?: string }
 }
 interface Transaction {
   id: string; type: string; amount: number; timestamp: string
@@ -48,6 +50,7 @@ export default function DashboardPage() {
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
   const [claimingId, setClaimingId] = useState<string | null>(null)
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set())
+  const [txError, setTxError] = useState<string | null>(null)
 
   const { writeContractAsync } = useWriteContract()
 
@@ -83,7 +86,7 @@ export default function DashboardPage() {
   )
 
   const handleVote = async (item: VotingMilestone, approve: boolean) => {
-    if (item.onChainId == null) { alert('This milestone is not yet deployed on-chain.'); return }
+    if (item.onChainId == null) { setTxError('This milestone is not yet deployed on-chain.'); return }
     setVotingTx({ id: item.id, approve })
     try {
       await writeContractAsync({
@@ -94,14 +97,14 @@ export default function DashboardPage() {
       })
       setVotedIds(prev => new Set(prev).add(item.id))
     } catch (err: any) {
-      alert(err?.shortMessage || err?.message || 'Vote failed')
+      setTxError(err?.shortMessage || err?.message || 'Vote failed')
     } finally {
       setVotingTx(null)
     }
   }
 
   const handleClaim = async (item: ReclaimItem) => {
-    if (item.onChainId == null) { alert('Campaign is not on-chain.'); return }
+    if (item.onChainId == null) { setTxError('Campaign is not on-chain.'); return }
     setClaimingId(item.id)
     try {
       await writeContractAsync({
@@ -112,7 +115,7 @@ export default function DashboardPage() {
       })
       setClaimedIds(prev => new Set(prev).add(item.id))
     } catch (err: any) {
-      alert(err?.shortMessage || err?.message || 'Claim failed')
+      setTxError(err?.shortMessage || err?.message || 'Claim failed')
     } finally {
       setClaimingId(null)
     }
@@ -135,13 +138,14 @@ export default function DashboardPage() {
 
   if (loading) return (
     <div className="app-container"><AppNavbar />
-      <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--color-text-secondary)' }}>Loading dashboard...</div>
+      <LoadingScreen message="Loading your dashboard" />
     </div>
   )
 
   return (
     <div className="app-container">
       <AppNavbar />
+      {txError && <TxBanner message={txError} onClose={() => setTxError(null)} />}
       <div className="dashboard-page">
         <div className="container">
           {/* Stats Grid */}
@@ -222,6 +226,12 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <p className="voting-description">{item.description}</p>
+                  {item.onChainId != null && (
+                    <MilestoneVotingStatus
+                      milestoneOnChainId={item.onChainId}
+                      paymentToken={item.campaign.paymentToken}
+                    />
+                  )}
                   <div className="voting-actions">
                     {item.proofUrl && (
                       <button className="btn-vote view-proof" onClick={() => { setSelectedProof({ title: item.title, content: item.proofUrl! }); setShowProofModal(true) }}>

@@ -30,6 +30,10 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     setTimeout(() => this.poll(), 5_000);
     this.timer = setInterval(() => this.poll(), 12_000);
+    // Run keeper every 5 minutes to finalize expired milestone voting
+    // and transition deadline-expired campaigns to Funded/Cancelled.
+    setInterval(() => this.finalizeExpiredVoting(), 5 * 60 * 1_000);
+    setInterval(() => this.checkExpiredDeadlines(), 5 * 60 * 1_000);
   }
 
   onModuleDestroy() {
@@ -48,6 +52,8 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private static readonly CHUNK_SIZE = 10_000;
+
   private async processEvents() {
     const startBlock = this.config.get<number>('startBlock') ?? 0;
 
@@ -61,54 +67,50 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     if (fromBlock > currentBlock) return;
 
     const contract = this.blockchain.getContract();
-    const logs = await contract.queryFilter('*' as any, fromBlock, currentBlock);
+    let totalEvents = 0;
 
-    for (const log of logs) {
-      try {
-        await this.handleEvent(log as ethers.EventLog);
-      } catch (err) {
-        this.logger.warn(`Failed to handle event ${(log as ethers.EventLog).eventName}`, err);
-      }
+    // Walk the range in 10k-block chunks so a long catch-up doesn't exceed RPC limits,
+    // and so we only advance lastBlock once a chunk is fully written.
+    for (
+      let chunkStart = fromBlock;
+      chunkStart <= currentBlock;
+      chunkStart += IndexerService.CHUNK_SIZE
+    ) {
+      const chunkEnd = Math.min(
+        chunkStart + IndexerService.CHUNK_SIZE - 1,
+        currentBlock,
+      );
+
+      const logs = await contract.queryFilter('*' as any, chunkStart, chunkEnd);
+
+      // Event handlers are idempotent (upsert / updateMany / existence-checked create),
+      // so a crash mid-chunk is safe: the chunk will replay on restart without advancing
+      // lastBlock, and individual handler errors are caught per-event so one bad log
+      // doesn't abort the whole chunk.
+      await this.prisma.$transaction(async () => {
+        for (const log of logs) {
+          try {
+            await this.handleEvent(log as ethers.EventLog);
+          } catch (err) {
+            this.logger.warn(
+              `Failed to handle event ${(log as ethers.EventLog).eventName}`,
+              err,
+            );
+          }
+        }
+
+        await this.prisma.indexerState.upsert({
+          where: { id: 'singleton' },
+          create: { id: 'singleton', lastBlock: chunkEnd },
+          update: { lastBlock: chunkEnd },
+        });
+      });
+
+      totalEvents += logs.length;
     }
 
-    await this.prisma.indexerState.upsert({
-      where: { id: 'singleton' },
-      create: { id: 'singleton', lastBlock: currentBlock },
-      update: { lastBlock: currentBlock },
-    });
-
-    if (logs.length > 0) {
-      this.logger.log(`Indexed ${logs.length} events up to block ${currentBlock}`);
-    }
-
-    // Auto-finalize any milestones whose voting period has expired on-chain
-    await this.finalizeExpiredVoting();
-  }
-
-  private async finalizeExpiredVoting() {
-    const privateKey = this.config.get<string>('adminPrivateKey');
-    if (!privateKey) return;
-
-    const expired = await this.prisma.milestone.findMany({
-      where: {
-        status: MilestoneStatus.VOTING,
-        votingEndTime: { lt: new Date() },
-        onChainId: { not: null },
-      },
-      select: { id: true, onChainId: true },
-    });
-
-    if (expired.length === 0) return;
-
-    const contract = this.blockchain.getContractWithSigner(privateKey);
-    for (const m of expired) {
-      try {
-        const tx = await contract.finalizeMilestoneVoting(m.onChainId);
-        await tx.wait();
-        this.logger.log(`Finalized voting for milestone onChainId=${m.onChainId}`);
-      } catch (err) {
-        this.logger.warn(`Could not finalize milestone onChainId=${m.onChainId}`, err);
-      }
+    if (totalEvents > 0) {
+      this.logger.log(`Indexed ${totalEvents} events up to block ${currentBlock}`);
     }
   }
 
@@ -147,6 +149,9 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       case 'MilestoneFundsReleased':
         await this.onFundsReleased(log);
         break;
+      case 'RefundProposed':
+        await this.onRefundProposed(log);
+        break;
       case 'RefundApproved':
         await this.onRefundApproved(log);
         break;
@@ -160,27 +165,28 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
   private async onCampaignCreated(log: ethers.EventLog) {
     const campaignId = Number(log.args[0] as bigint);
-    const creator = (log.args[1] as string).toLowerCase();
 
-    // If the campaign was already registered in DB with this onChainId, skip
+    // If the campaign was already linked in DB (e.g. by the admin approval page), skip
     const existing = await this.prisma.campaign.findFirst({
       where: { onChainId: campaignId },
     });
     if (existing) return;
 
-    // Try to link to an approved-but-not-yet-deployed DB campaign for this creator
+    // Read the ipfsHash from the on-chain campaign struct so we can match it to the
+    // DB campaign — the admin wallet called createCampaign(), so msg.sender is the
+    // admin (not the creator), making creator-address matching unreliable.
+    const contract = this.blockchain.getContract();
+    const onChainCampaign = await contract.campaigns(campaignId);
+    const ipfsHash = onChainCampaign.ipfsHash as string;
+
     const campaign = await this.prisma.campaign.findFirst({
-      where: {
-        onChainId: null,
-        isAdminApproved: true,
-        creator: { walletAddress: creator },
-      },
+      where: { onChainId: null, ipfsHash },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!campaign) {
       this.logger.warn(
-        `CampaignCreated onChainId=${campaignId} — no matching DB campaign for creator ${creator}`,
+        `CampaignCreated onChainId=${campaignId} — no matching DB campaign for ipfsHash=${ipfsHash}`,
       );
       return;
     }
@@ -287,6 +293,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     const milestoneOnChainId = Number(log.args[0] as bigint);
     const voterAddress = (log.args[1] as string).toLowerCase();
     const approve = Boolean(log.args[2]);
+    const weight = (log.args[3] as bigint).toString();
 
     const [voter, milestone] = await Promise.all([
       this.prisma.user.upsert({
@@ -301,8 +308,8 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
     await this.prisma.vote.upsert({
       where: { voterId_milestoneId: { voterId: voter.id, milestoneId: milestone.id } },
-      create: { choice: approve, voterId: voter.id, milestoneId: milestone.id },
-      update: { choice: approve },
+      create: { choice: approve, weight, voterId: voter.id, milestoneId: milestone.id },
+      update: { choice: approve, weight },
     });
   }
 
@@ -346,13 +353,104 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     ]);
   }
 
+  private async onRefundProposed(log: ethers.EventLog) {
+    // args: (proposalId, campaignId, proposer)
+    const proposalOnChainId = Number(log.args[0] as bigint);
+    const campaignOnChainId = Number(log.args[1] as bigint);
+    const proposer = (log.args[2] as string).toLowerCase();
+
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { onChainId: campaignOnChainId },
+    });
+    if (!campaign) return;
+
+    const block = await this.blockchain.getProvider().getBlock(log.blockNumber);
+    const proposedAt = block ? new Date(block.timestamp * 1000) : new Date();
+    const expiresAt = new Date(proposedAt.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+    await this.prisma.refundProposal.upsert({
+      where: { onChainId: proposalOnChainId },
+      create: {
+        onChainId: proposalOnChainId,
+        proposer,
+        proposedAt,
+        expiresAt,
+        campaignId: campaign.id,
+      },
+      update: {},
+    });
+  }
+
   private async onRefundApproved(log: ethers.EventLog) {
     // args: (proposalId, campaignId, approver)
+    const proposalOnChainId = Number(log.args[0] as bigint);
     const campaignOnChainId = Number(log.args[1] as bigint);
-    await this.prisma.campaign.updateMany({
-      where: { onChainId: campaignOnChainId },
-      data: { fundsReclaimed: true },
+    const approver = (log.args[2] as string).toLowerCase();
+
+    await Promise.all([
+      this.prisma.campaign.updateMany({
+        where: { onChainId: campaignOnChainId },
+        data: { fundsReclaimed: true },
+      }),
+      this.prisma.refundProposal.updateMany({
+        where: { onChainId: proposalOnChainId },
+        data: { approver, executed: true },
+      }),
+    ]);
+  }
+
+  private async finalizeExpiredVoting() {
+    const privateKey = this.config.get<string>('operatorPrivateKey');
+    if (!privateKey) return;
+
+    const now = new Date();
+    const expired = await this.prisma.milestone.findMany({
+      where: { status: MilestoneStatus.VOTING, votingEndTime: { lte: now } },
+      select: { onChainId: true, id: true },
     });
+
+    if (expired.length === 0) return;
+
+    const contract = this.blockchain.getContractWithSigner(privateKey);
+    for (const milestone of expired) {
+      if (milestone.onChainId === null) continue;
+      try {
+        const tx = await contract.finalizeMilestoneVoting(milestone.onChainId);
+        await tx.wait();
+        this.logger.log(`Finalized voting for milestone onChainId=${milestone.onChainId}`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to finalize milestone onChainId=${milestone.onChainId}: ${err.message}`);
+      }
+    }
+  }
+
+  private async checkExpiredDeadlines() {
+    const privateKey = this.config.get<string>('operatorPrivateKey');
+    if (!privateKey) return;
+
+    const now = new Date();
+    const expired = await this.prisma.campaign.findMany({
+      where: {
+        status: CampaignStatus.ACTIVE,
+        deadline: { lte: now },
+        onChainId: { not: null },
+      },
+      select: { onChainId: true, id: true },
+    });
+
+    if (expired.length === 0) return;
+
+    const contract = this.blockchain.getContractWithSigner(privateKey);
+    for (const campaign of expired) {
+      if (campaign.onChainId === null) continue;
+      try {
+        const tx = await contract.checkCampaignDeadline(campaign.onChainId);
+        await tx.wait();
+        this.logger.log(`Checked deadline for campaign onChainId=${campaign.onChainId}`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to check deadline for campaign onChainId=${campaign.onChainId}: ${err.message}`);
+      }
+    }
   }
 
   private async onRefundClaimed(log: ethers.EventLog) {

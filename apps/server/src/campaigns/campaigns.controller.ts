@@ -12,6 +12,7 @@ import { CampaignsService } from './campaigns.service';
 import { QueryCampaignsDto } from './dto/query-campaigns.dto';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
+import { CreateUpdateDto } from './dto/create-update.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
@@ -70,6 +71,16 @@ export class CampaignsController {
     @Body() dto: UpdateCampaignDto,
   ) {
     return this.campaigns.updateCampaign(id, user.userId, dto);
+  }
+
+  @Post('projects/:id/updates')
+  @UseGuards(JwtAuthGuard)
+  createUpdate(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreateUpdateDto,
+  ) {
+    return this.campaigns.createUpdate(id, user.userId, dto);
   }
 
   @Get('creator/projects')

@@ -3,10 +3,12 @@ import AppNavbar from '../components/layout/AppNavbar'
 import CreateCampaignModal from '../components/modals/CreateCampaignModal'
 import SubmitProofModal from '../components/modals/SubmitProofModal'
 import ProofModal from '../components/common/ProofModal'
+import TxBanner from '../components/common/TxBanner'
+import LoadingScreen from '../components/common/LoadingScreen'
 import {
   HiCurrencyDollar, HiChartBar, HiUsers, HiCheckCircle, HiClock,
   HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray,
-  HiBanknotes, HiNoSymbol,
+  HiBanknotes, HiNoSymbol, HiMegaphone, HiPlusCircle,
 } from 'react-icons/hi2'
 import { useWriteContract } from 'wagmi'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
@@ -17,8 +19,12 @@ interface Milestone {
   id: string; title: string; status: string; amount: string
   onChainId: number | null; proofUrl: string | null; submissionCount: number
 }
+interface CampaignUpdate {
+  id: string; title: string; content: string; createdAt: string
+}
 interface CreatorCampaign {
   id: string; title: string; description: string; category: string; status: string
+  onChainId: number | null
   raisedAmount: string; goalAmount: string; paymentToken: string
   _count: { milestones: number; contributions: number }
   milestones: Milestone[]
@@ -50,6 +56,15 @@ export default function CreatorStudioPage() {
   const [releasingId, setReleasingId] = useState<string | null>(null)
   const [releasedIds, setReleasedIds] = useState<Set<string>>(new Set())
   const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set())
+  const [txError, setTxError] = useState<string | null>(null)
+
+  const [openUpdatesCampaignId, setOpenUpdatesCampaignId] = useState<string | null>(null)
+  const [updatesMap, setUpdatesMap] = useState<Record<string, CampaignUpdate[]>>({})
+  const [showUpdateForm, setShowUpdateForm] = useState(false)
+  const [updateTitle, setUpdateTitle] = useState('')
+  const [updateContent, setUpdateContent] = useState('')
+  const [postingUpdate, setPostingUpdate] = useState(false)
+  const [updateFeedback, setUpdateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const { writeContractAsync } = useWriteContract()
 
@@ -64,7 +79,7 @@ export default function CreatorStudioPage() {
   useEffect(() => { loadCampaigns() }, [token])
 
   const handleReleaseFunds = async (milestone: Milestone) => {
-    if (!milestone.onChainId) { alert('Milestone not yet on-chain.'); return }
+    if (!milestone.onChainId) { setTxError('Milestone not yet on-chain.'); return }
     setReleasingId(milestone.id)
     try {
       await writeContractAsync({
@@ -73,7 +88,7 @@ export default function CreatorStudioPage() {
       })
       setReleasedIds(prev => new Set(prev).add(milestone.id))
     } catch (err: any) {
-      alert(err?.shortMessage || err?.message || 'Transaction failed')
+      setTxError(err?.shortMessage || err?.message || 'Transaction failed')
     } finally {
       setReleasingId(null)
     }
@@ -88,6 +103,63 @@ export default function CreatorStudioPage() {
     })
     setSubmittedIds(prev => new Set(prev).add(proofModal.milestoneId))
     setProofModal(null)
+  }
+
+  const handleCancelCampaign = async (campaign: CreatorCampaign) => {
+    if (!campaign.onChainId) { setTxError('Campaign not yet on-chain.'); return }
+    if (!window.confirm(`Cancel "${campaign.title}"? This is irreversible. Contributors will be able to propose refunds.`)) return
+    try {
+      await writeContractAsync({
+        address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
+        functionName: 'cancelCampaign', args: [BigInt(campaign.onChainId)],
+      })
+      loadCampaigns()
+    } catch (err: any) {
+      setTxError(err?.shortMessage || err?.message || 'Transaction failed')
+    }
+  }
+
+  const toggleUpdates = (campaignId: string) => {
+    if (openUpdatesCampaignId === campaignId) {
+      setOpenUpdatesCampaignId(null)
+      setShowUpdateForm(false)
+      setUpdateFeedback(null)
+      return
+    }
+    setOpenUpdatesCampaignId(campaignId)
+    setShowUpdateForm(false)
+    setUpdateFeedback(null)
+    if (!updatesMap[campaignId]) {
+      apiFetch(`/projects/${campaignId}/updates`)
+        .then(r => r.ok ? r.json() : [])
+        .then(data => setUpdatesMap(prev => ({ ...prev, [campaignId]: data })))
+    }
+  }
+
+  const handlePostUpdate = async (campaignId: string) => {
+    if (!updateTitle.trim() || !updateContent.trim()) return
+    setPostingUpdate(true)
+    setUpdateFeedback(null)
+    try {
+      const res = await apiFetch(`/projects/${campaignId}/updates`, {
+        method: 'POST',
+        body: JSON.stringify({ title: updateTitle.trim(), content: updateContent.trim() }),
+      }, token)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || 'Failed to post update')
+      }
+      const newUpdate = await res.json()
+      setUpdatesMap(prev => ({ ...prev, [campaignId]: [newUpdate, ...(prev[campaignId] || [])] }))
+      setUpdateTitle('')
+      setUpdateContent('')
+      setShowUpdateForm(false)
+      setUpdateFeedback({ type: 'success', message: 'Update posted successfully.' })
+    } catch (err: any) {
+      setUpdateFeedback({ type: 'error', message: err.message || 'Failed to post update' })
+    } finally {
+      setPostingUpdate(false)
+    }
   }
 
   const isActive = (c: CreatorCampaign) => ['ACTIVE', 'FUNDED'].includes(c.status)
@@ -109,13 +181,14 @@ export default function CreatorStudioPage() {
 
   if (loading) return (
     <div className="app-container"><AppNavbar />
-      <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--color-text-secondary)' }}>Loading...</div>
+      <LoadingScreen message="Loading your campaigns" />
     </div>
   )
 
   return (
     <div className="app-container">
       <AppNavbar />
+      {txError && <TxBanner message={txError} onClose={() => setTxError(null)} />}
       <div className="creator-studio-page">
         <div className="container">
           <div className="creator-studio-header">
@@ -168,9 +241,20 @@ export default function CreatorStudioPage() {
                     <h2 className="creator-project-title">{project.title}</h2>
                     <p className="creator-project-description">{project.description}</p>
                   </div>
-                  <button className="creator-view-project-btn">
-                    <HiArrowDownTray style={{ marginRight: 8 }} /> Download Report
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="creator-view-project-btn">
+                      <HiArrowDownTray style={{ marginRight: 8 }} /> Download Report
+                    </button>
+                    {['PENDING', 'ACTIVE'].includes(project.status) && project.onChainId != null && (
+                      <button
+                        className="creator-view-project-btn"
+                        onClick={() => handleCancelCampaign(project)}
+                        style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
+                      >
+                        Cancel Campaign
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="creator-project-stats">
@@ -279,6 +363,104 @@ export default function CreatorStudioPage() {
                     })}
                   </div>
                 </div>
+
+                {/* Updates section */}
+                <div className="creator-milestones-section" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: openUpdatesCampaignId === project.id ? '16px' : '0' }}>
+                    <h3 className="creator-milestones-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <HiMegaphone style={{ color: 'var(--color-primary)' }} /> Project Updates
+                    </h3>
+                    <button
+                      className="btn"
+                      onClick={() => toggleUpdates(project.id)}
+                      style={{ padding: '6px 14px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '6px', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: '500' }}
+                    >
+                      {openUpdatesCampaignId === project.id ? 'Hide Updates' : 'View / Post Updates'}
+                    </button>
+                  </div>
+
+                  {openUpdatesCampaignId === project.id && (
+                    <div>
+                      {updateFeedback && (
+                        <div style={{
+                          padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '13px',
+                          background: updateFeedback.type === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+                          border: `1px solid ${updateFeedback.type === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                          color: updateFeedback.type === 'error' ? 'var(--color-error)' : '#15803d',
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                        }}>
+                          {updateFeedback.type === 'error' ? <HiXCircle /> : <HiCheckCircle />} {updateFeedback.message}
+                        </div>
+                      )}
+
+                      {!showUpdateForm ? (
+                        <button
+                          className="btn"
+                          onClick={() => { setShowUpdateForm(true); setUpdateFeedback(null) }}
+                          style={{ padding: '8px 16px', fontSize: '13px', marginBottom: '16px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <HiPlusCircle /> Post Update
+                        </button>
+                      ) : (
+                        <div style={{ background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>New Update</h4>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Update title"
+                            value={updateTitle}
+                            onChange={e => setUpdateTitle(e.target.value)}
+                            style={{ marginBottom: '10px', width: '100%', boxSizing: 'border-box' }}
+                          />
+                          <textarea
+                            className="form-input"
+                            placeholder="What's new? Share progress, milestones reached, or news with your supporters..."
+                            value={updateContent}
+                            onChange={e => setUpdateContent(e.target.value)}
+                            rows={4}
+                            style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', fontSize: '14px', marginBottom: '12px' }}
+                          />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="btn btn-primary"
+                              onClick={() => handlePostUpdate(project.id)}
+                              disabled={postingUpdate || !updateTitle.trim() || !updateContent.trim()}
+                              style={{ padding: '8px 18px', fontSize: '13px', fontWeight: '600', opacity: (postingUpdate || !updateTitle.trim() || !updateContent.trim()) ? 0.6 : 1 }}
+                            >
+                              {postingUpdate ? 'Posting…' : 'Post Update'}
+                            </button>
+                            <button
+                              className="btn"
+                              onClick={() => { setShowUpdateForm(false); setUpdateTitle(''); setUpdateContent('') }}
+                              style={{ padding: '8px 14px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '6px', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {(updatesMap[project.id] || []).length === 0 ? (
+                        <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'center', padding: '16px 0' }}>
+                          No updates posted yet.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {(updatesMap[project.id] || []).map(u => (
+                            <div key={u.id} style={{ border: '1px solid var(--color-border)', borderRadius: '8px', padding: '14px 16px', background: 'var(--color-bg-card)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>{u.title}</span>
+                                <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>{new Date(u.createdAt).toLocaleDateString()}</span>
+                              </div>
+                              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: '1.6' }}>{u.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
               </div>
             ))}
           </div>

@@ -84,7 +84,7 @@ export class UsersService {
         id: { notIn: alreadyVotedMilestoneIds },
       },
       include: {
-        campaign: { select: { id: true, title: true } },
+        campaign: { select: { id: true, title: true, paymentToken: true } },
       },
       orderBy: { votingEndTime: 'asc' },
     });

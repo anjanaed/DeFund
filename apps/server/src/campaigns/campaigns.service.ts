@@ -123,6 +123,14 @@ export class CampaignsService {
     });
   }
 
+  async createUpdate(campaignId: string, userId: string, dto: { title: string; content: string }) {
+    const campaign = await this.ensureExists(campaignId);
+    if (campaign.creatorId !== userId) throw new ForbiddenException();
+    return this.prisma.update.create({
+      data: { title: dto.title, content: dto.content, campaignId },
+    });
+  }
+
   async createCampaign(userId: string, dto: CreateCampaignDto) {
     const { milestones, deadline, onChainId, transactionHash, paymentToken, ...rest } = dto;
     return this.prisma.campaign.create({

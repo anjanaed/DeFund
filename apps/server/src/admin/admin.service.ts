@@ -1,20 +1,15 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { BlockchainService } from '../blockchain/blockchain.service';
-import { CampaignStatus, MilestoneStatus } from '../generated/prisma';
+import { CampaignStatus, MilestoneStatus, UserRole } from '../generated/prisma';
 
 @Injectable()
 export class AdminService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly blockchain: BlockchainService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getStats() {
     const [pending, flagged, rejected, totalRaisedAgg] = await Promise.all([
@@ -76,7 +71,7 @@ export class AdminService {
         take: limit,
         orderBy: { timestamp: 'desc' },
         include: {
-          campaign: { select: { id: true, title: true } },
+          campaign: { select: { id: true, title: true, paymentToken: true } },
           contributor: { select: { walletAddress: true, name: true } },
         },
       }),
@@ -165,27 +160,25 @@ export class AdminService {
     };
   }
 
-  async approveCampaign(id: string) {
+  async approveCampaign(id: string, onChainId: number) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
-    if (campaign.onChainId === null) {
-      throw new BadRequestException(
-        'Campaign has not been deployed on-chain yet. The creator must call createCampaign() first.',
-      );
-    }
+    // Admin called createCampaign() on-chain and passes back the resulting on-chain ID.
+    // Link the DB campaign, mark it approved/active, and promote the creator to CREATOR role
+    // so they have a verified-creator badge for future campaigns.
+    await this.prisma.$transaction([
+      this.prisma.campaign.update({
+        where: { id },
+        data: { onChainId, isAdminApproved: true, status: CampaignStatus.ACTIVE },
+      }),
+      this.prisma.user.update({
+        where: { id: campaign.creatorId },
+        data: { role: UserRole.CREATOR },
+      }),
+    ]);
 
-    const privateKey = this.config.get<string>('adminPrivateKey');
-    if (!privateKey) throw new BadRequestException('Admin private key not configured');
-
-    const contract = this.blockchain.getContractWithSigner(privateKey);
-    await contract.approveCampaign(campaign.onChainId);
-
-    // Indexer will also catch the CampaignApproved event, but update DB immediately for responsiveness
-    return this.prisma.campaign.update({
-      where: { id },
-      data: { isAdminApproved: true, status: CampaignStatus.ACTIVE },
-    });
+    return { success: true, onChainId };
   }
 
   async rejectCampaign(id: string) {
@@ -197,15 +190,10 @@ export class AdminService {
   }
 
   async flagCampaign(id: string, reason: string) {
-    const campaign = await this.ensureExists(id);
+    await this.ensureExists(id);
 
-    if (campaign.onChainId !== null) {
-      const privateKey = this.config.get<string>('adminPrivateKey');
-      if (!privateKey) throw new BadRequestException('Admin private key not configured');
-      const contract = this.blockchain.getContractWithSigner(privateKey);
-      await contract.flagCampaign(campaign.onChainId, reason);
-    }
-
+    // The admin signs flagCampaign() directly from their wallet on the frontend.
+    // This endpoint performs the immediate DB update; the indexer also syncs from the CampaignFlagged event.
     return this.prisma.campaign.update({
       where: { id },
       data: { status: CampaignStatus.FLAGGED },
@@ -216,48 +204,45 @@ export class AdminService {
     return this.flagCampaign(id, 'blocked');
   }
 
-  /** First admin proposes a refund for a flagged/cancelled campaign */
+  /** First admin proposes a refund — signed from their wallet on the frontend */
   async proposeRefund(id: string) {
     const campaign = await this.ensureExists(id);
-
-    if (campaign.onChainId === null) {
-      throw new BadRequestException('Campaign is not on-chain');
-    }
-
-    const privateKey = this.config.get<string>('adminPrivateKey');
-    if (!privateKey) throw new BadRequestException('Admin private key not configured');
-
-    const contract = this.blockchain.getContractWithSigner(privateKey);
-    const tx = await contract.proposeRefund(campaign.onChainId);
-    await tx.wait();
-
-    return { message: 'Refund proposed on-chain. A second admin must now approve it.' };
+    if (campaign.onChainId === null) throw new BadRequestException('Campaign is not on-chain');
+    return { message: 'Sign proposeRefund() from your admin wallet. The indexer will sync the DB once the transaction confirms.' };
   }
 
-  /** Second admin approves the refund proposal (must be a different key) */
+  /** Second admin approves the refund — signed from their wallet on the frontend */
   async approveRefund(id: string) {
     const campaign = await this.ensureExists(id);
+    if (campaign.onChainId === null) throw new BadRequestException('Campaign is not on-chain');
+    return { message: 'Sign approveRefund() from your admin wallet. Contributors can claim refunds once the transaction confirms.' };
+  }
 
-    if (campaign.onChainId === null) {
-      throw new BadRequestException('Campaign is not on-chain');
-    }
+  async getRefundProposals() {
+    return this.prisma.refundProposal.findMany({
+      orderBy: { proposedAt: 'desc' },
+      include: {
+        campaign: { select: { id: true, title: true, onChainId: true } },
+      },
+    });
+  }
 
-    const privateKey = this.config.get<string>('adminPrivateKey');
-    if (!privateKey) throw new BadRequestException('Admin private key not configured');
-
-    const contract = this.blockchain.getContractWithSigner(privateKey);
-    const tx = await contract.approveRefund(campaign.onChainId);
-    await tx.wait();
-
-    return {
-      message:
-        'Refund approved on-chain. Contributors can now call claimRefund() to recover their funds.',
-    };
+  async getRefundProposalForCampaign(campaignId: string) {
+    const proposal = await this.prisma.refundProposal.findFirst({
+      where: { campaignId, executed: false },
+      orderBy: { proposedAt: 'desc' },
+    });
+    // Fallback to most recent (including executed) so admins can see history
+    if (proposal) return proposal;
+    return this.prisma.refundProposal.findFirst({
+      where: { campaignId },
+      orderBy: { proposedAt: 'desc' },
+    });
   }
 
   async getMilestones(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const [items, total] = await Promise.all([
+    const [milestones, total] = await Promise.all([
       this.prisma.milestone.findMany({
         skip,
         take: limit,
@@ -269,6 +254,29 @@ export class AdminService {
       }),
       this.prisma.milestone.count(),
     ]);
+
+    const ids = milestones.map((m) => m.id);
+    const groups = ids.length
+      ? await this.prisma.vote.groupBy({
+          by: ['milestoneId', 'choice'],
+          where: { milestoneId: { in: ids } },
+          _count: { _all: true },
+        })
+      : [];
+
+    const counts = new Map<string, { for: number; against: number }>();
+    for (const g of groups) {
+      const entry = counts.get(g.milestoneId) ?? { for: 0, against: 0 };
+      if (g.choice) entry.for += g._count._all;
+      else entry.against += g._count._all;
+      counts.set(g.milestoneId, entry);
+    }
+
+    const items = milestones.map((m) => {
+      const c = counts.get(m.id) ?? { for: 0, against: 0 };
+      return { ...m, votesFor: c.for, votesAgainst: c.against };
+    });
+
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
@@ -311,10 +319,43 @@ export class AdminService {
     };
   }
 
-  async setUserRole(userId: string, role: string) {
+  async setUserRole(userId: string, role: string, currentUserId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
+
+    if (
+      userId === currentUserId &&
+      user.role === UserRole.ADMIN &&
+      role !== UserRole.ADMIN
+    ) {
+      throw new ForbiddenException('Admins cannot demote themselves');
+    }
+
     return this.prisma.user.update({ where: { id: userId }, data: { role: role as any } });
+  }
+
+  async getUsers(search?: string) {
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { walletAddress: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    return this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        walletAddress: true,
+        role: true,
+        createdAt: true,
+        _count: { select: { createdCampaigns: true, contributions: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   private async ensureExists(id: string) {
