@@ -89,10 +89,13 @@ export class SocialAuthService {
 
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(
+          `${process.env.DISCORD_CLIENT_ID}:${process.env.DISCORD_CLIENT_SECRET}`,
+        ).toString('base64')}`,
+      },
       body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID!,
-        client_secret: process.env.DISCORD_CLIENT_SECRET!,
         grant_type: 'authorization_code',
         code,
         redirect_uri: process.env.DISCORD_REDIRECT_URI!,
@@ -126,7 +129,7 @@ export class SocialAuthService {
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
     });
-    return `https://twitter.com/i/oauth2/authorize?${params}`;
+    return `https://x.com/i/oauth2/authorize?${params}`;
   }
 
   async twitterCallback(code: string, state: string): Promise<string> {
@@ -136,7 +139,7 @@ export class SocialAuthService {
       `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`,
     ).toString('base64');
 
-    const tokenRes = await fetch('https://api.twitter.com/2/oauth2/token', {
+    const tokenRes = await fetch('https://api.x.com/2/oauth2/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -152,7 +155,7 @@ export class SocialAuthService {
     const tokenData = await tokenRes.json() as any;
     if (!tokenData.access_token) throw new Error('Twitter token exchange failed');
 
-    const profileRes = await fetch('https://api.twitter.com/2/users/me', {
+    const profileRes = await fetch('https://api.x.com/2/users/me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const profile = await profileRes.json() as any;
