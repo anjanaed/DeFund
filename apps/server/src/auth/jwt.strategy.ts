@@ -13,9 +13,13 @@ export interface JwtPayload {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(config: ConfigService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: (req: any) => {
+        if (req?.cookies?.jwt) return req.cookies.jwt;
+        return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+      },
       ignoreExpiration: false,
       secretOrKey: config.get<string>('jwtSecret') ?? 'changeme',
+      passReqToCallback: false,
     });
   }
 

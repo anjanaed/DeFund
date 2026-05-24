@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HiMagnifyingGlass } from 'react-icons/hi2'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
@@ -36,7 +35,6 @@ function statusBadge(status: string): 'success' | 'warning' | 'error' | 'neutral
 
 export default function AdminRiskPage() {
   const navigate = useNavigate()
-  const { token } = useAuth()
   const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -46,16 +44,15 @@ export default function AdminRiskPage() {
   const itemsPerPage = 10
 
   useEffect(() => {
-    if (!token) return
     let cancelled = false
     setLoading(true)
-    apiFetch('/admin/projects', {}, token)
+    apiFetch('/admin/projects')
       .then((r) => r.json())
       .then((data) => !cancelled && setProjects(Array.isArray(data) ? data : []))
       .catch(() => !cancelled && setError('Failed to load projects'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [token])
+  }, [])
 
   const filtered = projects.filter((p) => {
     const q = searchTerm.toLowerCase()

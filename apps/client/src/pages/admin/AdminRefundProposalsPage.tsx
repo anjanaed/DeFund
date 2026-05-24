@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
@@ -18,22 +17,20 @@ interface RefundProposal {
 
 export default function AdminRefundProposalsPage() {
   const navigate = useNavigate()
-  const { token } = useAuth()
   const [proposals, setProposals] = useState<RefundProposal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!token) return
     let cancelled = false
     setLoading(true)
-    apiFetch('/admin/refund-proposals', {}, token)
+    apiFetch('/admin/refund-proposals')
       .then((r) => r.json())
       .then((data) => !cancelled && setProposals(Array.isArray(data) ? data : []))
       .catch(() => !cancelled && setError('Failed to load refund proposals'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [token])
+  }, [])
 
   const pending = proposals.filter((p) => !p.executed)
   const past = proposals.filter((p) => p.executed)

@@ -34,7 +34,7 @@ interface ReclaimItem {
 const fmt = (n: number) => `$${Number(n).toLocaleString()}`
 
 export default function DashboardPage() {
-  const { token } = useAuth()
+  const { isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = useState('portfolio')
   const [showProofModal, setShowProofModal] = useState(false)
   const [selectedProof, setSelectedProof] = useState<{ title: string; content: string } | null>(null)
@@ -55,14 +55,14 @@ export default function DashboardPage() {
   const { writeContractAsync } = useWriteContract()
 
   useEffect(() => {
-    if (!token) return
+    if (!isAuthenticated) return
     setLoading(true)
     Promise.all([
-      apiFetch('/user/dashboard', {}, token).then(r => r.ok ? r.json() : null),
-      apiFetch('/user/contributions', {}, token).then(r => r.ok ? r.json() : null),
-      apiFetch('/user/voting-required', {}, token).then(r => r.ok ? r.json() : null),
-      apiFetch('/user/transactions', {}, token).then(r => r.ok ? r.json() : null),
-      apiFetch('/user/reclaimable', {}, token).then(r => r.ok ? r.json() : null),
+      apiFetch('/user/dashboard').then(r => r.ok ? r.json() : null),
+      apiFetch('/user/contributions').then(r => r.ok ? r.json() : null),
+      apiFetch('/user/voting-required').then(r => r.ok ? r.json() : null),
+      apiFetch('/user/transactions').then(r => r.ok ? r.json() : null),
+      apiFetch('/user/reclaimable').then(r => r.ok ? r.json() : null),
     ]).then(([stats, contribs, voting, txs, reclaim]) => {
       if (stats) setDashStats(stats)
       if (contribs) setContributions(contribs)
@@ -71,7 +71,7 @@ export default function DashboardPage() {
       if (reclaim) setReclaimable(reclaim)
       setLoading(false)
     })
-  }, [token])
+  }, [isAuthenticated])
 
   // Group contributions by campaign for portfolio tab
   const portfolio = Object.values(

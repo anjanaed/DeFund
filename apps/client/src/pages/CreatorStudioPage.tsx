@@ -43,7 +43,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default function CreatorStudioPage() {
-  const { token } = useAuth()
+  const { isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = useState('active')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showProofModal, setShowProofModal] = useState(false)
@@ -69,14 +69,14 @@ export default function CreatorStudioPage() {
   const { writeContractAsync } = useWriteContract()
 
   const loadCampaigns = () => {
-    if (!token) return
+    if (!isAuthenticated) return
     setLoading(true)
-    apiFetch('/creator/projects', {}, token)
+    apiFetch('/creator/projects')
       .then(r => r.ok ? r.json() : [])
       .then(data => { setCampaigns(data); setLoading(false) })
   }
 
-  useEffect(() => { loadCampaigns() }, [token])
+  useEffect(() => { loadCampaigns() }, [isAuthenticated])
 
   const handleReleaseFunds = async (milestone: Milestone) => {
     if (!milestone.onChainId) { setTxError('Milestone not yet on-chain.'); return }
@@ -144,7 +144,7 @@ export default function CreatorStudioPage() {
       const res = await apiFetch(`/projects/${campaignId}/updates`, {
         method: 'POST',
         body: JSON.stringify({ title: updateTitle.trim(), content: updateContent.trim() }),
-      }, token)
+      })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Failed to post update')

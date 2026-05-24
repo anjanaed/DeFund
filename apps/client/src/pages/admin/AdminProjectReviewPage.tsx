@@ -7,7 +7,6 @@ import { sepolia } from 'viem/chains'
 import { HiArrowLeft, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiCurrencyDollar } from 'react-icons/hi2'
 import { FaTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
 import '../../Admin.css'
@@ -15,7 +14,6 @@ import '../../Admin.css'
 export default function AdminProjectReviewPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { token } = useAuth()
   const { writeContractAsync } = useWriteContract()
 
   const [campaign, setCampaign] = useState<any>(null)
@@ -24,12 +22,12 @@ export default function AdminProjectReviewPage() {
   const [actionMessage, setActionMessage] = useState('')
 
   useEffect(() => {
-    apiFetch(`/admin/projects/${id}`, {}, token)
+    apiFetch(`/admin/projects/${id}`)
       .then((r) => r.json())
       .then((data) => setCampaign(data))
       .catch(() => setActionMessage('Failed to load campaign'))
       .finally(() => setLoading(false))
-  }, [id, token])
+  }, [id])
 
   const handleApprove = async () => {
     if (!campaign?.ipfsHash) {
@@ -105,7 +103,7 @@ export default function AdminProjectReviewPage() {
         await apiFetch(`/admin/projects/${id}/approve`, {
           method: 'POST',
           body: JSON.stringify({ onChainId }),
-        }, token)
+        })
       } catch {
         // Swallow — indexer will sync from CampaignCreated + CampaignApproved events
       }
@@ -148,7 +146,7 @@ export default function AdminProjectReviewPage() {
     setActionStatus('pending')
     setActionMessage('')
     try {
-      const res = await apiFetch(`/admin/projects/${id}/reject`, { method: 'POST' }, token)
+      const res = await apiFetch(`/admin/projects/${id}/reject`, { method: 'POST' })
       if (!res.ok) throw new Error('Rejection failed')
       setActionStatus('success')
       setActionMessage('Campaign rejected.')
@@ -175,7 +173,7 @@ export default function AdminProjectReviewPage() {
         args: [BigInt(campaign.onChainId), 'Flagged by admin'],
       })
       try {
-        await apiFetch(`/admin/projects/${id}/flag`, { method: 'POST' }, token)
+        await apiFetch(`/admin/projects/${id}/flag`, { method: 'POST' })
       } catch {
         // Indexer will sync from CampaignFlagged event
       }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { HiClock, HiFlag, HiChartBar, HiXCircle, HiMagnifyingGlass } from 'react-icons/hi2'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
@@ -76,7 +75,6 @@ function activityStatusColor(status: string): 'success' | 'warning' | 'error' | 
 }
 
 export default function AdminDashboardPage() {
-  const { token } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [currentPage, setCurrentPage] = useState(1)
@@ -89,13 +87,12 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!token) return
     let cancelled = false
     setLoading(true)
     Promise.all([
-      apiFetch('/admin/stats', {}, token).then((r) => r.json()),
-      apiFetch('/admin/activity', {}, token).then((r) => r.json()),
-      apiFetch(`/admin/transactions?page=${currentPage}&limit=${itemsPerPage}`, {}, token).then((r) => r.json()),
+      apiFetch('/admin/stats').then((r) => r.json()),
+      apiFetch('/admin/activity').then((r) => r.json()),
+      apiFetch(`/admin/transactions?page=${currentPage}&limit=${itemsPerPage}`).then((r) => r.json()),
     ])
       .then(([statsData, activityData, txData]) => {
         if (cancelled) return
@@ -106,7 +103,7 @@ export default function AdminDashboardPage() {
       .catch(() => !cancelled && setError('Failed to load dashboard data'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [token, currentPage])
+  }, [currentPage])
 
   const filteredTransactions = (txPage?.items ?? []).filter((tx) => {
     const q = searchTerm.toLowerCase()

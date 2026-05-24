@@ -18,7 +18,7 @@ interface AdminUser {
 }
 
 export default function AdminUsersPage() {
-  const { token, user: currentUser } = useAuth()
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -26,10 +26,9 @@ export default function AdminUsersPage() {
   const [savingId, setSavingId] = useState<string | null>(null)
 
   const load = async () => {
-    if (!token) return
     setLoading(true)
     try {
-      const res = await apiFetch('/admin/users', {}, token)
+      const res = await apiFetch('/admin/users')
       const data = await res.json()
       setUsers(Array.isArray(data) ? data : [])
     } catch {
@@ -42,7 +41,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [])
 
   const handleRoleChange = async (userId: string, role: Role) => {
     if (userId === currentUser?.id && role !== 'ADMIN') {
@@ -54,7 +53,7 @@ export default function AdminUsersPage() {
       const res = await apiFetch(`/admin/users/${userId}/set-role`, {
         method: 'POST',
         body: JSON.stringify({ role }),
-      }, token)
+      })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Role update failed')

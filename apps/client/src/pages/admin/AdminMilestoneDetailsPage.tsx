@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useWriteContract } from 'wagmi'
 import { HiArrowLeft, HiClock, HiDocumentText, HiCurrencyDollar, HiCheckCircle, HiXCircle } from 'react-icons/hi2'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
 import '../../Admin.css'
@@ -11,7 +10,6 @@ import '../../Admin.css'
 export default function AdminMilestoneDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { token } = useAuth()
   const { writeContractAsync } = useWriteContract()
 
   const [milestone, setMilestone] = useState<any>(null)
@@ -22,18 +20,18 @@ export default function AdminMilestoneDetailsPage() {
   const [notifyMessage, setNotifyMessage] = useState('')
 
   useEffect(() => {
-    apiFetch(`/admin/milestones/${id}`, {}, token)
+    apiFetch(`/admin/milestones/${id}`)
       .then((r) => r.json())
       .then((data) => setMilestone(data))
       .catch(() => setFinalizeMessage('Failed to load milestone'))
       .finally(() => setLoading(false))
-  }, [id, token])
+  }, [id])
 
   const handleNotifyRelease = async () => {
     setNotifyStatus('pending')
     setNotifyMessage('')
     try {
-      const res = await apiFetch(`/admin/milestones/${id}/notify-release`, { method: 'POST' }, token)
+      const res = await apiFetch(`/admin/milestones/${id}/notify-release`, { method: 'POST' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Notification failed')
@@ -66,7 +64,7 @@ export default function AdminMilestoneDetailsPage() {
       setFinalizeMessage('Voting finalized on-chain. Refreshing in a few seconds…')
       // Reload from API so the actual vote result (APPROVED or REJECTED) is shown
       setTimeout(() => {
-        apiFetch(`/admin/milestones/${id}`, {}, token)
+        apiFetch(`/admin/milestones/${id}`)
           .then((r) => r.json())
           .then((data) => {
             setMilestone(data)

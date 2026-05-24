@@ -32,7 +32,7 @@ export class AuthService {
 
   async verifySignature(
     dto: VerifySignatureDto,
-  ): Promise<{ accessToken: string }> {
+  ): Promise<{ accessToken: string; user: { id: string; walletAddress: string; role: string } }> {
     const user = await this.prisma.user.findUnique({
       where: { walletAddress: dto.walletAddress.toLowerCase() },
     });
@@ -73,6 +73,9 @@ export class AuthService {
       role,
     });
 
-    return { accessToken };
+    return {
+      accessToken,
+      user: { id: user.id, walletAddress: user.walletAddress, role },
+    };
   }
 }

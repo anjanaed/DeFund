@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HiMagnifyingGlass } from 'react-icons/hi2'
 import Spinner from '../../components/common/Spinner'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import '../../Admin.css'
 
@@ -16,18 +15,17 @@ interface Campaign {
 
 export default function AdminVerificationPage() {
   const navigate = useNavigate()
-  const { token } = useAuth()
   const [projects, setProjects] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    apiFetch('/admin/verification', {}, token)
+    apiFetch('/admin/verification')
       .then((r) => r.json())
       .then((data) => setProjects(Array.isArray(data) ? data : []))
       .catch(() => setProjects([]))
       .finally(() => setLoading(false))
-  }, [token])
+  }, [])
 
   const filtered = projects.filter(
     (p) =>

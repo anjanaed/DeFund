@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-const STORAGE_KEY = 'defund_auth'
 
 interface AuthUser {
   id: string
@@ -10,49 +9,34 @@ interface AuthUser {
   role: string
 }
 
-interface AuthState {
-  token: string
-  user: AuthUser
-}
-
 interface AuthContextType {
   user: AuthUser | null
-  token: string | null
   isAuthenticated: boolean
   isAdmin: boolean
   login: (walletAddress: string, signFn: (message: string) => Promise<string>) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-function parseJwt(token: string): Record<string, any> {
-  const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-  return JSON.parse(atob(base64))
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<AuthState | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  })
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
+  // Restore session from HttpOnly cookie on page load
   useEffect(() => {
-    if (auth) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(auth))
-    } else {
-      localStorage.removeItem(STORAGE_KEY)
-    }
-  }, [auth])
+    fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.user) setUser(data.user) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
   const login = async (walletAddress: string, signFn: (message: string) => Promise<string>) => {
     // Step 1: get nonce
     const nonceRes = await fetch(`${API_BASE}/auth/nonce`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ walletAddress }),
     })
@@ -62,32 +46,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Step 2: sign the nonce with the wallet
     const signature = await signFn(nonce)
 
-    // Step 3: verify signature and receive JWT
+    // Step 3: verify signature — server sets HttpOnly cookie, returns user info
     const verifyRes = await fetch(`${API_BASE}/auth/verify`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ walletAddress, signature }),
     })
     if (!verifyRes.ok) throw new Error('Signature verification failed')
-    const { accessToken } = await verifyRes.json()
-
-    // Step 4: decode and store
-    const payload = parseJwt(accessToken)
-    setAuth({
-      token: accessToken,
-      user: { id: payload.sub, walletAddress: payload.walletAddress, role: payload.role },
-    })
+    const { user: authUser } = await verifyRes.json()
+    setUser(authUser)
   }
 
-  const logout = () => setAuth(null)
+  const logout = async () => {
+    await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+    setUser(null)
+  }
+
+  if (loading) return null
 
   return (
     <AuthContext.Provider
       value={{
-        user: auth?.user ?? null,
-        token: auth?.token ?? null,
-        isAuthenticated: auth !== null,
-        isAdmin: auth?.user.role === 'ADMIN',
+        user,
+        isAuthenticated: user !== null,
+        isAdmin: user?.role === 'ADMIN',
         login,
         logout,
       }}

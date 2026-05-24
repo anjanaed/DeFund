@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HiMagnifyingGlass } from 'react-icons/hi2'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
@@ -70,7 +69,6 @@ function statusBadge(status: string): 'success' | 'warning' | 'error' | 'neutral
 
 export default function AdminMilestonePage() {
   const navigate = useNavigate()
-  const { token } = useAuth()
   const [page, setPage] = useState<MilestonesPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -80,16 +78,15 @@ export default function AdminMilestonePage() {
   const itemsPerPage = 10
 
   useEffect(() => {
-    if (!token) return
     let cancelled = false
     setLoading(true)
-    apiFetch(`/admin/milestones?page=${currentPage}&limit=${itemsPerPage}`, {}, token)
+    apiFetch(`/admin/milestones?page=${currentPage}&limit=${itemsPerPage}`)
       .then((r) => r.json())
       .then((data: MilestonesPage) => !cancelled && setPage(data))
       .catch(() => !cancelled && setError('Failed to load milestones'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [token, currentPage])
+  }, [currentPage])
 
   const filtered = (page?.items ?? []).filter((m) => {
     const q = searchTerm.toLowerCase()

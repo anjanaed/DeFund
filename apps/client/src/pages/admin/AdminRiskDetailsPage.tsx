@@ -4,7 +4,6 @@ import { useWriteContract } from 'wagmi'
 import { HiArrowLeft, HiShieldCheck, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiExclamationTriangle } from 'react-icons/hi2'
 import { FaGithub, FaTwitter, FaDiscord } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
-import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
 import '../../Admin.css'
@@ -12,7 +11,6 @@ import '../../Admin.css'
 export default function AdminRiskDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { token } = useAuth()
   const { writeContractAsync } = useWriteContract()
 
   const [campaign, setCampaign] = useState<any>(null)
@@ -25,8 +23,8 @@ export default function AdminRiskDetailsPage() {
 
   const loadData = () => {
     return Promise.all([
-      apiFetch(`/admin/projects/${id}`, {}, token).then((r) => r.json()),
-      apiFetch(`/admin/projects/${id}/refund-proposal`, {}, token).then((r) =>
+      apiFetch(`/admin/projects/${id}`).then((r) => r.json()),
+      apiFetch(`/admin/projects/${id}/refund-proposal`).then((r) =>
         r.ok ? r.json() : null,
       ),
     ])
@@ -95,7 +93,7 @@ export default function AdminRiskDetailsPage() {
     setBlockStatus('pending')
     setBlockError('')
     try {
-      const res = await apiFetch(`/admin/projects/${id}/block`, { method: 'POST' }, token)
+      const res = await apiFetch(`/admin/projects/${id}/block`, { method: 'POST' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Block failed')
