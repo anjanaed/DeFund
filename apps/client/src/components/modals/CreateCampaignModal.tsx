@@ -18,7 +18,7 @@ interface CreateCampaignModalProps {
 }
 
 export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampaignModalProps) {
-  const { token, isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth()
 
   const [formData, setFormData] = useState({
     title: '',
@@ -46,18 +46,22 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
   const [socialError, setSocialError] = useState<string | null>(null)
 
   const handleConnect = async (platform: 'twitter' | 'discord' | 'github') => {
-    if (socials[platform].connected || !token) return
+    if (socials[platform].connected || !isAuthenticated) return
     setSocialError(null)
     setConnectingPlatform(platform)
     // Open popup synchronously inside the click handler — browsers block window.open after await
     const popup = window.open('', `${platform}-oauth`, 'width=600,height=700,left=400,top=100')
     try {
-      const res = await apiFetch(`/auth/${platform}/initiate`, {}, token)
+      const res = await apiFetch(`/auth/${platform}/initiate`)
       if (!res.ok) {
         popup?.close()
-        const err = await res.json().catch(() => ({}))
-        setSocialError(`Could not start ${platform} auth: ${err.message || res.status}`)
         setConnectingPlatform(null)
+        if (res.status === 401) {
+          setSocialError('Session expired — please disconnect your wallet and reconnect, then try again.')
+        } else {
+          const err = await res.json().catch(() => ({}))
+          setSocialError(`Could not start ${platform} auth: ${err.message || res.status}`)
+        }
         return
       }
       const { url } = await res.json()
@@ -111,7 +115,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     e.preventDefault()
     setErrorMsg('')
 
-    if (!isAuthenticated || !token) {
+    if (!isAuthenticated) {
       setErrorMsg('Please sign in with your wallet first.')
       return
     }
@@ -158,7 +162,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
             amount: parseFloat(m.amount),
           })),
         }),
-      }, token)
+      })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))

@@ -44,7 +44,7 @@ function formatTimestamp(iso: string): string {
 }
 
 export default function ProjectForum({ projectId }: Props) {
-  const { token, isAuthenticated, user, isAdmin } = useAuth()
+  const { isAuthenticated, user, isAdmin } = useAuth()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -126,14 +126,14 @@ export default function ProjectForum({ projectId }: Props) {
   }
 
   const handlePost = async () => {
-    if (!composer.trim() || !token) return
+    if (!composer.trim() || !isAuthenticated) return
     setPosting(true)
     setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum`, {
         method: 'POST',
         body: JSON.stringify({ content: composer.trim() }),
-      }, token)
+      })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Post failed')
@@ -149,14 +149,14 @@ export default function ProjectForum({ projectId }: Props) {
   }
 
   const handleReplySubmit = async (parentId: string) => {
-    if (!replyText.trim() || !token) return
+    if (!replyText.trim() || !isAuthenticated) return
     setBusyMessageId(parentId)
     setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum`, {
         method: 'POST',
         body: JSON.stringify({ content: replyText.trim(), parentId }),
-      }, token)
+      })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Reply failed')
@@ -173,14 +173,14 @@ export default function ProjectForum({ projectId }: Props) {
   }
 
   const handleEditSubmit = async (messageId: string) => {
-    if (!editText.trim() || !token) return
+    if (!editText.trim() || !isAuthenticated) return
     setBusyMessageId(messageId)
     setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum/${messageId}`, {
         method: 'PATCH',
         body: JSON.stringify({ content: editText.trim() }),
-      }, token)
+      })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Edit failed')
@@ -197,14 +197,14 @@ export default function ProjectForum({ projectId }: Props) {
   }
 
   const handleDelete = async (messageId: string) => {
-    if (!token) return
+    if (!isAuthenticated) return
     if (!confirm('Delete this message? It will be marked as deleted but kept in the thread.')) return
     setBusyMessageId(messageId)
     setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum/${messageId}`, {
         method: 'DELETE',
-      }, token)
+      })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Delete failed')
@@ -219,7 +219,7 @@ export default function ProjectForum({ projectId }: Props) {
   }
 
   const handleReact = async (messageId: string, type: ReactionType) => {
-    if (!token || !user) return
+    if (!isAuthenticated || !user) return
     const flatten = [...messages, ...messages.flatMap((m) => m.replies ?? [])]
     const target = flatten.find((m) => m.id === messageId)
     if (!target) return
@@ -235,7 +235,7 @@ export default function ProjectForum({ projectId }: Props) {
       const res = await apiFetch(`/projects/${projectId}/forum/${messageId}/reactions`, {
         method: 'POST',
         body: JSON.stringify({ type }),
-      }, token)
+      })
       if (!res.ok) throw new Error('Reaction failed')
     } catch (e: any) {
       // Roll back

@@ -3,13 +3,13 @@
 .admin-container {
   display: flex;
   min-height: 100vh;
-  background: var(--color-bg-purple-subtle);
+  background: #F1EEF9;
 }
 
 .admin-sidebar {
   width: 260px;
-  background: white;
-  border-right: 1px solid var(--color-border);
+  background: #FFFFFF;
+  border-right: 1px solid var(--color-border-purple);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -17,6 +17,7 @@
   bottom: 0;
   left: 0;
   z-index: 100;
+  box-shadow: 2px 0 12px rgba(91, 33, 182, 0.07);
 }
 
 .admin-main {
@@ -24,6 +25,7 @@
   margin-left: 260px;
   padding: var(--space-8);
   overflow-y: auto;
+  min-height: 100vh;
 }
 
 /* Sidebar Elements */
@@ -32,7 +34,8 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-6);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-purple);
+  background: linear-gradient(135deg, #EDE9FE 0%, #F5F3FF 100%);
 }
 
 .admin-brand-logo {
@@ -133,11 +136,18 @@
 }
 
 .admin-stat-card {
-  background: white;
+  background: #FFFFFF;
   padding: var(--space-6);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   position: relative;
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+
+.admin-stat-card:hover {
+  box-shadow: 0 6px 18px rgba(91, 33, 182, 0.10);
+  transform: translateY(-1px);
 }
 
 .admin-stat-icon {
@@ -174,10 +184,11 @@
 
 /* Tables */
 .admin-table-card {
-  background: white;
+  background: #FFFFFF;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
 .admin-table-header {

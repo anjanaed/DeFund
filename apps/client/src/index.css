@@ -9,10 +9,10 @@
   
   /* Backgrounds */
   --color-bg: #FFFFFF;
-  --color-bg-subtle: #FAFAFA;
-  --color-bg-muted: #F4F4F5;
-  --color-bg-purple-light: #FCFAFF;
-  --color-bg-purple-subtle: #F9F8FF;
+  --color-bg-subtle: #F7F4FF;
+  --color-bg-muted: #F2F0F9;
+  --color-bg-purple-light: #EDE9FE;
+  --color-bg-purple-subtle: #F5F3FF;
   
   /* Text */
   --color-text-primary: #18181B;
@@ -22,7 +22,7 @@
   /* Borders - Subtle 1px */
   --color-border: #E4E4E7;
   --color-border-hover: #D4D4D8;
-  --color-border-purple: #E9D5FF;
+  --color-border-purple: #C4B5FD;
   
   /* Functional Colors */
   --color-success: #10B981;
@@ -44,7 +44,7 @@
   --space-24: 96px;
   
   /* Typography Scale */
-  --text-xs: 12px;
+  --text-xs: 13px;
   --text-sm: 14px;
   --text-base: 16px;
   --text-lg: 18px;
@@ -85,7 +85,7 @@ body {
   font-size: var(--text-base);
   line-height: 1.6;
   color: var(--color-text-primary);
-  background: linear-gradient(180deg, #FDFBFF 0%, #FFFFFF 100%);
+  background: linear-gradient(180deg, #EDE9FE 0%, #F5F0FF 30%, #FAF8FF 60%, #FFFFFF 100%);
   min-height: 100vh;
   font-feature-settings: 'cv11', 'ss01';
 }
@@ -239,13 +239,13 @@ a:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.04);
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 .card:hover {
   border-color: var(--color-border-hover);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 6px 20px rgba(91, 33, 182, 0.10);
 }
 
 /* Badge - Minimal */
@@ -298,7 +298,7 @@ input::placeholder, textarea::placeholder {
 
 /* Progress Bar */
 .progress {
-  height: 5px;
+  height: 6px;
   background: var(--color-bg-muted);
   border-radius: var(--radius-full);
   overflow: hidden;
