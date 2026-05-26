@@ -213,17 +213,16 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     const dbStatus = ON_CHAIN_STATUS[onChainStatusIndex];
     if (!dbStatus) return;
 
-    // Don't overwrite an admin-rejected campaign (FAILED with isAdminApproved=false)
-    const campaign = await this.prisma.campaign.findFirst({ where: { onChainId } });
-    if (
-      campaign &&
-      campaign.status === CampaignStatus.FAILED &&
-      !campaign.isAdminApproved
-    ) {
-      return;
-    }
-
-    await this.prisma.campaign.updateMany({ where: { onChainId }, data: { status: dbStatus } });
+    // Atomic conditional update: never overwrite an admin-rejected campaign
+    // (FAILED with isAdminApproved=false). The NOT filter makes this a single
+    // DB round-trip and avoids the read-then-write race.
+    await this.prisma.campaign.updateMany({
+      where: {
+        onChainId,
+        NOT: { AND: [{ status: CampaignStatus.FAILED }, { isAdminApproved: false }] },
+      },
+      data: { status: dbStatus },
+    });
   }
 
   private async onStatusChange(onChainIdBig: bigint, status: CampaignStatus) {

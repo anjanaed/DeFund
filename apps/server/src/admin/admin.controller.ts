@@ -36,10 +36,14 @@ export class AdminController {
   getTransactions(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
   ) {
     return this.admin.getTransactions(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
+      search,
+      status,
     );
   }
 

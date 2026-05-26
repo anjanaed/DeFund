@@ -66,7 +66,11 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
       }
       const { url } = await res.json()
       if (popup) popup.location.href = url
+      const expectedOrigin = import.meta.env.VITE_API_URL
+        ? new URL(import.meta.env.VITE_API_URL).origin
+        : window.location.origin
       const handler = (e: MessageEvent) => {
+        if (e.origin !== expectedOrigin) return
         if (e.data?.provider !== platform) return
         window.removeEventListener('message', handler)
         setConnectingPlatform(null)

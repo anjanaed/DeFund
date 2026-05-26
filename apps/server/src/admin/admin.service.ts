@@ -63,10 +63,22 @@ export class AdminService {
     return activity.slice(0, 20);
   }
 
-  async getTransactions(page = 1, limit = 20) {
+  async getTransactions(page = 1, limit = 20, search?: string, status?: string) {
     const skip = (page - 1) * limit;
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { campaign: { title: { contains: search, mode: 'insensitive' } } },
+        { transactionHash: { contains: search, mode: 'insensitive' } },
+        { contributor: { walletAddress: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+    if (status === 'Refunded') where.refunded = true;
+    else if (status === 'Success') where.refunded = false;
+
     const [items, total] = await Promise.all([
       this.prisma.contribution.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { timestamp: 'desc' },
@@ -75,7 +87,7 @@ export class AdminService {
           contributor: { select: { walletAddress: true, name: true } },
         },
       }),
-      this.prisma.contribution.count(),
+      this.prisma.contribution.count({ where }),
     ]);
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }

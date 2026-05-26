@@ -86,13 +86,29 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Debounce search so we don't fire a request on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 400)
+    return () => clearTimeout(t)
+  }, [searchTerm])
+
+  // Reset to page 1 whenever the search/filter changes
+  useEffect(() => { setCurrentPage(1) }, [debouncedSearch, statusFilter])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    const txParams = new URLSearchParams({
+      page: String(currentPage),
+      limit: String(itemsPerPage),
+    })
+    if (debouncedSearch) txParams.set('search', debouncedSearch)
+    if (statusFilter !== 'All') txParams.set('status', statusFilter)
     Promise.all([
       apiFetch('/admin/stats').then((r) => r.json()),
       apiFetch('/admin/activity').then((r) => r.json()),
-      apiFetch(`/admin/transactions?page=${currentPage}&limit=${itemsPerPage}`).then((r) => r.json()),
+      apiFetch(`/admin/transactions?${txParams}`).then((r) => r.json()),
     ])
       .then(([statsData, activityData, txData]) => {
         if (cancelled) return
@@ -103,18 +119,9 @@ export default function AdminDashboardPage() {
       .catch(() => !cancelled && setError('Failed to load dashboard data'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [currentPage])
+  }, [currentPage, debouncedSearch, statusFilter])
 
-  const filteredTransactions = (txPage?.items ?? []).filter((tx) => {
-    const q = searchTerm.toLowerCase()
-    const matchesSearch =
-      tx.campaign.title.toLowerCase().includes(q) ||
-      (tx.transactionHash ?? '').toLowerCase().includes(q) ||
-      tx.contributor.walletAddress.toLowerCase().includes(q)
-    const status = tx.refunded ? 'Refunded' : 'Success'
-    const matchesStatus = statusFilter === 'All' || status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filteredTransactions = txPage?.items ?? []
 
   const statCards = [
     { label: 'Pending Verification', value: stats?.pending ?? '—', subtitle: 'Projects awaiting approval', icon: HiClock, trend: 'neutral' },

@@ -65,6 +65,7 @@ export default function CreatorStudioPage() {
   const [updateContent, setUpdateContent] = useState('')
   const [postingUpdate, setPostingUpdate] = useState(false)
   const [updateFeedback, setUpdateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
 
   const { writeContractAsync } = useWriteContract()
 
@@ -107,7 +108,11 @@ export default function CreatorStudioPage() {
 
   const handleCancelCampaign = async (campaign: CreatorCampaign) => {
     if (!campaign.onChainId) { setTxError('Campaign not yet on-chain.'); return }
-    if (!window.confirm(`Cancel "${campaign.title}"? This is irreversible. Contributors will be able to propose refunds.`)) return
+    if (cancelConfirmId !== campaign.id) {
+      setCancelConfirmId(campaign.id)
+      return
+    }
+    setCancelConfirmId(null)
     try {
       await writeContractAsync({
         address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
@@ -246,13 +251,32 @@ export default function CreatorStudioPage() {
                       <HiArrowDownTray style={{ marginRight: 8 }} /> Download Report
                     </button>
                     {['PENDING', 'ACTIVE'].includes(project.status) && project.onChainId != null && (
-                      <button
-                        className="creator-view-project-btn"
-                        onClick={() => handleCancelCampaign(project)}
-                        style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
-                      >
-                        Cancel Campaign
-                      </button>
+                      cancelConfirmId === project.id ? (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '13px', color: 'var(--color-error)' }}>Are you sure? This is irreversible.</span>
+                          <button
+                            className="creator-view-project-btn"
+                            onClick={() => handleCancelCampaign(project)}
+                            style={{ background: 'var(--color-error)', border: 'none', color: 'white' }}
+                          >
+                            Confirm Cancel
+                          </button>
+                          <button
+                            className="creator-view-project-btn"
+                            onClick={() => setCancelConfirmId(null)}
+                          >
+                            No, Keep
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="creator-view-project-btn"
+                          onClick={() => handleCancelCampaign(project)}
+                          style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
+                        >
+                          Cancel Campaign
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

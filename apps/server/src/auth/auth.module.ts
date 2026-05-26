@@ -13,7 +13,7 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('jwtSecret') ?? 'changeme',
+        secret: config.get<string>('jwtSecret') || (() => { throw new Error('JWT_SECRET environment variable is required'); })(),
         signOptions: { expiresIn: '7d' },
       }),
     }),

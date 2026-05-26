@@ -19,12 +19,31 @@ const messageInclude = {
   _count: { select: { replies: true } },
 };
 
+
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
 @Injectable()
 export class ForumService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async annotateContributors<T extends { userId: string; user: Record<string, unknown> }>(
+    messages: T[],
+    campaignId: string,
+    creatorId: string,
+  ): Promise<(T & { user: T['user'] & { isContributor: boolean; isCreator: boolean } })[]> {
+    if (messages.length === 0) return messages as any;
+    const userIds = [...new Set(messages.map((m) => m.userId))];
+    const contributors = await this.prisma.contribution.findMany({
+      where: { campaignId, contributorId: { in: userIds } },
+      select: { contributorId: true },
+    });
+    const contributorIds = new Set(contributors.map((c) => c.contributorId));
+    return messages.map((m) => ({
+      ...m,
+      user: { ...m.user, isContributor: contributorIds.has(m.userId), isCreator: m.userId === creatorId },
+    })) as any;
+  }
 
   async getForumByProjectId(
     campaignId: string,
@@ -65,8 +84,13 @@ export class ForumService {
         })
       : [];
 
-    const repliesByParent = new Map<string, typeof replies>();
-    for (const r of replies) {
+    const [annotatedItems, annotatedReplies] = await Promise.all([
+      this.annotateContributors(items, campaignId, campaign.creatorId),
+      this.annotateContributors(replies, campaignId, campaign.creatorId),
+    ]);
+
+    const repliesByParent = new Map<string, typeof annotatedReplies>();
+    for (const r of annotatedReplies) {
       const arr = repliesByParent.get(r.parentId!) ?? [];
       arr.push(r);
       repliesByParent.set(r.parentId!, arr);
@@ -74,7 +98,7 @@ export class ForumService {
 
     return {
       id: forum.id,
-      messages: items.map((m) => ({
+      messages: annotatedItems.map((m) => ({
         ...m,
         replies: repliesByParent.get(m.id) ?? [],
       })),
@@ -114,7 +138,7 @@ export class ForumService {
       }
     }
 
-    return this.prisma.message.create({
+    const msg = await this.prisma.message.create({
       data: {
         content: dto.content,
         forumId: forum.id,
@@ -123,6 +147,16 @@ export class ForumService {
       },
       include: messageInclude,
     });
+
+    const isCreator = campaign.creatorId === userId;
+    const contribution = await this.prisma.contribution.findFirst({
+      where: { campaignId, contributorId: userId },
+    });
+
+    return {
+      ...msg,
+      user: { ...msg.user, isContributor: !!contribution, isCreator },
+    };
   }
 
   async updateMessage(

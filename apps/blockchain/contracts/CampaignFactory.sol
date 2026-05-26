@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title CampaignFactory
@@ -12,6 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @notice Factory contract managing all campaigns with contribution-weighted voting
  */
 contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
     enum CampaignStatus {
         Pending, // Awaiting admin approval
         Active, // Approved and accepting contributions
@@ -125,9 +127,6 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
     uint256 public constant VOTING_PERIOD = 7 days;
     uint256 public constant MIN_QUORUM_PERCENTAGE = 30; // 30% of total raised must vote
     uint256 public constant REFUND_PROPOSAL_EXPIRY = 3 days;
-
-    bytes32 public constant CAMPAIGN_CREATOR_ROLE =
-        keccak256("CAMPAIGN_CREATOR_ROLE");
 
     event CampaignCreated(
         uint256 indexed campaignId,
@@ -347,25 +346,6 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice Admin approves pending campaign
-     * @param _campaignId Campaign ID to approve
-     */
-    function approveCampaign(
-        uint256 _campaignId
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) validCampaign(_campaignId) {
-        Campaign storage campaign = campaigns[_campaignId];
-        require(
-            campaign.status == CampaignStatus.Pending,
-            "Campaign not pending"
-        );
-
-        campaign.status = CampaignStatus.Active;
-
-        emit CampaignApproved(_campaignId, msg.sender);
-        emit CampaignStatusChanged(_campaignId, CampaignStatus.Active);
-    }
-
-    /**
      * @notice Admin flags campaign for issues
      * @param _campaignId Campaign ID to flag
      * @param _reason Reason for flagging
@@ -520,10 +500,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         );
         require(_amount > 0, "Contribution must be positive");
 
-        require(
-            usdcToken.transferFrom(msg.sender, address(this), _amount),
-            "USDC transfer failed"
-        );
+        usdcToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         contributionCounter++;
         uint256 newContributionId = contributionCounter;
@@ -674,7 +651,6 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         uint256 _milestoneId
     ) external validMilestone(_milestoneId) {
         Milestone storage milestone = milestones[_milestoneId];
-        Campaign storage campaign = campaigns[milestone.campaignId];
 
         require(
             milestone.status == MilestoneStatus.Voting,
@@ -772,10 +748,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             }("");
             require(success, "ETH transfer failed");
         } else {
-            require(
-                usdcToken.transfer(campaign.creator, milestone.amountRequired),
-                "USDC transfer failed"
-            );
+            usdcToken.safeTransfer(campaign.creator, milestone.amountRequired);
         }
 
         emit MilestoneFundsReleased(
@@ -799,7 +772,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             campaign.status == CampaignStatus.Flagged ||
                 campaign.status == CampaignStatus.Cancelled ||
                 (campaign.status == CampaignStatus.Active &&
-                    block.timestamp > campaign.deadline),
+                    block.timestamp >= campaign.deadline),
             "Campaign not eligible for refund"
         );
 
@@ -884,10 +857,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
             );
             require(success, "ETH refund failed");
         } else {
-            require(
-                usdcToken.transfer(msg.sender, refundAmount),
-                "USDC refund failed"
-            );
+            usdcToken.safeTransfer(msg.sender, refundAmount);
         }
 
         emit RefundClaimed(_campaignId, msg.sender, refundAmount);
@@ -990,23 +960,4 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         _unpause();
     }
 
-    /**
-     * @notice Grant campaign creator role to address
-     * @param _account Address to grant role
-     */
-    function grantCreatorRole(
-        address _account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(CAMPAIGN_CREATOR_ROLE, _account);
-    }
-
-    /**
-     * @notice Revoke campaign creator role from address
-     * @param _account Address to revoke role
-     */
-    function revokeCreatorRole(
-        address _account
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(CAMPAIGN_CREATOR_ROLE, _account);
-    }
 }

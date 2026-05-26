@@ -43,6 +43,10 @@ const mockPrisma = {
     create: jest.fn(),
     delete: jest.fn(),
   },
+  contribution: {
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+  },
 };
 
 describe('ForumService', () => {
@@ -95,21 +99,22 @@ describe('ForumService', () => {
     });
 
     it('returns messages with nested replies attached', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'creator-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       const parent = makeMessage({ id: 'msg-1' });
       const reply = makeMessage({ id: 'msg-r1', parentId: 'msg-1' });
       mockPrisma.message.findMany
         .mockResolvedValueOnce([parent])  // top-level (no hasMore)
         .mockResolvedValueOnce([reply]);  // replies
+      mockPrisma.contribution.findMany.mockResolvedValue([]);
 
       const result = await service.getForumByProjectId('campaign-1');
 
-      expect(result.messages[0].replies).toEqual([reply]);
+      expect(result.messages[0].replies[0]).toMatchObject({ id: reply.id });
     });
 
     it('sets nextCursor when there are more messages than the limit', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'creator-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       // Return limit+1 items to signal hasMore
       const messages = Array.from({ length: 21 }, (_, i) =>
@@ -118,6 +123,7 @@ describe('ForumService', () => {
       mockPrisma.message.findMany
         .mockResolvedValueOnce(messages)
         .mockResolvedValueOnce([]);
+      mockPrisma.contribution.findMany.mockResolvedValue([]);
 
       const result = await service.getForumByProjectId('campaign-1', undefined, 20);
 
@@ -126,11 +132,12 @@ describe('ForumService', () => {
     });
 
     it('sets nextCursor to null when there are no more messages', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'creator-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       mockPrisma.message.findMany
         .mockResolvedValueOnce([makeMessage()])
         .mockResolvedValueOnce([]);
+      mockPrisma.contribution.findMany.mockResolvedValue([]);
 
       const result = await service.getForumByProjectId('campaign-1');
 
@@ -160,14 +167,17 @@ describe('ForumService', () => {
     });
 
     it('creates a top-level message without parentId', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'user-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       const created = makeMessage({ content: 'Hello' });
       mockPrisma.message.create.mockResolvedValue(created);
+      mockPrisma.contribution.findFirst.mockResolvedValue(null);
 
       const result = await service.createMessage('campaign-1', 'user-1', { content: 'Hello' });
 
-      expect(result).toEqual(created);
+      expect(result).toMatchObject({ content: 'Hello', parentId: null });
+      expect(result.user.isCreator).toBe(true);
+      expect(result.user.isContributor).toBe(false);
       expect(mockPrisma.message.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ parentId: null }),
@@ -175,8 +185,34 @@ describe('ForumService', () => {
       );
     });
 
+    it('allows a contributor (non-creator) to post and marks isContributor as true', async () => {
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'other-user' });
+      mockPrisma.contribution.findFirst.mockResolvedValue({ id: 'c-1' });
+      mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
+      const created = makeMessage({ content: 'Hello from contributor' });
+      mockPrisma.message.create.mockResolvedValue(created);
+
+      const result = await service.createMessage('campaign-1', 'user-1', { content: 'Hello from contributor' });
+
+      expect(result.user.isContributor).toBe(true);
+      expect(result.user.isCreator).toBe(false);
+    });
+
+    it('allows a non-contributor non-creator to post and marks isContributor as false', async () => {
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'other-user' });
+      mockPrisma.contribution.findFirst.mockResolvedValue(null);
+      mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
+      const created = makeMessage({ content: 'Hello from newcomer' });
+      mockPrisma.message.create.mockResolvedValue(created);
+
+      const result = await service.createMessage('campaign-1', 'user-1', { content: 'Hello from newcomer' });
+
+      expect(result.user.isContributor).toBe(false);
+      expect(result.user.isCreator).toBe(false);
+    });
+
     it('creates a reply to an existing top-level message', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'user-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       const parent = makeMessage({ id: 'msg-1', parentId: null, isDeleted: false });
       mockPrisma.message.findUnique.mockResolvedValue(parent);
@@ -188,11 +224,11 @@ describe('ForumService', () => {
         parentId: 'msg-1',
       });
 
-      expect(result.parentId).toBe('reply-1' ? reply.parentId : 'msg-1');
+      expect(result.parentId).toBe(reply.parentId);
     });
 
     it('throws BadRequestException when trying to reply to a reply (max 1 level deep)', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'user-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       const nestedReply = makeMessage({ id: 'r1', parentId: 'msg-0', isDeleted: false });
       mockPrisma.message.findUnique.mockResolvedValue(nestedReply);
@@ -203,7 +239,7 @@ describe('ForumService', () => {
     });
 
     it('throws BadRequestException when parent message is deleted', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'user-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum());
       const deletedParent = makeMessage({ id: 'msg-1', parentId: null, isDeleted: true });
       mockPrisma.message.findUnique.mockResolvedValue(deletedParent);
@@ -214,7 +250,7 @@ describe('ForumService', () => {
     });
 
     it('throws BadRequestException when parent message belongs to a different forum', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1' });
+      mockPrisma.campaign.findUnique.mockResolvedValue({ id: 'campaign-1', creatorId: 'user-1' });
       mockPrisma.forum.findUnique.mockResolvedValue(makeForum({ id: 'forum-1' }));
       const foreignParent = makeMessage({ id: 'msg-other', forumId: 'forum-9' });
       mockPrisma.message.findUnique.mockResolvedValue(foreignParent);

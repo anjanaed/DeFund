@@ -1,8 +1,8 @@
-export const CAMPAIGN_FACTORY_ADDRESS =
-  (import.meta.env.VITE_CONTRACT_ADDRESS as `0x${string}`) || '0x0000000000000000000000000000000000000000'
+if (!import.meta.env.VITE_CONTRACT_ADDRESS) throw new Error('VITE_CONTRACT_ADDRESS is required')
+if (!import.meta.env.VITE_USDC_ADDRESS) throw new Error('VITE_USDC_ADDRESS is required')
 
-export const USDC_ADDRESS =
-  (import.meta.env.VITE_USDC_ADDRESS as `0x${string}`) || '0x0000000000000000000000000000000000000000'
+export const CAMPAIGN_FACTORY_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as `0x${string}`
+export const USDC_ADDRESS = import.meta.env.VITE_USDC_ADDRESS as `0x${string}`
 
 export const ERC20_APPROVE_ABI = [
   {
@@ -130,15 +130,6 @@ export const CAMPAIGN_FACTORY_ABI = [
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [{ name: '_milestoneId', type: 'uint256' }],
-    outputs: [],
-  },
-
-  // approveCampaign(campaignId) — admin only
-  {
-    name: 'approveCampaign',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: '_campaignId', type: 'uint256' }],
     outputs: [],
   },
 

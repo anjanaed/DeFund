@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
       },
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('jwtSecret') ?? 'changeme',
+      secretOrKey: config.get<string>('jwtSecret') || (() => { throw new Error('JWT_SECRET environment variable is required'); })(),
       passReqToCallback: false,
     });
   }

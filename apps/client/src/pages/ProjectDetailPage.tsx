@@ -73,6 +73,9 @@ export default function ProjectDetailPage() {
 
   const handleContribute = async () => {
     if (!campaign?.onChainId || !contributionAmount) return
+    const amt = parseFloat(contributionAmount)
+    if (isNaN(amt) || amt <= 0) { setTxError('Amount must be greater than zero'); return }
+    if (amt > 1_000_000) { setTxError('Amount exceeds maximum allowed'); return }
     setContributing(true)
     setContributingStep(null)
     try {
@@ -320,6 +323,7 @@ export default function ProjectDetailPage() {
                         value={contributionAmount}
                         onChange={e => setContributionAmount(e.target.value)}
                         min="0"
+                        max="1000000"
                         step="0.01"
                       />
                       <button

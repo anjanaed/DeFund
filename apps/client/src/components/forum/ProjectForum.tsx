@@ -19,7 +19,7 @@ interface Message {
   updatedAt: string
   isDeleted: boolean
   parentId: string | null
-  user: { id: string; name: string | null; walletAddress: string; avatar?: string | null }
+  user: { id: string; name: string | null; walletAddress: string; avatar?: string | null; isContributor?: boolean; isCreator?: boolean }
   reactions: Reaction[]
   replies?: Message[]
   _count: { replies: number }
@@ -268,11 +268,23 @@ export default function ProjectForum({ projectId }: Props) {
           opacity: m.isDeleted ? 0.6 : 1,
         }}
       >
-        <div className="forum-message-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', marginBottom: '6px' }}>
-          <span className="forum-message-author" style={{ fontWeight: 600, fontSize: '14px' }}>
-            {m.user.name || shortenAddress(m.user.walletAddress)}
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+        <div className="forum-message-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span className="forum-message-author" style={{ fontWeight: 600, fontSize: '14px' }}>
+              {m.user.name || shortenAddress(m.user.walletAddress)}
+            </span>
+            {m.user.isCreator && (
+              <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '10px', letterSpacing: '0.02em', background: 'rgba(99,102,241,0.12)', color: 'var(--color-primary)' }}>
+                Creator
+              </span>
+            )}
+            {m.user.isContributor && !m.user.isCreator && (
+              <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '10px', letterSpacing: '0.02em', background: 'rgba(34,197,94,0.12)', color: '#16a34a' }}>
+                Contributor
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>
             {formatTimestamp(m.createdAt)}{wasEdited && <em style={{ marginLeft: 6 }}>(edited)</em>}
           </span>
         </div>

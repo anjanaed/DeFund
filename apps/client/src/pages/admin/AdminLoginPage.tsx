@@ -81,11 +81,11 @@ export default function AdminLoginPage() {
   }, [isAuthenticated, isAdmin])
 
   const statusLabel: Record<Status, string> = {
-    idle: 'Connect Wallet',
+    idle: isConnected ? 'Sign In' : 'Connect Wallet',
     connecting: 'Connecting...',
-    signing: 'Sign the message in your wallet...',
+    signing: 'Sign message in wallet...',
     verifying: 'Verifying...',
-    error: 'Connect Wallet',
+    error: isConnected ? 'Try Again' : 'Connect Wallet',
   }
 
   return (
@@ -118,19 +118,27 @@ export default function AdminLoginPage() {
             Connect your authorized wallet to continue
           </p>
 
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
-            Wallet Address
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', marginBottom: '8px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Wallet
           </label>
-          <div style={{
-            background: 'var(--color-bg-subtle)',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border)',
-            fontFamily: 'monospace',
-            color: address ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-            marginBottom: '16px',
-          }}>
-            {address || '0x...'}
+          <div className={`admin-wallet-field${isConnected && address ? ' is-connected' : ''}`}>
+            {isConnected && address ? (
+              <>
+                <span className="admin-wallet-dot" />
+                <HiWallet size={15} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                <span className="admin-wallet-addr">
+                  {address.slice(0, 6)}
+                  <span style={{ color: 'var(--color-text-tertiary)', margin: '0 1px' }}>···</span>
+                  {address.slice(-4)}
+                </span>
+                <span className="admin-wallet-chip">Connected</span>
+              </>
+            ) : (
+              <>
+                <HiWallet size={15} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: '14px' }}>No wallet connected</span>
+              </>
+            )}
           </div>
 
           {errorMsg && (
