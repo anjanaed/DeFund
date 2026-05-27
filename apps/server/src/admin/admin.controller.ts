@@ -48,13 +48,21 @@ export class AdminController {
   }
 
   @Get('verification')
-  getVerification(@Query('search') search?: string) {
-    return this.admin.getVerification(search);
+  getVerification(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.admin.getVerification(search, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
   }
 
   @Get('projects')
-  getProjects() {
-    return this.admin.getProjects();
+  getProjects(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.admin.getProjects(page ? parseInt(page) : 1, limit ? parseInt(limit) : 20, status);
   }
 
   @Get('projects/:id')
@@ -68,18 +76,38 @@ export class AdminController {
   }
 
   @Post('projects/:id/approve')
-  approveCampaign(@Param('id') id: string, @Body() body: { onChainId: number }) {
-    return this.admin.approveCampaign(id, body.onChainId);
+  approveCampaign(
+    @Param('id') id: string,
+    @Body() body: { onChainId: number },
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.approveCampaignAudited(id, body.onChainId, user.walletAddress);
   }
 
   @Post('projects/:id/reject')
-  rejectCampaign(@Param('id') id: string) {
-    return this.admin.rejectCampaign(id);
+  rejectCampaign(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.rejectCampaignAudited(id, user.walletAddress);
   }
 
   @Post('projects/:id/flag')
-  flagCampaign(@Param('id') id: string, @Body() dto: FlagCampaignDto) {
-    return this.admin.flagCampaign(id, dto.reason);
+  proposeFlagCampaign(@Param('id') id: string, @Body() dto: FlagCampaignDto) {
+    return this.admin.proposeFlagCampaign(id, dto.reason);
+  }
+
+  @Post('projects/:id/flag/confirm')
+  confirmFlagCampaign(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.confirmFlagCampaignAudited(id, user.walletAddress);
+  }
+
+  @Get('projects/:id/flag/proposal')
+  getFlagProposal(@Param('id') id: string) {
+    return this.admin.getFlagProposalForCampaign(id);
   }
 
   @Post('projects/:id/block')
@@ -123,9 +151,33 @@ export class AdminController {
     return this.admin.getMilestone(id);
   }
 
-  @Post('milestones/:id/notify-release')
-  notifyMilestoneRelease(@Param('id') id: string) {
-    return this.admin.notifyMilestoneRelease(id);
+  @Post('milestones/:id/release')
+  proposeReleaseFunds(@Param('id') id: string) {
+    return this.admin.proposeReleaseFunds(id);
+  }
+
+  @Post('milestones/:id/release/confirm')
+  confirmReleaseFunds(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.confirmReleaseFundsAudited(id, user.walletAddress);
+  }
+
+  @Get('audit-log')
+  getAuditLog(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.admin.getAuditLog(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 30,
+    );
+  }
+
+  @Get('milestones/:id/release/proposal')
+  getReleaseProposal(@Param('id') id: string) {
+    return this.admin.getReleaseProposalForMilestone(id);
   }
 
   @Post('users/:id/set-role')
@@ -138,7 +190,11 @@ export class AdminController {
   }
 
   @Get('users')
-  getUsers(@Query('search') search?: string) {
-    return this.admin.getUsers(search);
+  getUsers(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.admin.getUsers(search, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
   }
 }

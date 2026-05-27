@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { NonceRequestDto } from './dto/nonce-request.dto';
 import { VerifySignatureDto } from './dto/verify-signature.dto';
@@ -17,6 +18,9 @@ const COOKIE_OPTIONS = {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // M2 — rate-limit nonce generation to 5 requests per minute per IP
+  // to prevent spam / wallet-slot exhaustion attacks.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('nonce')
   @HttpCode(HttpStatus.OK)
   getNonce(@Body() dto: NonceRequestDto) {

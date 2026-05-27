@@ -29,12 +29,15 @@ export const ERC20_APPROVE_ABI = [
 
 // Minimal ABI — only the functions the frontend needs to call directly
 export const CAMPAIGN_FACTORY_ABI = [
-  // createCampaign(ipfsHash, paymentToken, fundGoal, deadline, milestones[])
+  // createCampaign(creator, ipfsHash, paymentToken, fundGoal, deadline, milestones[])
+  // [H2] _creator is the actual project creator's wallet (receives milestone payouts
+  //      and can submit milestone proofs). Separated from msg.sender (admin).
   {
     name: 'createCampaign',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
+      { name: '_creator', type: 'address' },
       { name: '_ipfsHash', type: 'string' },
       { name: '_paymentToken', type: 'uint8' },
       { name: '_fundGoal', type: 'uint256' },
@@ -73,9 +76,18 @@ export const CAMPAIGN_FACTORY_ABI = [
     outputs: [],
   },
 
-  // releaseMilestoneFunds(milestoneId)  — creator only
+  // proposeReleaseFunds(milestoneId) — admin only, first step of two-admin fund release
   {
-    name: 'releaseMilestoneFunds',
+    name: 'proposeReleaseFunds',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_milestoneId', type: 'uint256' }],
+    outputs: [],
+  },
+
+  // confirmReleaseFunds(milestoneId) — admin only, second step (different admin)
+  {
+    name: 'confirmReleaseFunds',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [{ name: '_milestoneId', type: 'uint256' }],
@@ -133,15 +145,24 @@ export const CAMPAIGN_FACTORY_ABI = [
     outputs: [],
   },
 
-  // flagCampaign(campaignId, reason) — admin only
+  // proposeFlagCampaign(campaignId, reason) — admin only, first step of two-admin flag
   {
-    name: 'flagCampaign',
+    name: 'proposeFlagCampaign',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
       { name: '_campaignId', type: 'uint256' },
       { name: '_reason', type: 'string' },
     ],
+    outputs: [],
+  },
+
+  // confirmFlagCampaign(campaignId) — admin only, second step (different admin)
+  {
+    name: 'confirmFlagCampaign',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
     outputs: [],
   },
 
@@ -161,6 +182,71 @@ export const CAMPAIGN_FACTORY_ABI = [
     stateMutability: 'nonpayable',
     inputs: [{ name: '_campaignId', type: 'uint256' }],
     outputs: [],
+  },
+
+  // expireCampaign(campaignId) — permissionless; cancels any Funded campaign whose
+  // deadline has passed (H3: no longer requires unsubmitted milestone)
+  {
+    name: 'expireCampaign',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [],
+  },
+
+  // withdrawFees(recipient, token, amount) — admin only; extracts accumulated protocol fees
+  {
+    name: 'withdrawFees',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_recipient', type: 'address' },
+      { name: '_token', type: 'uint8' },
+      { name: '_amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+
+  // setMinContribution(minETH, minUSDC) — admin only
+  {
+    name: 'setMinContribution',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_minETH', type: 'uint256' },
+      { name: '_minUSDC', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+
+  // minContributionETH() — public getter
+  {
+    name: 'minContributionETH',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+
+  // minContributionUSDC() — public getter
+  {
+    name: 'minContributionUSDC',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+
+  // hasClaimedRefund(campaignId, contributor) — check if refund already claimed
+  {
+    name: 'hasClaimedRefund',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: '', type: 'uint256' },
+      { name: '', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
   },
 
   // milestones(uint256) — public getter for the milestones mapping (used by MilestoneVotingStatus)

@@ -41,26 +41,24 @@ export class CampaignsService {
     }
 
     if (sort === 'trending') {
-      const campaigns = await this.prisma.campaign.findMany({
-        where: {
-          ...where,
-          status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] },
-        },
-        include: campaignInclude,
-      });
-      const sorted = campaigns.sort((a, b) => {
-        const ratioA = Number(a.raisedAmount) / (Number(a.goalAmount) || 1);
-        const ratioB = Number(b.raisedAmount) / (Number(b.goalAmount) || 1);
-        return ratioB - ratioA;
-      });
-      const items = sorted.slice(skip, skip + limit);
-      return {
-        items,
-        total: sorted.length,
-        page,
-        limit,
-        totalPages: Math.ceil(sorted.length / limit),
+      // Trending = active/funded campaigns sorted by raisedAmount desc (highest absolute
+      // funding correlates strongly with high funding ratio and contributor engagement).
+      // Doing this in the DB avoids loading all campaigns into memory.
+      const trendingWhere: any = {
+        ...where,
+        status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] },
       };
+      const [items, total] = await Promise.all([
+        this.prisma.campaign.findMany({
+          where: trendingWhere,
+          orderBy: { raisedAmount: 'desc' },
+          skip,
+          take: limit,
+          include: campaignInclude,
+        }),
+        this.prisma.campaign.count({ where: trendingWhere }),
+      ]);
+      return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
     const orderBy: any =
@@ -81,17 +79,12 @@ export class CampaignsService {
   }
 
   async findTrending() {
-    const campaigns = await this.prisma.campaign.findMany({
+    return this.prisma.campaign.findMany({
       where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } },
       include: campaignInclude,
+      orderBy: { raisedAmount: 'desc' },
+      take: 3,
     });
-    return campaigns
-      .sort((a, b) => {
-        const ratioA = Number(a.raisedAmount) / (Number(a.goalAmount) || 1);
-        const ratioB = Number(b.raisedAmount) / (Number(b.goalAmount) || 1);
-        return ratioB - ratioA;
-      })
-      .slice(0, 3);
   }
 
   async findOne(id: string) {

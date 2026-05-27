@@ -114,15 +114,21 @@ describe('CampaignsService', () => {
       );
     });
 
-    it('handles trending sort: fetches only ACTIVE/FUNDED, sorts by ratio, paginates in memory', async () => {
-      const low = makeCampaign({ id: 'c1', raisedAmount: 100, goalAmount: 1000 });
-      const high = makeCampaign({ id: 'c2', raisedAmount: 900, goalAmount: 1000 });
-      mockPrisma.campaign.findMany.mockResolvedValue([low, high]);
+    it('handles trending sort: queries only ACTIVE/FUNDED with raisedAmount desc orderBy', async () => {
+      mockPrisma.campaign.findMany.mockResolvedValue([]);
+      mockPrisma.campaign.count.mockResolvedValue(0);
 
-      const result = await service.findAll({ sort: 'trending', page: 1, limit: 12 });
+      await service.findAll({ sort: 'trending', page: 1, limit: 12 });
 
-      expect(result.items[0].id).toBe('c2');
-      expect(result.items[1].id).toBe('c1');
+      // Sorting is now delegated to the DB — verify correct orderBy and status filter
+      expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { raisedAmount: 'desc' },
+          where: expect.objectContaining({
+            status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] },
+          }),
+        }),
+      );
     });
 
     it('calculates correct totalPages with custom limit', async () => {
@@ -147,19 +153,23 @@ describe('CampaignsService', () => {
   });
 
   describe('findTrending', () => {
-    it('returns the top 3 campaigns sorted by raisedAmount/goalAmount ratio', async () => {
-      const c1 = makeCampaign({ id: 'c1', raisedAmount: 10, goalAmount: 100 });
-      const c2 = makeCampaign({ id: 'c2', raisedAmount: 80, goalAmount: 100 });
-      const c3 = makeCampaign({ id: 'c3', raisedAmount: 50, goalAmount: 100 });
-      const c4 = makeCampaign({ id: 'c4', raisedAmount: 60, goalAmount: 100 });
-      mockPrisma.campaign.findMany.mockResolvedValue([c1, c2, c3, c4]);
+    it('delegates sort and limit to DB — passes orderBy raisedAmount desc and take 3', async () => {
+      const c1 = makeCampaign({ id: 'c1', raisedAmount: 80, goalAmount: 100 });
+      const c2 = makeCampaign({ id: 'c2', raisedAmount: 50, goalAmount: 100 });
+      const c3 = makeCampaign({ id: 'c3', raisedAmount: 60, goalAmount: 100 });
+      // DB mock returns 3 items (as take:3 would do)
+      mockPrisma.campaign.findMany.mockResolvedValue([c1, c2, c3]);
 
       const result = await service.findTrending();
 
       expect(result).toHaveLength(3);
-      expect(result[0].id).toBe('c2');
-      expect(result[1].id).toBe('c4');
-      expect(result[2].id).toBe('c3');
+      expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { raisedAmount: 'desc' },
+          take: 3,
+          where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } },
+        }),
+      );
     });
 
     it('only queries ACTIVE and FUNDED campaigns', async () => {

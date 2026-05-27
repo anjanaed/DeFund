@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAccount, useSignMessage } from 'wagmi'
 import logo from '../../assets/logo.png'
-import { HiHome, HiMagnifyingGlass, HiSquares2X2, HiPencilSquare, HiArrowRightOnRectangle } from 'react-icons/hi2'
+import { HiHome, HiMagnifyingGlass, HiSquares2X2, HiPencilSquare, HiArrowRightOnRectangle, HiExclamationTriangle, HiXMark } from 'react-icons/hi2'
 import ConnectWallet from '../wallet/ConnectWallet'
 import { useAuth } from '../../context/AuthContext'
+import NotificationBell from '../notifications/NotificationBell'
 
 export default function AppNavbar() {
   const location = useLocation()
@@ -13,6 +14,19 @@ export default function AppNavbar() {
   const { signMessageAsync } = useSignMessage()
   const [signing, setSigning] = useState(false)
   const [signError, setSignError] = useState('')
+  // F4 — wallet disconnect detection
+  const [showDisconnectBanner, setShowDisconnectBanner] = useState(false)
+  const prevConnected = useRef(isConnected)
+
+  useEffect(() => {
+    // When a signed-in user's wallet becomes disconnected, show the banner
+    if (prevConnected.current && !isConnected && isAuthenticated) {
+      setShowDisconnectBanner(true)
+    }
+    // If they reconnect, hide the banner
+    if (isConnected) setShowDisconnectBanner(false)
+    prevConnected.current = isConnected
+  }, [isConnected, isAuthenticated])
 
   const navItems = [
     { path: '/home', label: 'Home', icon: HiHome, requiresAuth: false },
@@ -39,6 +53,25 @@ export default function AppNavbar() {
   const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
 
   return (
+    <>
+    {/* F4 — wallet disconnect banner */}
+    {showDisconnectBanner && (
+      <div style={{
+        background: 'var(--color-warning-bg, #78350f)',
+        color: '#fef3c7',
+        padding: '0.6rem 1rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+        fontSize: '0.875rem',
+        position: 'relative', zIndex: 100,
+      }}>
+        <HiExclamationTriangle style={{ flexShrink: 0 }} />
+        <span>Your wallet was disconnected. Transaction buttons are disabled until you reconnect.</span>
+        <ConnectWallet />
+        <button onClick={() => setShowDisconnectBanner(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: '0.5rem' }}>
+          <HiXMark />
+        </button>
+      </div>
+    )}
     <nav className="app-navbar">
       <div className="app-navbar-container">
         <Link to="/home" className="app-navbar-logo">
@@ -85,6 +118,8 @@ export default function AppNavbar() {
           )}
 
           {isAuthenticated && user && (
+            <>
+            <NotificationBell />
             <div className="wallet-connected-wrapper">
               <button className="wallet-address-btn">
                 {formatAddress(user.walletAddress)}
@@ -97,9 +132,11 @@ export default function AppNavbar() {
                 Sign Out
               </button>
             </div>
+            </>
           )}
         </div>
       </div>
     </nav>
+    </>
   )
 }

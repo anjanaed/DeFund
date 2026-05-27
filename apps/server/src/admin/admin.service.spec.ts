@@ -9,6 +9,8 @@ const makeCampaign = (overrides: Partial<Record<string, any>> = {}) => ({
   title: 'Test Campaign',
   status: CampaignStatus.PENDING,
   creatorId: 'creator-1',
+  // [H2] approveCampaign now returns creatorWallet — include in base mock
+  creator: { walletAddress: '0xdeadbeef' },
   raisedAmount: 5000,
   goalAmount: 10000,
   releasedAmount: 0,
@@ -65,10 +67,22 @@ const mockPrisma = {
     findMany: jest.fn(),
     findFirst: jest.fn(),
   },
+  flagProposal: {
+    findFirst: jest.fn(),
+  },
+  releaseFundsProposal: {
+    findFirst: jest.fn(),
+  },
   user: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
+  },
+  adminAuditLog: {
+    create: jest.fn().mockResolvedValue({}),
+    findMany: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
   },
   $transaction: jest.fn(),
 };
@@ -171,13 +185,16 @@ describe('AdminService', () => {
   });
 
   describe('getVerification', () => {
-    it('returns all PENDING campaigns without search', async () => {
+    it('returns paginated PENDING campaigns without search', async () => {
       const campaigns = [makeCampaign()];
       mockPrisma.campaign.findMany.mockResolvedValue(campaigns);
+      mockPrisma.campaign.count.mockResolvedValue(1);
 
       const result = await service.getVerification();
 
-      expect(result).toEqual(campaigns);
+      expect(result.items).toEqual(campaigns);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
       expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ status: CampaignStatus.PENDING }),
@@ -187,6 +204,7 @@ describe('AdminService', () => {
 
     it('applies OR search filter on title and creator wallet', async () => {
       mockPrisma.campaign.findMany.mockResolvedValue([]);
+      mockPrisma.campaign.count.mockResolvedValue(0);
 
       await service.getVerification('defi');
 
@@ -200,18 +218,44 @@ describe('AdminService', () => {
         }),
       );
     });
+
+    it('uses correct skip for page 2 with custom limit', async () => {
+      mockPrisma.campaign.findMany.mockResolvedValue([]);
+      mockPrisma.campaign.count.mockResolvedValue(0);
+
+      await service.getVerification(undefined, 2, 10);
+
+      expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 }),
+      );
+    });
   });
 
   describe('getProjects', () => {
-    it('sorts FLAGGED campaigns to the top', async () => {
+    it('returns paginated campaigns and floats FLAGGED to the top within the page', async () => {
       const flagged = makeCampaign({ id: 'c2', status: CampaignStatus.FLAGGED });
       const active = makeCampaign({ id: 'c1', status: CampaignStatus.ACTIVE });
       mockPrisma.campaign.findMany.mockResolvedValue([active, flagged]);
+      mockPrisma.campaign.count.mockResolvedValue(2);
 
       const result = await service.getProjects();
 
-      expect(result[0].id).toBe('c2');
-      expect(result[1].id).toBe('c1');
+      expect(result.items[0].id).toBe('c2');
+      expect(result.items[1].id).toBe('c1');
+      expect(result.total).toBe(2);
+    });
+
+    it('filters by status when provided', async () => {
+      mockPrisma.campaign.findMany.mockResolvedValue([]);
+      mockPrisma.campaign.count.mockResolvedValue(0);
+
+      await service.getProjects(1, 20, CampaignStatus.FLAGGED);
+
+      expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: CampaignStatus.FLAGGED },
+        }),
+      );
     });
   });
 
@@ -268,7 +312,8 @@ describe('AdminService', () => {
 
       const result = await service.approveCampaign('campaign-1', 42);
 
-      expect(result).toEqual({ success: true, onChainId: 42 });
+      // [H2] creatorWallet is now included so the frontend can pass it to createCampaign
+      expect(result).toEqual({ success: true, onChainId: 42, creatorWallet: '0xdeadbeef' });
       // $transaction is called once with the two update operations
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       // campaign.update and user.update are invoked to build the array passed to $transaction
@@ -314,24 +359,36 @@ describe('AdminService', () => {
     });
   });
 
-  describe('flagCampaign', () => {
-    it('updates campaign status to FLAGGED', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue(makeCampaign());
-      mockPrisma.campaign.update.mockResolvedValue(makeCampaign({ status: CampaignStatus.FLAGGED }));
-
-      await service.flagCampaign('campaign-1', 'fraud');
-
-      expect(mockPrisma.campaign.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: { status: CampaignStatus.FLAGGED },
-        }),
+  describe('proposeFlagCampaign', () => {
+    it('returns signing instructions for an on-chain ACTIVE campaign', async () => {
+      mockPrisma.campaign.findUnique.mockResolvedValue(
+        makeCampaign({ onChainId: 5, status: CampaignStatus.ACTIVE }),
       );
+
+      const result = await service.proposeFlagCampaign('campaign-1', 'fraud');
+
+      expect(result.message).toContain('proposeFlagCampaign()');
+      expect(result.onChainId).toBe(5);
+    });
+
+    it('throws BadRequestException when campaign is not on-chain', async () => {
+      mockPrisma.campaign.findUnique.mockResolvedValue(makeCampaign({ onChainId: null, status: CampaignStatus.ACTIVE }));
+
+      await expect(service.proposeFlagCampaign('campaign-1', 'fraud')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when campaign cannot be flagged in current status', async () => {
+      mockPrisma.campaign.findUnique.mockResolvedValue(
+        makeCampaign({ onChainId: 5, status: CampaignStatus.PENDING }),
+      );
+
+      await expect(service.proposeFlagCampaign('campaign-1', 'fraud')).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when campaign does not exist', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(null);
 
-      await expect(service.flagCampaign('bad-id', 'fraud')).rejects.toThrow(NotFoundException);
+      await expect(service.proposeFlagCampaign('bad-id', 'fraud')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -455,32 +512,52 @@ describe('AdminService', () => {
     });
   });
 
-  describe('notifyMilestoneRelease', () => {
-    it('returns creator wallet and onChainId for APPROVED milestone', async () => {
+  describe('proposeReleaseFunds', () => {
+    it('returns signing instructions for an APPROVED on-chain milestone with no existing proposal', async () => {
       const milestone = {
         ...makeMilestone({ status: MilestoneStatus.APPROVED, onChainId: 3 }),
-        campaign: { creator: { walletAddress: '0xCreator' } },
+        campaign: { id: 'campaign-1', onChainId: 5, status: CampaignStatus.FUNDED },
       };
       mockPrisma.milestone.findUnique.mockResolvedValue(milestone);
+      mockPrisma.releaseFundsProposal.findFirst.mockResolvedValue(null);
 
-      const result = await service.notifyMilestoneRelease('milestone-1');
+      const result = await service.proposeReleaseFunds('milestone-1');
 
-      expect(result.creatorWallet).toBe('0xCreator');
+      expect(result.message).toContain('proposeReleaseFunds()');
       expect(result.milestoneOnChainId).toBe(3);
     });
 
     it('throws BadRequestException when milestone is not APPROVED', async () => {
       mockPrisma.milestone.findUnique.mockResolvedValue(
-        makeMilestone({ status: MilestoneStatus.PENDING }),
+        makeMilestone({ status: MilestoneStatus.PENDING, onChainId: 3 }),
       );
 
-      await expect(service.notifyMilestoneRelease('milestone-1')).rejects.toThrow(BadRequestException);
+      await expect(service.proposeReleaseFunds('milestone-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when milestone is not on-chain', async () => {
+      mockPrisma.milestone.findUnique.mockResolvedValue(
+        makeMilestone({ status: MilestoneStatus.APPROVED, onChainId: null }),
+      );
+
+      await expect(service.proposeReleaseFunds('milestone-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when a pending proposal already exists', async () => {
+      const milestone = {
+        ...makeMilestone({ status: MilestoneStatus.APPROVED, onChainId: 3 }),
+        campaign: { id: 'campaign-1', onChainId: 5, status: CampaignStatus.FUNDED },
+      };
+      mockPrisma.milestone.findUnique.mockResolvedValue(milestone);
+      mockPrisma.releaseFundsProposal.findFirst.mockResolvedValue({ id: 'rp1', executed: false });
+
+      await expect(service.proposeReleaseFunds('milestone-1')).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when milestone does not exist', async () => {
       mockPrisma.milestone.findUnique.mockResolvedValue(null);
 
-      await expect(service.notifyMilestoneRelease('bad-id')).rejects.toThrow(NotFoundException);
+      await expect(service.proposeReleaseFunds('bad-id')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -516,13 +593,16 @@ describe('AdminService', () => {
   });
 
   describe('getUsers', () => {
-    it('returns all users when no search provided', async () => {
+    it('returns paginated users when no search provided', async () => {
       const users = [makeUser()];
       mockPrisma.user.findMany.mockResolvedValue(users);
+      mockPrisma.user.count.mockResolvedValue(1);
 
       const result = await service.getUsers();
 
-      expect(result).toEqual(users);
+      expect(result.items).toEqual(users);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
       expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: {} }),
       );
@@ -530,6 +610,7 @@ describe('AdminService', () => {
 
     it('applies search filter on name, walletAddress, and email', async () => {
       mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.user.count.mockResolvedValue(0);
 
       await service.getUsers('alice');
 
@@ -543,6 +624,17 @@ describe('AdminService', () => {
             ]),
           }),
         }),
+      );
+    });
+
+    it('uses correct skip for page 3 with limit 5', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      await service.getUsers(undefined, 3, 5);
+
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 5 }),
       );
     });
   });

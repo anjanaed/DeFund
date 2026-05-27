@@ -27,18 +27,16 @@ const MAX_PAGE_SIZE = 50;
 export class ForumService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async annotateContributors<T extends { userId: string; user: Record<string, unknown> }>(
+  /** Strip all HTML tags to prevent XSS. Preserves plain text including special chars. */
+  private stripHtml(input: string): string {
+    return input.replace(/<[^>]*>/g, '').trim();
+  }
+
+  private applyContributorFlags<T extends { userId: string; user: Record<string, unknown> }>(
     messages: T[],
-    campaignId: string,
+    contributorIds: Set<string>,
     creatorId: string,
-  ): Promise<(T & { user: T['user'] & { isContributor: boolean; isCreator: boolean } })[]> {
-    if (messages.length === 0) return messages as any;
-    const userIds = [...new Set(messages.map((m) => m.userId))];
-    const contributors = await this.prisma.contribution.findMany({
-      where: { campaignId, contributorId: { in: userIds } },
-      select: { contributorId: true },
-    });
-    const contributorIds = new Set(contributors.map((c) => c.contributorId));
+  ): (T & { user: T['user'] & { isContributor: boolean; isCreator: boolean } })[] {
     return messages.map((m) => ({
       ...m,
       user: { ...m.user, isContributor: contributorIds.has(m.userId), isCreator: m.userId === creatorId },
@@ -84,10 +82,20 @@ export class ForumService {
         })
       : [];
 
-    const [annotatedItems, annotatedReplies] = await Promise.all([
-      this.annotateContributors(items, campaignId, campaign.creatorId),
-      this.annotateContributors(replies, campaignId, campaign.creatorId),
-    ]);
+    // Single query covers all unique authors across both items and replies
+    const allMessages = [...items, ...replies];
+    const allUserIds = [...new Set(allMessages.map((m) => m.userId))];
+    const contributorSet = new Set<string>();
+    if (allUserIds.length > 0) {
+      const contributors = await this.prisma.contribution.findMany({
+        where: { campaignId, contributorId: { in: allUserIds } },
+        select: { contributorId: true },
+      });
+      contributors.forEach((c) => contributorSet.add(c.contributorId));
+    }
+
+    const annotatedItems = this.applyContributorFlags(items, contributorSet, campaign.creatorId);
+    const annotatedReplies = this.applyContributorFlags(replies, contributorSet, campaign.creatorId);
 
     const repliesByParent = new Map<string, typeof annotatedReplies>();
     for (const r of annotatedReplies) {
@@ -140,7 +148,7 @@ export class ForumService {
 
     const msg = await this.prisma.message.create({
       data: {
-        content: dto.content,
+        content: this.stripHtml(dto.content),
         forumId: forum.id,
         userId,
         parentId: dto.parentId ?? null,
@@ -176,7 +184,7 @@ export class ForumService {
     }
     return this.prisma.message.update({
       where: { id: messageId },
-      data: { content: dto.content },
+      data: { content: this.stripHtml(dto.content) },
       include: messageInclude,
     });
   }

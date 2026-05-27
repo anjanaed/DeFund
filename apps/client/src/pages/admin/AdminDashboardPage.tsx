@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HiClock, HiFlag, HiChartBar, HiXCircle, HiMagnifyingGlass } from 'react-icons/hi2'
+import { HiClock, HiFlag, HiChartBar, HiXCircle, HiMagnifyingGlass, HiClipboardDocumentList } from 'react-icons/hi2'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
@@ -39,6 +39,23 @@ interface TransactionsPage {
   totalPages: number
 }
 
+interface HealthData {
+  status: 'ok' | 'warning'
+  indexer: { lastPollAt: string | null; lastBlockProcessed: number; isStale: boolean }
+  database: 'connected' | 'error'
+  rpc: 'reachable' | 'error'
+}
+
+interface AuditLogItem {
+  id: string
+  adminWallet: string
+  action: string
+  entityType: string
+  entityId: string
+  entityTitle?: string | null
+  createdAt: string
+}
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diffMs / 60000)
@@ -53,6 +70,17 @@ function timeAgo(iso: string): string {
 function shortHash(hash: string | null): string {
   if (!hash) return '—'
   return `${hash.slice(0, 6)}…${hash.slice(-4)}`
+}
+
+const AUDIT_ACTION_LABEL: Record<string, { label: string; color: string }> = {
+  APPROVE_CAMPAIGN:       { label: 'Approved campaign',      color: '#15803d' },
+  REJECT_CAMPAIGN:        { label: 'Rejected campaign',      color: 'var(--color-error)' },
+  CONFIRM_FLAG:           { label: 'Confirmed flag',         color: '#b45309' },
+  CONFIRM_RELEASE_FUNDS:  { label: 'Released milestone funds', color: '#0369a1' },
+}
+
+function auditActionDisplay(action: string) {
+  return AUDIT_ACTION_LABEL[action] ?? { label: action.toLowerCase().replace(/_/g, ' '), color: 'var(--color-text-secondary)' }
 }
 
 function activityStatusColor(status: string): 'success' | 'warning' | 'error' | 'info' {
@@ -83,6 +111,8 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [txPage, setTxPage] = useState<TransactionsPage | null>(null)
+  const [health, setHealth] = useState<HealthData | null>(null)
+  const [auditLog, setAuditLog] = useState<AuditLogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -109,12 +139,16 @@ export default function AdminDashboardPage() {
       apiFetch('/admin/stats').then((r) => r.json()),
       apiFetch('/admin/activity').then((r) => r.json()),
       apiFetch(`/admin/transactions?${txParams}`).then((r) => r.json()),
+      apiFetch('/health').then((r) => r.ok ? r.json() : null).catch(() => null),
+      apiFetch('/admin/audit-log?limit=10').then((r) => r.ok ? r.json() : null).catch(() => null),
     ])
-      .then(([statsData, activityData, txData]) => {
+      .then(([statsData, activityData, txData, healthData, auditData]) => {
         if (cancelled) return
         setStats(statsData)
         setActivity(Array.isArray(activityData) ? activityData : [])
         setTxPage(txData)
+        setHealth(healthData)
+        setAuditLog(auditData?.items ?? [])
       })
       .catch(() => !cancelled && setError('Failed to load dashboard data'))
       .finally(() => !cancelled && setLoading(false))
@@ -193,22 +227,84 @@ export default function AdminDashboardPage() {
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>System Status</h3>
           </div>
           <div style={{ padding: '24px' }}>
-            {/* TODO: wire to a real GET /api/health endpoint that pings RPC + DB */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {[
-                { name: 'Blockchain Network Status', status: 'Operational', color: 'success' },
-                { name: 'API Gateway', status: 'Operational', color: 'success' },
-              ].map((item, index) => (
-                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>{item.name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: `var(--color-${item.color})` }} />
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>{item.status}</span>
+            {loading ? (
+              <Spinner label="Checking system status…" />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {[
+                  {
+                    name: 'Blockchain RPC',
+                    status: health?.rpc === 'reachable' ? 'Reachable' : health?.rpc === 'error' ? 'Error' : 'Unknown',
+                    color: health?.rpc === 'reachable' ? 'success' : 'error',
+                  },
+                  {
+                    name: 'Database',
+                    status: health?.database === 'connected' ? 'Connected' : health?.database === 'error' ? 'Error' : 'Unknown',
+                    color: health?.database === 'connected' ? 'success' : 'error',
+                  },
+                  {
+                    name: 'Event Indexer',
+                    status: health?.indexer.isStale ? 'Stale (>3 min)' : health?.indexer.lastPollAt ? 'Active' : 'Inactive',
+                    color: health?.indexer.isStale ? 'warning' : 'success',
+                  },
+                ].map((item, index) => (
+                  <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>{item.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: `var(--color-${item.color})` }} />
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>{item.status}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+                {health?.indexer.lastPollAt && (
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                    Last block: #{health.indexer.lastBlockProcessed} · polled {timeAgo(health.indexer.lastPollAt)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* U8 — Admin Audit Log */}
+      <div className="admin-table-card" style={{ marginBottom: '32px' }}>
+        <div className="admin-table-header">
+          <h3 style={{ fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <HiClipboardDocumentList style={{ color: 'var(--color-primary)' }} /> Admin Audit Log
+          </h3>
+        </div>
+        <div style={{ padding: '16px 24px' }}>
+          {loading ? (
+            <Spinner label="Loading audit log…" />
+          ) : auditLog.length === 0 ? (
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>No admin actions recorded yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {auditLog.map((entry) => {
+                const { label, color } = auditActionDisplay(entry.action)
+                return (
+                  <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '13px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, marginTop: '5px', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: '600', color }}>
+                        {label}
+                      </span>
+                      {entry.entityTitle && (
+                        <span style={{ color: 'var(--color-text-primary)' }}> — {entry.entityTitle}</span>
+                      )}
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
+                        <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                          {entry.adminWallet.slice(0, 8)}…{entry.adminWallet.slice(-4)}
+                        </code>
+                        {' · '}{timeAgo(entry.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 

@@ -8,9 +8,8 @@ interface RefundProposal {
   id: string
   campaignId: string
   proposer: string
-  approver: string | null
+  confirmer: string | null  // [L2] renamed from approver
   proposedAt: string
-  expiresAt: string | null
   executed: boolean
   campaign: { id: string; title: string; onChainId: number | null }
 }
@@ -58,15 +57,14 @@ export default function AdminRefundProposalsPage() {
               <th>Campaign</th>
               <th>Proposer</th>
               <th>Proposed</th>
-              <th>Expires</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ padding: 0 }}><Spinner label="Loading refund proposals…" /></td></tr>
+              <tr><td colSpan={4} style={{ padding: 0 }}><Spinner label="Loading refund proposals…" /></td></tr>
             ) : pending.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No pending proposals.</td></tr>
+              <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No pending proposals.</td></tr>
             ) : pending.map((p) => (
               <tr key={p.id}>
                 <td style={{ fontWeight: '600' }}>{p.campaign.title}</td>
@@ -74,7 +72,6 @@ export default function AdminRefundProposalsPage() {
                   {p.proposer.slice(0, 8)}…{p.proposer.slice(-4)}
                 </td>
                 <td>{new Date(p.proposedAt).toLocaleString()}</td>
-                <td>{p.expiresAt ? new Date(p.expiresAt).toLocaleString() : '—'}</td>
                 <td>
                   <button
                     className="btn"
@@ -99,7 +96,7 @@ export default function AdminRefundProposalsPage() {
             <tr>
               <th>Campaign</th>
               <th>Proposer</th>
-              <th>Approver</th>
+              <th>Confirmer</th>
               <th>Proposed</th>
             </tr>
           </thead>
@@ -113,7 +110,7 @@ export default function AdminRefundProposalsPage() {
                   {p.proposer.slice(0, 8)}…{p.proposer.slice(-4)}
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
-                  {p.approver ? `${p.approver.slice(0, 8)}…${p.approver.slice(-4)}` : '—'}
+                  {p.confirmer ? `${p.confirmer.slice(0, 8)}…${p.confirmer.slice(-4)}` : '—'}
                 </td>
                 <td>{new Date(p.proposedAt).toLocaleString()}</td>
               </tr>

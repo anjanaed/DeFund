@@ -5,7 +5,7 @@ export class CreateMessageDto {
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MinLength(1)
-  @MaxLength(2000)
+  @MaxLength(5000)
   content: string;
 
   @IsOptional()

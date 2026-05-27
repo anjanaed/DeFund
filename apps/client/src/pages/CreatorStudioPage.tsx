@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import CreateCampaignModal from '../components/modals/CreateCampaignModal'
 import SubmitProofModal from '../components/modals/SubmitProofModal'
@@ -8,16 +9,21 @@ import LoadingScreen from '../components/common/LoadingScreen'
 import {
   HiCurrencyDollar, HiChartBar, HiUsers, HiCheckCircle, HiClock,
   HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray,
-  HiBanknotes, HiNoSymbol, HiMegaphone, HiPlusCircle,
+  HiNoSymbol, HiMegaphone, HiPlusCircle, HiRocketLaunch, HiScale,
+  HiThumbUp, HiThumbDown, HiExclamationTriangle, HiChartPie,
 } from 'react-icons/hi2'
 import { useWriteContract } from 'wagmi'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
+import { parseContractError } from '../lib/errors'
 
 interface Milestone {
   id: string; title: string; status: string; amount: string
   onChainId: number | null; proofUrl: string | null; submissionCount: number
+  votingEndTime?: string | null
+  approveWeight?: string | null; rejectWeight?: string | null; totalVoteWeight?: string | null
+  adminNote?: string | null
 }
 interface CampaignUpdate {
   id: string; title: string; content: string; createdAt: string
@@ -53,8 +59,6 @@ export default function CreatorStudioPage() {
   const [campaigns, setCampaigns] = useState<CreatorCampaign[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [releasingId, setReleasingId] = useState<string | null>(null)
-  const [releasedIds, setReleasedIds] = useState<Set<string>>(new Set())
   const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set())
   const [txError, setTxError] = useState<string | null>(null)
 
@@ -78,22 +82,6 @@ export default function CreatorStudioPage() {
   }
 
   useEffect(() => { loadCampaigns() }, [isAuthenticated])
-
-  const handleReleaseFunds = async (milestone: Milestone) => {
-    if (!milestone.onChainId) { setTxError('Milestone not yet on-chain.'); return }
-    setReleasingId(milestone.id)
-    try {
-      await writeContractAsync({
-        address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
-        functionName: 'releaseMilestoneFunds', args: [BigInt(milestone.onChainId)],
-      })
-      setReleasedIds(prev => new Set(prev).add(milestone.id))
-    } catch (err: any) {
-      setTxError(err?.shortMessage || err?.message || 'Transaction failed')
-    } finally {
-      setReleasingId(null)
-    }
-  }
 
   const handleSubmitProof = async (proofIpfsHash: string) => {
     if (!proofModal?.onChainId) throw new Error('Milestone not yet on-chain.')
@@ -120,7 +108,7 @@ export default function CreatorStudioPage() {
       })
       loadCampaigns()
     } catch (err: any) {
-      setTxError(err?.shortMessage || err?.message || 'Transaction failed')
+      setTxError(parseContractError(err))
     }
   }
 
@@ -230,8 +218,23 @@ export default function CreatorStudioPage() {
           {/* Projects */}
           <div className="creator-projects-list">
             {filteredCampaigns.length === 0 ? (
-              <div className="empty-state" style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                <p>No projects found in this category.</p>
+              <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                <HiRocketLaunch style={{ fontSize: '3rem', color: 'var(--color-primary)', opacity: 0.6 }} />
+                <p style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                  {activeTab === 'active' ? 'No active projects yet' : activeTab === 'pending' ? 'No pending projects' : 'No campaigns yet'}
+                </p>
+                <p style={{ margin: 0, fontSize: '14px', maxWidth: '360px' }}>
+                  {activeTab === 'active'
+                    ? 'Start a new campaign to raise funds for your project.'
+                    : activeTab === 'pending'
+                    ? 'Campaigns awaiting admin approval will appear here.'
+                    : 'Create your first campaign and start building your community.'}
+                </p>
+                {activeTab !== 'pending' && (
+                  <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 20px' }}>
+                    <HiPlusCircle /> Launch a Campaign
+                  </button>
+                )}
               </div>
             ) : filteredCampaigns.map(project => (
               <div key={project.id} className="creator-project-card" style={{ marginBottom: '2rem' }}>
@@ -298,6 +301,41 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
 
+                {/* F1 — Campaign analytics bar */}
+                {isActive(project) && (() => {
+                  const goal = Number(project.goalAmount)
+                  const raised = Number(project.raisedAmount)
+                  const pct = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0
+                  const contribs = project._count.contributions
+                  const avgContrib = contribs > 0 ? (raised / contribs) : 0
+                  const totalMs = project.milestones.length
+                  const completedMs = project.milestones.filter(m => m.status === 'COMPLETED' || m.status === 'APPROVED').length
+                  return (
+                    <div style={{ padding: '12px 0', borderTop: '1px solid var(--color-border)', margin: '0 0 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
+                        <HiChartPie style={{ color: 'var(--color-primary)' }} /> Campaign Analytics
+                      </div>
+                      <div style={{ display: 'flex', gap: '24px', fontSize: '13px', flexWrap: 'wrap' }}>
+                        <div>
+                          <span style={{ color: 'var(--color-text-tertiary)' }}>Funding: </span>
+                          <span style={{ fontWeight: '600' }}>{pct}%</span>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--color-text-tertiary)' }}>Avg contribution: </span>
+                          <span style={{ fontWeight: '600' }}>{avgContrib > 0 ? `${avgContrib.toFixed(4)} ${project.paymentToken}` : '—'}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--color-text-tertiary)' }}>Milestones: </span>
+                          <span style={{ fontWeight: '600' }}>{completedMs}/{totalMs} done</span>
+                        </div>
+                      </div>
+                      <div style={{ height: '4px', borderRadius: '2px', background: 'var(--color-border)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: pct >= 100 ? 'var(--color-success)' : 'var(--color-primary)', borderRadius: '2px', transition: 'width 0.4s' }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* Milestones */}
                 <div className="creator-milestones-section">
                   <h3 className="creator-milestones-title">Milestones</h3>
@@ -307,8 +345,21 @@ export default function CreatorStudioPage() {
                       const isApproved = m.status === 'APPROVED' || m.status === 'COMPLETED'
                       const isRejected = m.status === 'REJECTED'
                       const canSubmit = (m.status === 'PENDING') && !submittedIds.has(m.id)
-                      const canResubmit = isRejected && m.submissionCount < 2 && !submittedIds.has(m.id)
-                      const permanentlyRejected = isRejected && m.submissionCount >= 2
+                      const canResubmit = isRejected && m.submissionCount < 3 && !submittedIds.has(m.id)
+                      const permanentlyRejected = isRejected && m.submissionCount >= 3
+
+                      // U3 — voting countdown helper
+                      const votingEndDate = m.votingEndTime ? new Date(m.votingEndTime) : null
+                      const msLeft = votingEndDate ? votingEndDate.getTime() - Date.now() : null
+                      const hoursLeft = msLeft !== null ? Math.max(0, Math.ceil(msLeft / 3_600_000)) : null
+                      const daysLeft = hoursLeft !== null ? Math.floor(hoursLeft / 24) : null
+
+                      // U3 — vote tally percentage
+                      const totalWeight = Number(m.totalVoteWeight ?? 0)
+                      const approveWeight = Number(m.approveWeight ?? 0)
+                      const rejectWeight = Number(m.rejectWeight ?? 0)
+                      const approvePct = totalWeight > 0 ? Math.round((approveWeight / totalWeight) * 100) : null
+                      const rejectPct = totalWeight > 0 ? Math.round((rejectWeight / totalWeight) * 100) : null
 
                       return (
                         <div key={m.id} className="creator-milestone-card">
@@ -333,17 +384,10 @@ export default function CreatorStudioPage() {
                                 </button>
                               )}
 
-                              {/* Release funds */}
-                              {isApproved && !releasedIds.has(m.id) && m.status !== 'COMPLETED' && (
-                                <button className="creator-submit-proof-btn" onClick={() => handleReleaseFunds(m)}
-                                  disabled={releasingId === m.id}
-                                  style={{ background: 'var(--color-success)', borderColor: 'var(--color-success)', color: '#fff', opacity: releasingId === m.id ? 0.7 : 1 }}>
-                                  <HiBanknotes />{releasingId === m.id ? 'Confirming...' : 'Release Funds'}
-                                </button>
-                              )}
-                              {releasedIds.has(m.id) && (
-                                <span style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <HiCheckCircle /> Funds Released
+                              {/* Approved — awaiting admin fund release */}
+                              {isApproved && m.status !== 'COMPLETED' && (
+                                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <HiClock /> Awaiting admin release
                                 </span>
                               )}
 
@@ -376,12 +420,57 @@ export default function CreatorStudioPage() {
                                 </span>
                               )}
 
-                              {/* Default icon for VOTING or COMPLETED */}
-                              {!canSubmit && !canResubmit && !permanentlyRejected && !submittedIds.has(m.id) && !isApproved && !isRejected && (
+                              {/* Default icon for non-VOTING statuses */}
+                              {!canSubmit && !canResubmit && !permanentlyRejected && !submittedIds.has(m.id) && !isApproved && !isRejected && m.status !== 'VOTING' && (
                                 <div className={`creator-milestone-icon ${STATUS_COLOR[m.status] || 'neutral'}`}><Icon /></div>
                               )}
                             </div>
                           </div>
+
+                          {/* U3 — VOTING progress panel */}
+                          {m.status === 'VOTING' && !submittedIds.has(m.id) && (
+                            <div style={{ marginTop: '16px', padding: '14px 16px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#92400e' }}>
+                                <HiScale style={{ flexShrink: 0 }} />
+                                Community is voting on this milestone
+                              </div>
+                              {votingEndDate && (
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <HiClock size={13} />
+                                  {msLeft !== null && msLeft > 0
+                                    ? `Voting closes in ${daysLeft && daysLeft > 0 ? `${daysLeft}d ` : ''}${hoursLeft! % 24}h — ${votingEndDate.toLocaleDateString()}`
+                                    : 'Voting period has ended — awaiting finalization'}
+                                </div>
+                              )}
+                              {approvePct !== null && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d' }}><HiThumbUp size={12} /> Approve {approvePct}%</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-error)' }}>Reject {rejectPct}% <HiThumbDown size={12} /></span>
+                                  </div>
+                                  <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(239,68,68,0.2)', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${approvePct}%`, background: '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
+                                  </div>
+                                </div>
+                              )}
+                              {approvePct === null && (
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                  No votes recorded yet — you'll be notified when the result is finalized.
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* U6 — Admin note on rejected milestones */}
+                          {isRejected && m.adminNote && (
+                            <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', display: 'flex', gap: '8px', fontSize: '13px' }}>
+                              <HiExclamationTriangle style={{ flexShrink: 0, color: 'var(--color-error)', marginTop: '1px' }} />
+                              <div>
+                                <span style={{ fontWeight: '600', color: 'var(--color-error)' }}>Admin note: </span>
+                                <span style={{ color: 'var(--color-text-secondary)' }}>{m.adminNote}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}

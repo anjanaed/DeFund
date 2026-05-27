@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MilestonesService } from './milestones.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const makeMilestone = (overrides: Partial<Record<string, any>> = {}) => ({
   id: 'milestone-1',
@@ -10,7 +11,7 @@ const makeMilestone = (overrides: Partial<Record<string, any>> = {}) => ({
   status: 'PENDING',
   proofUrl: null,
   campaignId: 'campaign-1',
-  campaign: { creatorId: 'user-1' },
+  campaign: { creatorId: 'user-1', title: 'Test Campaign' },
   ...overrides,
 });
 
@@ -25,6 +26,10 @@ const mockConfig = {
   get: jest.fn(),
 };
 
+const mockNotifications = {
+  createForContributors: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('MilestonesService', () => {
   let service: MilestonesService;
 
@@ -37,6 +42,7 @@ describe('MilestonesService', () => {
         MilestonesService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
 
@@ -132,10 +138,46 @@ describe('MilestonesService', () => {
 
     it('throws ForbiddenException when caller is not the campaign creator', async () => {
       mockPrisma.milestone.findUnique.mockResolvedValue(
-        makeMilestone({ campaign: { creatorId: 'real-creator' } }),
+        makeMilestone({ campaign: { creatorId: 'real-creator', title: 'Test' } }),
       );
 
       await expect(service.submitProof('milestone-1', 'intruder', dto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when milestone is in VOTING status (H7)', async () => {
+      mockPrisma.milestone.findUnique.mockResolvedValue(
+        makeMilestone({ status: 'VOTING', campaign: { creatorId: 'user-1', title: 'Test' } }),
+      );
+
+      await expect(service.submitProof('milestone-1', 'user-1', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when milestone is APPROVED (H7)', async () => {
+      mockPrisma.milestone.findUnique.mockResolvedValue(
+        makeMilestone({ status: 'APPROVED', campaign: { creatorId: 'user-1', title: 'Test' } }),
+      );
+
+      await expect(service.submitProof('milestone-1', 'user-1', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when milestone is COMPLETED (H7)', async () => {
+      mockPrisma.milestone.findUnique.mockResolvedValue(
+        makeMilestone({ status: 'COMPLETED', campaign: { creatorId: 'user-1', title: 'Test' } }),
+      );
+
+      await expect(service.submitProof('milestone-1', 'user-1', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows proof submission when milestone is REJECTED (H7)', async () => {
+      mockPrisma.milestone.findUnique.mockResolvedValue(
+        makeMilestone({ status: 'REJECTED', campaign: { creatorId: 'user-1', title: 'Test' } }),
+      );
+      const updated = makeMilestone({ status: 'REJECTED', proofUrl: dto.proofUrl });
+      mockPrisma.milestone.update.mockResolvedValue(updated);
+
+      const result = await service.submitProof('milestone-1', 'user-1', dto);
+
+      expect(result.proofUrl).toBe(dto.proofUrl);
     });
   });
 });

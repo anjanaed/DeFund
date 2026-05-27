@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
-import { HiChartBar, HiLockClosed, HiCheckCircle, HiClock, HiXCircle, HiEye } from 'react-icons/hi2'
+import { HiChartBar, HiLockClosed, HiCheckCircle, HiClock, HiXCircle, HiEye, HiRocketLaunch, HiBolt, HiScale } from 'react-icons/hi2'
 import ProofModal from '../components/common/ProofModal'
 import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
 import TxBanner from '../components/common/TxBanner'
@@ -10,6 +10,7 @@ import { useWriteContract } from 'wagmi'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
+import { parseContractError } from '../lib/errors'
 
 interface DashboardStats { totalContributed: number; lockedFunds: number; releasedFunds: number }
 interface Contribution {
@@ -19,7 +20,7 @@ interface Contribution {
 interface VotingMilestone {
   id: string; title: string; description: string; status: string
   onChainId: number | null; votingEndTime: string | null; proofUrl: string | null
-  campaign: { id: string; title: string; paymentToken?: string }
+  campaign: { id: string; title: string; paymentToken?: string; raisedAmount?: string }
 }
 interface Transaction {
   id: string; type: string; amount: number; timestamp: string
@@ -96,8 +97,8 @@ export default function DashboardPage() {
         args: [BigInt(item.onChainId), approve],
       })
       setVotedIds(prev => new Set(prev).add(item.id))
-    } catch (err: any) {
-      setTxError(err?.shortMessage || err?.message || 'Vote failed')
+    } catch (err) {
+      setTxError(parseContractError(err))
     } finally {
       setVotingTx(null)
     }
@@ -105,6 +106,11 @@ export default function DashboardPage() {
 
   const handleClaim = async (item: ReclaimItem) => {
     if (item.onChainId == null) { setTxError('Campaign is not on-chain.'); return }
+
+    // P4 — show estimated refund before signing
+    const estimatedRefund = (item.totalContributed * 0.95).toFixed(4)
+    if (!window.confirm(`You will receive approximately ${estimatedRefund} (95% of your contribution). Proceed?`)) return
+
     setClaimingId(item.id)
     try {
       await writeContractAsync({
@@ -114,8 +120,8 @@ export default function DashboardPage() {
         args: [BigInt(item.onChainId)],
       })
       setClaimedIds(prev => new Set(prev).add(item.id))
-    } catch (err: any) {
-      setTxError(err?.shortMessage || err?.message || 'Claim failed')
+    } catch (err) {
+      setTxError(parseContractError(err))
     } finally {
       setClaimingId(null)
     }
@@ -176,7 +182,15 @@ export default function DashboardPage() {
           {activeTab === 'portfolio' && (
             <div className="dashboard-portfolio">
               {portfolio.length === 0 ? (
-                <div className="empty-state"><p>You haven't contributed to any projects yet.</p></div>
+                /* U7 — helpful empty state */
+                <div className="empty-state">
+                  <HiRocketLaunch className="empty-icon" style={{ fontSize: '2.5rem', color: 'var(--color-primary)' }} />
+                  <h3>No projects yet</h3>
+                  <p>Support a campaign to see your portfolio here.</p>
+                  <Link to="/explore" className="btn btn-primary" style={{ marginTop: '1rem', display: 'inline-block' }}>
+                    Discover Projects
+                  </Link>
+                </div>
               ) : portfolio.map((project) => (
                 <Link key={project.id} to={`/project/${project.id}`} className="dashboard-project-card clickable-card">
                   <div className="dashboard-project-header">
@@ -208,13 +222,33 @@ export default function DashboardPage() {
           {activeTab === 'voting' && (
             <div className="dashboard-voting">
               {votingRequired.length === 0 ? (
-                <div className="empty-state"><HiCheckCircle className="empty-icon" /><h3>No Pending Votes</h3><p>You're all caught up!</p></div>
-              ) : votingRequired.map(item => (
+                /* U7 — helpful empty state */
+                <div className="empty-state">
+                  <HiBolt className="empty-icon" style={{ fontSize: '2.5rem', color: 'var(--color-primary)' }} />
+                  <h3>No Pending Votes</h3>
+                  <p>You're all caught up! Your votes will appear here when a milestone you contributed to enters the voting phase.</p>
+                </div>
+              ) : votingRequired.map(item => {
+                // U2 — compute voting power from the contributor's contribution to this campaign
+                const myContrib = contributions
+                  .filter(c => c.campaign.id === item.campaign.id)
+                  .reduce((sum, c) => sum + Number(c.amount), 0)
+                const totalRaised = Number(item.campaign.raisedAmount ?? 0)
+                const votingPower = totalRaised > 0 ? ((myContrib / totalRaised) * 100).toFixed(2) : null
+
+                return (
                 <div key={item.id} className="voting-card">
                   <div className="voting-card-header">
                     <div>
                       <h3 className="voting-project-title">{item.campaign.title}</h3>
                       <p className="voting-milestone-title">{item.title}</p>
+                      {/* U2 — voting power badge */}
+                      {votingPower !== null && (
+                        <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          <HiScale style={{ color: 'var(--color-primary)' }} />
+                          <span>Your voting weight: <strong>{myContrib.toFixed(4)}</strong> ({votingPower}% of total votes)</span>
+                        </div>
+                      )}
                     </div>
                     {item.votingEndTime && (
                       <div className="voting-deadline">
@@ -255,7 +289,7 @@ export default function DashboardPage() {
                     <Link to={`/project/${item.campaign.id}`} className="btn-vote details">View Project</Link>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
 
@@ -263,7 +297,15 @@ export default function DashboardPage() {
           {activeTab === 'transactions' && (
             <div className="dashboard-transactions">
               {transactions.length === 0 ? (
-                <div className="empty-state"><p>No transactions yet.</p></div>
+                /* U7 — helpful empty state */
+                <div className="empty-state">
+                  <HiChartBar className="empty-icon" style={{ fontSize: '2.5rem', color: 'var(--color-primary)' }} />
+                  <h3>No transactions yet</h3>
+                  <p>Your contributions will appear here once you support a campaign.</p>
+                  <Link to="/explore" className="btn btn-primary" style={{ marginTop: '1rem', display: 'inline-block' }}>
+                    Browse Campaigns
+                  </Link>
+                </div>
               ) : (
                 <div className="transactions-table">
                   <div className="table-header">

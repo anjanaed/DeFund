@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
-import { HiMagnifyingGlass, HiUsers, HiChartBar } from 'react-icons/hi2'
+import { HiMagnifyingGlass, HiUsers, HiChartBar, HiClock, HiRocketLaunch } from 'react-icons/hi2'
 import { apiFetch } from '../lib/api'
 import LoadingScreen from '../components/common/LoadingScreen'
 
@@ -26,11 +26,23 @@ interface Campaign {
   status: string
   raisedAmount: string
   goalAmount: string
+  deadline: string | null
+  creator: { id: string; name: string | null; walletAddress: string }
   _count: { milestones: number; contributions: number }
 }
 
 const fmt = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`
+
+const daysLeft = (deadline: string | null): string | null => {
+  if (!deadline) return null
+  const diff = new Date(deadline).getTime() - Date.now()
+  if (diff <= 0) return 'Ended'
+  const days = Math.ceil(diff / 86_400_000)
+  return days === 1 ? '1 day left' : `${days} days left`
+}
+
+const shortenAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`
 
 export default function ExplorePage() {
   const [search, setSearch] = useState('')
@@ -123,15 +135,26 @@ export default function ExplorePage() {
           {loading ? (
             <LoadingScreen message="Loading projects" />
           ) : projects.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--color-text-secondary)' }}>
-              No projects found.
+            /* U7 — helpful empty state with CTA */
+            <div style={{ textAlign: 'center', padding: '4rem 0' }}>
+              <HiRocketLaunch style={{ fontSize: '3rem', color: 'var(--color-primary)', marginBottom: '1rem' }} />
+              <h3 style={{ color: 'var(--color-text)', marginBottom: '0.5rem' }}>No projects found</h3>
+              <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
+                Try adjusting your search or filters, or be the first to launch a campaign!
+              </p>
+              <Link to="/creator-studio" className="btn btn-primary" style={{ display: 'inline-block' }}>
+                Create a Campaign
+              </Link>
             </div>
           ) : (
             <div className="explore-projects-grid">
               {projects.map((project) => {
                 const raised = Number(project.raisedAmount)
                 const goal = Number(project.goalAmount)
+                const pct = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0
                 const isActive = project.status === 'ACTIVE' || project.status === 'FUNDED'
+                const deadline = daysLeft(project.deadline)
+                const creatorLabel = project.creator?.name || shortenAddr(project.creator?.walletAddress || '')
                 return (
                   <Link
                     key={project.id}
@@ -148,21 +171,32 @@ export default function ExplorePage() {
                     </div>
                     <h3 className="explore-project-title">{project.title}</h3>
                     <p className="explore-project-description">{project.description}</p>
+
+                    {/* U1 — funding progress */}
                     <div className="explore-project-progress">
                       <div className="explore-progress-header">
                         <span className="explore-progress-amount">{fmt(raised)} raised</span>
-                        <span className="explore-progress-goal">of {fmt(goal)}</span>
+                        <span className="explore-progress-goal">of {fmt(goal)} ({Math.round(pct)}%)</span>
                       </div>
                       <div className="explore-progress-bar">
-                        <div
-                          className="explore-progress-fill"
-                          style={{ width: `${Math.min(goal > 0 ? (raised / goal) * 100 : 0, 100)}%` }}
-                        />
+                        <div className="explore-progress-fill" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
+
+                    {/* U1 — meta row: contributors, milestones, deadline */}
                     <div className="explore-project-meta">
                       <div className="explore-meta-item"><HiUsers /><span>{project._count.contributions} contributors</span></div>
                       <div className="explore-meta-item"><HiChartBar /><span>{project._count.milestones} milestones</span></div>
+                      {deadline && (
+                        <div className="explore-meta-item" style={{ color: deadline === 'Ended' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }}>
+                          <HiClock /><span>{deadline}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* U1 — creator identity */}
+                    <div style={{ marginTop: '0.5rem', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      by {creatorLabel}
                     </div>
                   </Link>
                 )

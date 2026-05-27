@@ -6,6 +6,7 @@ import { FaGithub, FaTwitter, FaDiscord } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
+import { parseContractError } from '../../lib/errors'
 import '../../Admin.css'
 
 export default function AdminRiskDetailsPage() {
@@ -60,7 +61,7 @@ export default function AdminRiskDetailsPage() {
       // Indexer may take a few seconds to catch up; reload data
       setTimeout(loadData, 3000)
     } catch (err: any) {
-      setRefundError(err.shortMessage || err.message || 'Transaction failed')
+      setRefundError(parseContractError(err))
       setRefundStatus('error')
     }
   }
@@ -83,7 +84,7 @@ export default function AdminRiskDetailsPage() {
       setRefundStatus('idle')
       setTimeout(loadData, 3000)
     } catch (err: any) {
-      setRefundError(err.shortMessage || err.message || 'Transaction failed')
+      setRefundError(parseContractError(err))
       setRefundStatus('error')
     }
   }
@@ -109,6 +110,12 @@ export default function AdminRiskDetailsPage() {
   const hasPendingProposal = proposal && !proposal.executed
   const isApproved = (proposal && proposal.executed) || campaign?.fundsReclaimed
   const isBlocked = campaign?.status === 'FLAGGED'
+
+  // P3 — stale proposal warning (>7 days open without second approval)
+  const proposalAgeMs = proposal?.proposedAt
+    ? Date.now() - new Date(proposal.proposedAt).getTime()
+    : 0
+  const isProposalStale = hasPendingProposal && proposalAgeMs > 7 * 24 * 60 * 60 * 1000
 
   if (loading) {
     return <LoadingScreen message="Loading project" />
@@ -289,11 +296,12 @@ export default function AdminRiskDetailsPage() {
                 <div style={{ fontSize: '12px', opacity: 0.8, fontFamily: 'monospace' }}>
                   Proposer: {proposal.proposer?.slice(0, 8)}…{proposal.proposer?.slice(-4)} • {new Date(proposal.proposedAt).toLocaleString()}
                 </div>
-                {proposal.expiresAt && (
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                    Expires: {new Date(proposal.expiresAt).toLocaleString()}
-                  </div>
-                )}
+              </div>
+            )}
+            {isProposalStale && (
+              <div style={{ padding: '10px 12px', borderRadius: '6px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: '1.5' }}>
+                <HiExclamationTriangle style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>This refund proposal has been pending for over 7 days without a second approval. Consider cancelling and re-proposing to maintain a clean audit trail.</span>
               </div>
             )}
             {isApproved && (
@@ -301,9 +309,9 @@ export default function AdminRiskDetailsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <HiCheckCircle /> Refund approved. Contributors can now claim their funds.
                 </div>
-                {proposal?.approver && (
+                {proposal?.confirmer && (
                   <div style={{ fontSize: '12px', opacity: 0.8, fontFamily: 'monospace' }}>
-                    Approved by {proposal.approver.slice(0, 8)}…{proposal.approver.slice(-4)}
+                    Confirmed by {proposal.confirmer.slice(0, 8)}…{proposal.confirmer.slice(-4)}
                   </div>
                 )}
               </div>

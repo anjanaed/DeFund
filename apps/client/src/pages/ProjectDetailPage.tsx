@@ -5,15 +5,17 @@ import ProofModal from '../components/common/ProofModal'
 import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
 import TxBanner from '../components/common/TxBanner'
 import LoadingScreen from '../components/common/LoadingScreen'
+import OnboardingModal from '../components/common/OnboardingModal'
 import {
   HiUsers, HiChartBar, HiCheckCircle, HiClock, HiInformationCircle,
-  HiEye, HiArrowLeft,
+  HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle,
 } from 'react-icons/hi2'
 import { useWriteContract, useAccount, usePublicClient } from 'wagmi'
 import { parseEther, parseUnits } from 'viem'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI, USDC_ADDRESS, ERC20_APPROVE_ABI } from '../config/contracts'
 import { apiFetch } from '../lib/api'
 import ProjectForum from '../components/forum/ProjectForum'
+import { parseContractError } from '../lib/errors'
 
 interface Campaign {
   id: string; title: string; description: string; category: string; status: string
@@ -55,6 +57,8 @@ export default function ProjectDetailPage() {
   const [contributingStep, setContributingStep] = useState<'approving' | 'contributing' | null>(null)
   const [contributionDone, setContributionDone] = useState(false)
   const [txError, setTxError] = useState<string | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -71,11 +75,19 @@ export default function ProjectDetailPage() {
     })
   }, [id])
 
+  // [L1] Minimum contributions enforced on-chain: 0.001 ETH / 1 USDC
+  const MIN_ETH = 0.001
+  const MIN_USDC = 1
+
   const handleContribute = async () => {
     if (!campaign?.onChainId || !contributionAmount) return
     const amt = parseFloat(contributionAmount)
     if (isNaN(amt) || amt <= 0) { setTxError('Amount must be greater than zero'); return }
     if (amt > 1_000_000) { setTxError('Amount exceeds maximum allowed'); return }
+    // Client-side minimum check mirrors on-chain require() to avoid wasted gas
+    const isUsdc = campaign.paymentToken === 'USDC'
+    if (isUsdc && amt < MIN_USDC) { setTxError(`Minimum contribution is ${MIN_USDC} USDC`); return }
+    if (!isUsdc && amt < MIN_ETH) { setTxError(`Minimum contribution is ${MIN_ETH} ETH`); return }
     setContributing(true)
     setContributingStep(null)
     try {
@@ -118,8 +130,8 @@ export default function ProjectDetailPage() {
       }
       setContributionDone(true)
       setContributionAmount('')
-    } catch (err: any) {
-      setTxError(err?.shortMessage || err?.message || 'Transaction failed')
+    } catch (err) {
+      setTxError(parseContractError(err))
     } finally {
       setContributing(false)
       setContributingStep(null)
@@ -150,16 +162,42 @@ export default function ProjectDetailPage() {
     ? Math.ceil((new Date(campaign.deadline).getTime() - Date.now()) / 86400000)
     : null
 
+  // F5 — copy campaign URL to clipboard
+  const handleShare = async () => {
+    await navigator.clipboard.writeText(window.location.href)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }
+
   return (
     <div className="app-container">
       <AppNavbar />
       {txError && <TxBanner message={txError} onClose={() => setTxError(null)} />}
+      {/* U5 — onboarding modal (auto-shows once, can be re-triggered) */}
+      <OnboardingModal forceShow={showOnboarding} onClose={() => setShowOnboarding(false)} />
       <div className="project-detail-page">
         <div className="container">
 
-          <Link to="/explore" className="project-back-link">
-            <HiArrowLeft /> Back to Explore
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <Link to="/explore" className="project-back-link" style={{ margin: 0 }}>
+              <HiArrowLeft /> Back to Explore
+            </Link>
+            {/* F5 — share + U5 how-it-works buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => setShowOnboarding(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.75rem', background: 'transparent', border: '1px solid var(--color-border, rgba(255,255,255,0.1))', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                <HiQuestionMarkCircle /> How it works
+              </button>
+              <button
+                onClick={handleShare}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.75rem', background: 'transparent', border: '1px solid var(--color-border, rgba(255,255,255,0.1))', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                <HiShare /> {shareCopied ? '✓ Copied!' : 'Share'}
+              </button>
+            </div>
+          </div>
 
           <div className="project-detail-grid">
 
@@ -338,6 +376,7 @@ export default function ProjectDetailPage() {
                     </div>
                     <p className="contribution-note">
                       <HiCheckCircle /> Secured by smart contract
+                      {' '}· Min: {campaign.paymentToken === 'USDC' ? `${MIN_USDC} USDC` : `${MIN_ETH} ETH`}
                     </p>
                   </div>
                 )}

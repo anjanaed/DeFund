@@ -54,11 +54,12 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  createdCampaigns Campaign[]     @relation("CreatedCampaigns")
+  createdCampaigns Campaign[]      @relation("CreatedCampaigns")
   contributions    Contribution[]
   votes            Vote[]
   messages         Message[]
   reactions        Reaction[]
+  notifications    Notification[]
 }
 
 model Campaign {
@@ -95,19 +96,46 @@ model Campaign {
   updates          Update[]
   forum            Forum?
   refundProposals  RefundProposal[]
+  flagProposals    FlagProposal[]
 }
 
 model RefundProposal {
   id         String   @id @default(uuid())
   onChainId  Int      @unique
   proposer   String
-  approver   String?
+  confirmer  String?  // [L2] renamed from `approver` to match FlagProposal/ReleaseFundsProposal naming
   executed   Boolean  @default(false)
   proposedAt DateTime @default(now())
-  expiresAt  DateTime?
 
   campaignId String
   campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model FlagProposal {
+  id         String   @id @default(uuid())
+  onChainId  Int      @unique
+  proposer   String
+  reason     String
+  confirmer  String?
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model ReleaseFundsProposal {
+  id         String   @id @default(uuid())
+  onChainId  Int      @unique
+  proposer   String
+  confirmer  String?
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id])
 }
 
 
@@ -130,6 +158,7 @@ model Milestone {
   campaignId String
   campaign   Campaign @relation(fields: [campaignId], references: [id])
   votes      Vote[]
+  releaseProposals ReleaseFundsProposal[]
 }
 
 model Contribution {
@@ -222,4 +251,48 @@ model IndexerState {
   id        String   @id @default("singleton")
   lastBlock Int      @default(0)
   updatedAt DateTime @updatedAt
+}
+
+// U8 — Admin audit log: tracks who did what and when
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  adminWallet String   // wallet address of the admin who performed the action
+  action      String   // e.g. APPROVE_CAMPAIGN, REJECT_CAMPAIGN, PROPOSE_FLAG, CONFIRM_FLAG, etc.
+  entityType  String   // "campaign" | "milestone"
+  entityId    String   // DB id of the affected entity
+  entityTitle String?  // human-readable title for display
+  metadata    Json?    // additional context (onChainId, reason, etc.)
+  createdAt   DateTime @default(now())
+
+  @@index([adminWallet, createdAt])
+  @@index([entityId, createdAt])
+}
+
+enum NotificationType {
+  MILESTONE_PROOF_UPLOADED
+  MILESTONE_VOTING_STARTED
+  MILESTONE_APPROVED
+  MILESTONE_REJECTED
+  CAMPAIGN_FULLY_FUNDED
+  REFUND_PROPOSED
+  REFUND_APPROVED
+  FLAG_PROPOSED
+  RELEASE_FUNDS_PROPOSED
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  eventKey  String?          // deduplication key: {type}:{campaignId}[:{milestoneId}]
+  createdAt DateTime         @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventKey])
+  @@index([userId, isRead, createdAt])
 }

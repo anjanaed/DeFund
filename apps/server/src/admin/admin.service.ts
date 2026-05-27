@@ -92,7 +92,8 @@ export class AdminService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async getVerification(search?: string) {
+  async getVerification(search?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
     const where: any = { status: CampaignStatus.PENDING };
     if (search) {
       where.OR = [
@@ -100,30 +101,48 @@ export class AdminService {
         { creator: { walletAddress: { contains: search, mode: 'insensitive' } } },
       ];
     }
-    return this.prisma.campaign.findMany({
-      where,
-      include: {
-        creator: { select: { id: true, name: true, walletAddress: true } },
-        _count: { select: { milestones: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [items, total] = await Promise.all([
+      this.prisma.campaign.findMany({
+        where,
+        include: {
+          creator: { select: { id: true, name: true, walletAddress: true } },
+          _count: { select: { milestones: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.campaign.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async getProjects() {
-    const campaigns = await this.prisma.campaign.findMany({
-      include: {
-        creator: { select: { id: true, name: true, walletAddress: true } },
-        _count: { select: { milestones: true, contributions: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return campaigns.sort((a, b) => {
+  async getProjects(page = 1, limit = 20, status?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (status) where.status = status;
+    const [items, total] = await Promise.all([
+      this.prisma.campaign.findMany({
+        where,
+        include: {
+          creator: { select: { id: true, name: true, walletAddress: true } },
+          _count: { select: { milestones: true, contributions: true } },
+        },
+        // FLAGGED campaigns always float to the top so admins can't miss them;
+        // within the same status bucket order by most recently updated.
+        orderBy: [{ updatedAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.campaign.count({ where }),
+    ]);
+    // Stable FLAGGED-first sort within the returned page (avoids full-table scan)
+    const sorted = items.sort((a, b) => {
       if (a.status === CampaignStatus.FLAGGED && b.status !== CampaignStatus.FLAGGED) return -1;
       if (b.status === CampaignStatus.FLAGGED && a.status !== CampaignStatus.FLAGGED) return 1;
       return 0;
     });
+    return { items: sorted, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async getProject(id: string) {
@@ -173,12 +192,17 @@ export class AdminService {
   }
 
   async approveCampaign(id: string, onChainId: number) {
-    const campaign = await this.prisma.campaign.findUnique({ where: { id } });
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id },
+      include: { creator: { select: { walletAddress: true } } },
+    });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
     // Admin called createCampaign() on-chain and passes back the resulting on-chain ID.
     // Link the DB campaign, mark it approved/active, and promote the creator to CREATOR role
     // so they have a verified-creator badge for future campaigns.
+    // [H2] Also return the creator's wallet address so callers can confirm what was passed
+    // as _creator on-chain.
     await this.prisma.$transaction([
       this.prisma.campaign.update({
         where: { id },
@@ -190,7 +214,7 @@ export class AdminService {
       }),
     ]);
 
-    return { success: true, onChainId };
+    return { success: true, onChainId, creatorWallet: campaign.creator.walletAddress };
   }
 
   async rejectCampaign(id: string) {
@@ -201,19 +225,46 @@ export class AdminService {
     });
   }
 
-  async flagCampaign(id: string, reason: string) {
-    await this.ensureExists(id);
+  async proposeFlagCampaign(id: string, reason: string) {
+    const campaign = await this.ensureExists(id);
+    if (campaign.onChainId === null) throw new BadRequestException('Campaign is not on-chain');
+    if (campaign.status !== CampaignStatus.ACTIVE && campaign.status !== CampaignStatus.FUNDED) {
+      throw new BadRequestException('Campaign cannot be flagged in its current state');
+    }
+    return {
+      message: 'Sign proposeFlagCampaign() from your admin wallet. A second admin must then confirmFlagCampaign() to execute.',
+      onChainId: campaign.onChainId,
+      reason,
+    };
+  }
 
-    // The admin signs flagCampaign() directly from their wallet on the frontend.
-    // This endpoint performs the immediate DB update; the indexer also syncs from the CampaignFlagged event.
-    return this.prisma.campaign.update({
-      where: { id },
-      data: { status: CampaignStatus.FLAGGED },
+  async confirmFlagCampaign(id: string, callerWalletAddress: string) {
+    const campaign = await this.ensureExists(id);
+    if (campaign.onChainId === null) throw new BadRequestException('Campaign is not on-chain');
+    const proposal = await this.prisma.flagProposal.findFirst({
+      where: { campaignId: id, executed: false },
     });
+    if (!proposal) throw new BadRequestException('No pending flag proposal for this campaign');
+    if (proposal.proposer.toLowerCase() === callerWalletAddress.toLowerCase()) {
+      throw new ForbiddenException('The same admin cannot confirm their own flag proposal — a different admin must confirm');
+    }
+    return {
+      message: 'Sign confirmFlagCampaign() from your admin wallet to execute the flag.',
+      onChainId: campaign.onChainId,
+    };
+  }
+
+  async getFlagProposalForCampaign(campaignId: string) {
+    await this.ensureExists(campaignId);
+    const proposal = await this.prisma.flagProposal.findFirst({
+      where: { campaignId },
+      orderBy: { proposedAt: 'desc' },
+    });
+    return proposal ?? null;
   }
 
   async blockCampaign(id: string) {
-    return this.flagCampaign(id, 'blocked');
+    return this.proposeFlagCampaign(id, 'blocked');
   }
 
   /** First admin proposes a refund — signed from their wallet on the frontend */
@@ -315,20 +366,55 @@ export class AdminService {
     return milestone;
   }
 
-  async notifyMilestoneRelease(id: string) {
+  async proposeReleaseFunds(id: string) {
     const milestone = await this.prisma.milestone.findUnique({
       where: { id },
-      include: { campaign: { select: { creator: { select: { walletAddress: true } } } } },
+      include: { campaign: { select: { id: true, onChainId: true, status: true } } },
     });
     if (!milestone) throw new NotFoundException('Milestone not found');
     if (milestone.status !== MilestoneStatus.APPROVED) {
       throw new BadRequestException('Milestone is not approved');
     }
+    if (milestone.onChainId === null) throw new BadRequestException('Milestone is not on-chain');
+
+    const existing = await this.prisma.releaseFundsProposal.findFirst({
+      where: { milestoneId: id, executed: false },
+    });
+    if (existing) throw new BadRequestException('A release proposal already exists for this milestone');
+
     return {
-      message: 'The campaign creator should call releaseMilestoneFunds() from the Creator Studio.',
-      creatorWallet: milestone.campaign.creator.walletAddress,
+      message: 'Sign proposeReleaseFunds() from your admin wallet. A second admin must then confirmReleaseFunds() to execute.',
       milestoneOnChainId: milestone.onChainId,
     };
+  }
+
+  async confirmReleaseFunds(id: string, callerWalletAddress: string) {
+    const milestone = await this.prisma.milestone.findUnique({ where: { id } });
+    if (!milestone) throw new NotFoundException('Milestone not found');
+    if (milestone.onChainId === null) throw new BadRequestException('Milestone is not on-chain');
+
+    const proposal = await this.prisma.releaseFundsProposal.findFirst({
+      where: { milestoneId: id, executed: false },
+    });
+    if (!proposal) throw new BadRequestException('No pending release proposal for this milestone');
+    if (proposal.proposer.toLowerCase() === callerWalletAddress.toLowerCase()) {
+      throw new ForbiddenException('The same admin cannot confirm their own release funds proposal — a different admin must confirm');
+    }
+
+    return {
+      message: 'Sign confirmReleaseFunds() from your admin wallet to execute the fund release.',
+      milestoneOnChainId: milestone.onChainId,
+    };
+  }
+
+  async getReleaseProposalForMilestone(milestoneId: string) {
+    const milestone = await this.prisma.milestone.findUnique({ where: { id: milestoneId } });
+    if (!milestone) throw new NotFoundException('Milestone not found');
+    const proposal = await this.prisma.releaseFundsProposal.findFirst({
+      where: { milestoneId },
+      orderBy: { proposedAt: 'desc' },
+    });
+    return proposal ?? null;
   }
 
   async setUserRole(userId: string, role: string, currentUserId: string) {
@@ -346,7 +432,8 @@ export class AdminService {
     return this.prisma.user.update({ where: { id: userId }, data: { role: role as any } });
   }
 
-  async getUsers(search?: string) {
+  async getUsers(search?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
     const where: any = {};
     if (search) {
       where.OR = [
@@ -355,20 +442,93 @@ export class AdminService {
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
-    return this.prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        walletAddress: true,
-        role: true,
-        createdAt: true,
-        _count: { select: { createdCampaigns: true, contributions: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          walletAddress: true,
+          role: true,
+          createdAt: true,
+          _count: { select: { createdCampaigns: true, contributions: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
+
+  // ─── U8 — Admin Audit Log ────────────────────────────────────────────────────
+
+  private async logAudit(
+    adminWallet: string,
+    action: string,
+    entityType: 'campaign' | 'milestone',
+    entityId: string,
+    entityTitle?: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    try {
+      await this.prisma.adminAuditLog.create({
+        data: {
+          adminWallet, action, entityType, entityId, entityTitle,
+          metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : undefined,
+        },
+      });
+    } catch {
+      // Audit logging is non-critical — swallow errors
+    }
+  }
+
+  async getAuditLog(page = 1, limit = 30) {
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this.prisma.adminAuditLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.adminAuditLog.count(),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  // ─── Instrumented action wrappers ────────────────────────────────────────────
+
+  async approveCampaignAudited(id: string, onChainId: number, adminWallet: string) {
+    const result = await this.approveCampaign(id, onChainId);
+    const campaign = await this.prisma.campaign.findUnique({ where: { id }, select: { title: true } });
+    await this.logAudit(adminWallet, 'APPROVE_CAMPAIGN', 'campaign', id, campaign?.title, { onChainId });
+    return result;
+  }
+
+  async rejectCampaignAudited(id: string, adminWallet: string) {
+    const result = await this.rejectCampaign(id);
+    const campaign = await this.prisma.campaign.findUnique({ where: { id }, select: { title: true } });
+    await this.logAudit(adminWallet, 'REJECT_CAMPAIGN', 'campaign', id, campaign?.title);
+    return result;
+  }
+
+  async confirmFlagCampaignAudited(id: string, callerWalletAddress: string) {
+    const result = await this.confirmFlagCampaign(id, callerWalletAddress);
+    const campaign = await this.prisma.campaign.findUnique({ where: { id }, select: { title: true } });
+    await this.logAudit(callerWalletAddress, 'CONFIRM_FLAG', 'campaign', id, campaign?.title);
+    return result;
+  }
+
+  async confirmReleaseFundsAudited(id: string, callerWalletAddress: string) {
+    const result = await this.confirmReleaseFunds(id, callerWalletAddress);
+    const milestone = await this.prisma.milestone.findUnique({ where: { id }, select: { title: true } });
+    await this.logAudit(callerWalletAddress, 'CONFIRM_RELEASE_FUNDS', 'milestone', id, milestone?.title);
+    return result;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   private async ensureExists(id: string) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
