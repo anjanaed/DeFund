@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useWriteContract, useAccount } from 'wagmi'
+import { usePublicClient, useAccount } from 'wagmi'
 import { parseEther, parseUnits, keccak256, toBytes, decodeEventLog } from 'viem'
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
+import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
+import { toast } from 'sonner'
 import { HiArrowLeft, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiCurrencyDollar, HiExclamationTriangle, HiUserCircle, HiClock } from 'react-icons/hi2'
 import { FaTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
@@ -15,213 +15,156 @@ import '../../Admin.css'
 export default function AdminProjectReviewPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { writeContractAsync } = useWriteContract()
+  const { writeWithSimulate } = useSimulatedWrite()
+  const publicClient = usePublicClient()
   const { address: connectedAddress } = useAccount()
 
   const [campaign, setCampaign] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [actionStatus, setActionStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
-  const [actionMessage, setActionMessage] = useState('')
-  const [approvalTxHash, setApprovalTxHash] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const [flagProposal, setFlagProposal] = useState<any>(null)
+  const [approvalProposal, setApprovalProposal] = useState<any>(null)
+
+  const loadProposals = async () => {
+    const [flag, approval] = await Promise.all([
+      apiFetch(`/admin/projects/${id}/flag/proposal`).then((r) => r.ok ? r.json() : null).catch(() => null),
+      apiFetch(`/admin/projects/${id}/approval-proposal`).then((r) => r.ok ? r.json() : null).catch(() => null),
+    ])
+    setFlagProposal(flag)
+    setApprovalProposal(approval)
+  }
 
   useEffect(() => {
     apiFetch(`/admin/projects/${id}`)
       .then((r) => r.json())
-      .then((data) => {
-        setCampaign(data)
-        // Load any existing flag proposal for this campaign
-        return apiFetch(`/admin/projects/${id}/flag/proposal`)
-          .then((r) => r.ok ? r.json() : null)
-          .then((p) => setFlagProposal(p))
-          .catch(() => {})
-      })
-      .catch(() => setActionMessage('Failed to load campaign'))
+      .then((data) => { setCampaign(data); return loadProposals() })
+      .catch(() => toast.error('Failed to load campaign'))
       .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  const handleApprove = async () => {
-    if (!campaign?.ipfsHash) {
-      setActionMessage('Campaign has no ipfsHash — it may have been submitted with an old version of the app.')
-      setActionStatus('error')
-      return
-    }
-    if (!campaign?.deadline) {
-      setActionMessage('Campaign has no deadline set.')
-      setActionStatus('error')
-      return
-    }
-    setActionStatus('pending')
-    setActionMessage('')
+  // ── Approval proposal handlers ───────────────────────────────────────────
+
+  const handleProposeApproval = async () => {
+    setPending(true)
+    try {
+      const res = await apiFetch(`/admin/projects/${id}/propose-approval`, { method: 'POST' })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed') }
+      toast.success('Approval proposed. A second admin must confirm to deploy on-chain.')
+      await loadProposals()
+    } catch (err: any) { toast.error(err.message || 'Failed to propose approval') }
+    finally { setPending(false) }
+  }
+
+  const handleCancelApprovalProposal = async () => {
+    if (!confirm('Cancel this approval proposal?')) return
+    setPending(true)
+    try {
+      const res = await apiFetch(`/admin/projects/${id}/approval-proposal`, { method: 'DELETE' })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed') }
+      toast.success('Approval proposal cancelled.')
+      await loadProposals()
+    } catch (err: any) { toast.error(err.message || 'Failed to cancel proposal') }
+    finally { setPending(false) }
+  }
+
+  // The second admin calls createCampaign() on-chain then confirms in the DB
+  const handleConfirmDeploy = async () => {
+    if (!campaign?.ipfsHash) { toast.error('Campaign has no ipfsHash.'); return }
+    if (!campaign?.deadline) { toast.error('Campaign has no deadline set.'); return }
+    if (!campaign.creator?.walletAddress) { toast.error('Campaign creator wallet address is missing.'); return }
+    setPending(true)
     try {
       const isUsdc = campaign.paymentToken === 'USDC'
-      const toWei = (val: string | number) =>
-        isUsdc ? parseUnits(String(val), 6) : parseEther(String(val))
-
+      const toWei = (val: string | number) => isUsdc ? parseUnits(String(val), 6) : parseEther(String(val))
       const deadlineTs = BigInt(Math.floor(new Date(campaign.deadline).getTime() / 1000))
-
       const contractMilestones = (campaign.milestones ?? []).map((m: any) => ({
         ipfsHash: keccak256(toBytes(m.title + m.description)),
         amountRequired: toWei(m.amount),
         deadline: deadlineTs,
       }))
+      const fundGoal = contractMilestones.reduce((sum: bigint, m: any) => sum + m.amountRequired, BigInt(0))
 
-      const fundGoal = contractMilestones.reduce(
-        (sum: bigint, m: any) => sum + m.amountRequired,
-        BigInt(0),
-      )
-
-      // Admin calls createCampaign() — this creates the campaign on-chain as Active
-      // and emits CampaignCreated + CampaignApproved for the indexer to sync.
-      // [H2] _creator is the actual project creator's wallet — passed as first arg
-      //      so on-chain milestone proof submission and fund releases go to them.
-      if (!campaign.creator?.walletAddress) {
-        setActionMessage('Campaign creator wallet address is missing — cannot deploy.')
-        setActionStatus('error')
-        return
-      }
-      const txHash = await writeContractAsync({
+      const txHash = await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'createCampaign',
-        args: [
-          campaign.creator.walletAddress as `0x${string}`,
-          campaign.ipfsHash,
-          isUsdc ? 1 : 0,
-          fundGoal,
-          deadlineTs,
-          contractMilestones,
-        ],
+        args: [campaign.creator.walletAddress as `0x${string}`, campaign.ipfsHash, isUsdc ? 1 : 0, fundGoal, deadlineTs, contractMilestones],
       })
-
-      // Wait for receipt and extract the new on-chain campaign ID
-      const publicClient = createPublicClient({ chain: sepolia, transport: http() })
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` })
 
       let onChainId: number | undefined
       for (const log of receipt.logs) {
         try {
-          const decoded = decodeEventLog({
-            abi: CAMPAIGN_FACTORY_ABI,
-            eventName: 'CampaignCreated',
-            data: log.data,
-            topics: log.topics,
-          })
+          const decoded = decodeEventLog({ abi: CAMPAIGN_FACTORY_ABI, eventName: 'CampaignCreated', data: log.data, topics: log.topics })
           onChainId = Number((decoded.args as any).campaignId)
           break
-        } catch {
-          // not CampaignCreated, skip
-        }
+        } catch { /* not this event */ }
       }
-
       if (onChainId === undefined) throw new Error('Could not read campaign ID from receipt')
 
-      // Update DB: link onChainId and mark as approved/active.
-      // The indexer will also sync from events as a fallback.
-      try {
-        await apiFetch(`/admin/projects/${id}/approve`, {
-          method: 'POST',
-          body: JSON.stringify({ onChainId }),
-        })
-      } catch {
-        // Swallow — indexer will sync from CampaignCreated + CampaignApproved events
-      }
+      await apiFetch(`/admin/projects/${id}/confirm-approval`, {
+        method: 'POST',
+        body: JSON.stringify({ onChainId }),
+      })
 
-      setApprovalTxHash(txHash as string)
-      setActionStatus('success')
-      setActionMessage(`Campaign deployed on-chain (ID: ${onChainId}) and approved.`)
+      toast.success(`Campaign deployed on-chain (ID: ${onChainId}). View: https://sepolia.etherscan.io/tx/${txHash}`, { duration: 8000 })
       setCampaign((c: any) => ({ ...c, status: 'ACTIVE', isAdminApproved: true, onChainId }))
+      setApprovalProposal((p: any) => p ? { ...p, executed: true } : p)
     } catch (err: any) {
-      setActionStatus('error')
-      setActionMessage(parseContractError(err))
+      toast.error(parseContractError(err))
+    } finally {
+      setPending(false)
     }
   }
 
+  // ── Other action handlers ────────────────────────────────────────────────
+
   const handleCancel = async () => {
-    if (!campaign?.onChainId) {
-      setActionMessage('Campaign has no on-chain ID.')
-      setActionStatus('error')
-      return
-    }
+    if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID.'); return }
     if (!window.confirm('Cancel this campaign on-chain? Contributors will be able to propose refunds.')) return
-    setActionStatus('pending')
-    setActionMessage('')
+    setPending(true)
     try {
-      await writeContractAsync({
-        address: CAMPAIGN_FACTORY_ADDRESS,
-        abi: CAMPAIGN_FACTORY_ABI,
-        functionName: 'cancelCampaign',
-        args: [BigInt(campaign.onChainId)],
-      })
-      setActionStatus('success')
-      setActionMessage('Campaign cancelled on-chain.')
+      await writeWithSimulate({ address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI, functionName: 'cancelCampaign', args: [BigInt(campaign.onChainId)] })
+      toast.success('Campaign cancelled on-chain.')
       setCampaign((c: any) => ({ ...c, status: 'FAILED' }))
-    } catch (err: any) {
-      setActionStatus('error')
-      setActionMessage(parseContractError(err))
-    }
+    } catch (err: any) { toast.error(parseContractError(err)) }
+    finally { setPending(false) }
   }
 
   const handleReject = async () => {
-    setActionStatus('pending')
-    setActionMessage('')
+    setPending(true)
     try {
       const res = await apiFetch(`/admin/projects/${id}/reject`, { method: 'POST' })
       if (!res.ok) throw new Error('Rejection failed')
-      setActionStatus('success')
-      setActionMessage('Campaign rejected.')
+      toast.success('Campaign rejected.')
       setCampaign((c: any) => ({ ...c, status: 'FAILED' }))
-    } catch (err: any) {
-      setActionStatus('error')
-      setActionMessage(err.message || 'Rejection failed')
-    }
+    } catch (err: any) { toast.error(err.message || 'Rejection failed') }
+    finally { setPending(false) }
   }
 
   const handleProposeFlag = async () => {
-    if (!campaign?.onChainId) {
-      setActionMessage('Campaign has no on-chain ID — use Reject for off-chain submissions.')
-      setActionStatus('error')
-      return
-    }
-    setActionStatus('pending')
-    setActionMessage('')
+    if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID — use Reject for off-chain submissions.'); return }
+    setPending(true)
     try {
-      await writeContractAsync({
-        address: CAMPAIGN_FACTORY_ADDRESS,
-        abi: CAMPAIGN_FACTORY_ABI,
-        functionName: 'proposeFlagCampaign',
-        args: [BigInt(campaign.onChainId), 'Flagged by admin'],
-      })
-      // Refresh proposal state from DB (indexer will sync from FlagProposed event)
+      await writeWithSimulate({ address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI, functionName: 'proposeFlagCampaign', args: [BigInt(campaign.onChainId), 'Flagged by admin'] })
       const p = await apiFetch(`/admin/projects/${id}/flag/proposal`).then((r) => r.ok ? r.json() : null).catch(() => null)
       setFlagProposal(p)
-      setActionStatus('success')
-      setActionMessage('Flag proposed. A second admin must confirm to execute.')
-    } catch (err: any) {
-      setActionStatus('error')
-      setActionMessage(parseContractError(err))
-    }
+      toast.success('Flag proposed. A second admin must confirm to execute.')
+    } catch (err: any) { toast.error(parseContractError(err)) }
+    finally { setPending(false) }
   }
 
   const handleConfirmFlag = async () => {
     if (!campaign?.onChainId) return
-    setActionStatus('pending')
-    setActionMessage('')
+    setPending(true)
     try {
-      await writeContractAsync({
-        address: CAMPAIGN_FACTORY_ADDRESS,
-        abi: CAMPAIGN_FACTORY_ABI,
-        functionName: 'confirmFlagCampaign',
-        args: [BigInt(campaign.onChainId)],
-      })
-      setActionStatus('success')
-      setActionMessage('Campaign flagged on-chain.')
+      await writeWithSimulate({ address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI, functionName: 'confirmFlagCampaign', args: [BigInt(campaign.onChainId)] })
+      toast.success('Campaign flagged on-chain.')
       setCampaign((c: any) => ({ ...c, status: 'FLAGGED' }))
       setFlagProposal((p: any) => p ? { ...p, executed: true } : p)
-    } catch (err: any) {
-      setActionStatus('error')
-      setActionMessage(parseContractError(err))
-    }
+    } catch (err: any) { toast.error(parseContractError(err)) }
+    finally { setPending(false) }
   }
 
   if (loading) {
@@ -233,11 +176,11 @@ export default function AdminProjectReviewPage() {
   }
 
   const isPending = campaign.status === 'PENDING'
+  const pendingApprovalProposal = approvalProposal && !approvalProposal.executed
+  const isApprovalProposer = pendingApprovalProposal && connectedAddress?.toLowerCase() === approvalProposal.proposer?.toLowerCase()
 
   // P3 — stale flag proposal warning (>7 days open without confirmation)
-  const flagProposalAgeMs = flagProposal?.proposedAt
-    ? Date.now() - new Date(flagProposal.proposedAt).getTime()
-    : 0
+  const flagProposalAgeMs = flagProposal?.proposedAt ? Date.now() - new Date(flagProposal.proposedAt).getTime() : 0
   const isFlagProposalStale = flagProposal && !flagProposal.executed && flagProposalAgeMs > 7 * 24 * 60 * 60 * 1000
 
   const shortAddr = (addr: string) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '—'
@@ -268,119 +211,80 @@ export default function AdminProjectReviewPage() {
         </div>
         {isPending && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'flex-end' }}>
+            {/* Flag proposal section (only when already on-chain) */}
             {campaign.onChainId != null && (() => {
-              const pendingProposal = flagProposal && !flagProposal.executed
-              const isProposer = pendingProposal && connectedAddress?.toLowerCase() === flagProposal.proposer?.toLowerCase()
+              const pendingFlag = flagProposal && !flagProposal.executed
+              const isFlagProposer = pendingFlag && connectedAddress?.toLowerCase() === flagProposal.proposer?.toLowerCase()
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                  {/* P3 — stale proposal warning */}
                   {isFlagProposalStale && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#92400e', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '6px 10px', maxWidth: '320px' }}>
-                      <HiExclamationTriangle style={{ flexShrink: 0 }} />
-                      <span>Proposal pending 7+ days — consider re-proposing.</span>
+                      <HiExclamationTriangle style={{ flexShrink: 0 }} /><span>Flag proposal pending 7+ days — consider re-proposing.</span>
                     </div>
                   )}
-                  {/* U4 — proposer metadata */}
-                  {pendingProposal && (
+                  {pendingFlag && (
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-subtle)', borderRadius: '6px', padding: '6px 10px', display: 'flex', gap: '12px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <HiUserCircle size={13} />
-                        <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>{shortAddr(flagProposal.proposer)}</code>
-                        {isProposer && <span style={{ color: 'var(--color-primary)', marginLeft: '2px' }}>(you)</span>}
-                      </span>
-                      {flagProposal.proposedAt && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <HiClock size={13} />
-                          {new Date(flagProposal.proposedAt).toLocaleDateString()}
-                        </span>
-                      )}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiUserCircle size={13} /><code style={{ fontFamily: 'monospace', fontSize: '11px' }}>{shortAddr(flagProposal.proposer)}</code>{isFlagProposer && <span style={{ color: 'var(--color-primary)', marginLeft: '2px' }}>(you)</span>}</span>
+                      {flagProposal.proposedAt && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiClock size={13} />{new Date(flagProposal.proposedAt).toLocaleDateString()}</span>}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: '12px' }}>
-                    {!pendingProposal && (
-                      <button
-                        className="btn"
-                        onClick={handleProposeFlag}
-                        disabled={actionStatus === 'pending'}
-                        style={{ background: 'white', border: '1px solid #f59e0b', color: '#d97706', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: actionStatus === 'pending' ? 0.5 : 1 }}
-                      >
-                        Propose Flag
-                      </button>
-                    )}
-                    {pendingProposal && isProposer && (
-                      <button disabled style={{ background: 'white', border: '1px solid #f59e0b', color: '#d97706', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: 0.5, cursor: 'not-allowed' }}>
-                        Awaiting Another Admin
-                      </button>
-                    )}
-                    {pendingProposal && !isProposer && (
-                      <button
-                        className="btn"
-                        onClick={handleConfirmFlag}
-                        disabled={actionStatus === 'pending'}
-                        style={{ background: '#f59e0b', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: actionStatus === 'pending' ? 0.5 : 1 }}
-                      >
-                        Confirm Flag
-                      </button>
-                    )}
+                    {!pendingFlag && <button className="btn" onClick={handleProposeFlag} disabled={pending} style={{ background: 'white', border: '1px solid #f59e0b', color: '#d97706', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Propose Flag</button>}
+                    {pendingFlag && isFlagProposer && <button disabled style={{ background: 'white', border: '1px solid #f59e0b', color: '#d97706', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: 0.5, cursor: 'not-allowed' }}>Awaiting Another Admin</button>}
+                    {pendingFlag && !isFlagProposer && <button className="btn" onClick={handleConfirmFlag} disabled={pending} style={{ background: '#f59e0b', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Confirm Flag</button>}
                   </div>
                 </div>
               )
             })()}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                className="btn"
-                onClick={handleReject}
-                disabled={actionStatus === 'pending'}
-                style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: actionStatus === 'pending' ? 0.5 : 1 }}
-              >
-                Reject
-              </button>
-              <button
-                className="btn"
-                onClick={handleApprove}
-                disabled={actionStatus === 'pending'}
-                style={{ background: 'var(--color-success)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: actionStatus === 'pending' ? 0.5 : 1 }}
-              >
-                {actionStatus === 'pending' ? 'Signing...' : 'Approve Project'}
-              </button>
+
+            {/* Two-admin approval section */}
+            {pendingApprovalProposal && (
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-subtle)', borderRadius: '6px', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '320px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: '#d97706' }}>
+                  <HiClock size={13} /> Approval proposed — awaiting second admin
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiUserCircle size={12} /><code style={{ fontFamily: 'monospace', fontSize: '11px' }}>{shortAddr(approvalProposal.proposer)}</code>{isApprovalProposer && <span style={{ color: 'var(--color-primary)', marginLeft: '2px' }}>(you)</span>}</span>
+                  <span>{new Date(approvalProposal.proposedAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={handleReject} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Reject</button>
+
+              {/* Step 1 — Propose Approval (no proposal yet) */}
+              {!pendingApprovalProposal && (
+                <button className="btn" onClick={handleProposeApproval} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-success)', color: 'var(--color-success)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>
+                  {pending ? 'Submitting…' : 'Propose Approval'}
+                </button>
+              )}
+
+              {/* Proposer view — awaiting second admin */}
+              {pendingApprovalProposal && isApprovalProposer && (
+                <>
+                  <button disabled style={{ background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: 0.6, cursor: 'not-allowed' }}>Awaiting Another Admin</button>
+                  <button className="btn" onClick={handleCancelApprovalProposal} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Cancel Proposal</button>
+                </>
+              )}
+
+              {/* Step 2 — Confirm & Deploy (different admin) */}
+              {pendingApprovalProposal && !isApprovalProposer && (
+                <button className="btn" onClick={handleConfirmDeploy} disabled={pending} style={{ background: 'var(--color-success)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>
+                  {pending ? 'Deploying…' : 'Confirm & Deploy'}
+                </button>
+              )}
             </div>
           </div>
         )}
         {['ACTIVE', 'FUNDED'].includes(campaign.status) && campaign.onChainId != null && (
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              className="btn"
-              onClick={handleCancel}
-              disabled={actionStatus === 'pending'}
-              style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: actionStatus === 'pending' ? 0.5 : 1 }}
-            >
-              {actionStatus === 'pending' ? 'Signing...' : 'Cancel Campaign'}
+            <button className="btn" onClick={handleCancel} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>
+              {pending ? 'Signing...' : 'Cancel Campaign'}
             </button>
           </div>
         )}
       </div>
-
-      {actionMessage && (
-        <div style={{
-          padding: '10px 14px', borderRadius: '6px', marginBottom: '24px', fontSize: '14px',
-          background: actionStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-          border: `1px solid ${actionStatus === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
-          color: actionStatus === 'error' ? 'var(--color-error)' : '#15803d',
-          display: 'flex', alignItems: 'center', gap: '8px',
-        }}>
-          {actionStatus === 'error' ? <HiXCircle /> : <HiCheckCircle />} {actionMessage}
-          {approvalTxHash && actionStatus === 'success' && (
-            <a
-              href={`https://sepolia.etherscan.io/tx/${approvalTxHash}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: '#15803d', fontWeight: '600', marginLeft: '4px', textDecoration: 'underline' }}
-            >
-              View on Etherscan ↗
-            </a>
-          )}
-        </div>
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>

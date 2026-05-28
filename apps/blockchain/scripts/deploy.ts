@@ -18,7 +18,7 @@ async function main() {
   );
 
   const CampaignFactory = await ethers.getContractFactory("CampaignFactory");
-  const factory = await CampaignFactory.deploy(usdcAddress);
+  const factory = await CampaignFactory.deploy(usdcAddress, ethers.ZeroAddress);
   await factory.waitForDeployment();
 
   const address = await factory.getAddress();

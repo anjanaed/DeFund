@@ -283,6 +283,21 @@ export const CAMPAIGN_FACTORY_ABI = [
     outputs: [{ name: '', type: 'bool' }],
   },
 
+  // OpenZeppelin AccessControl custom errors — required for viem to decode them
+  {
+    name: 'AccessControlUnauthorizedAccount',
+    type: 'error',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'neededRole', type: 'bytes32' },
+    ],
+  },
+  {
+    name: 'AccessControlBadConfirmation',
+    type: 'error',
+    inputs: [],
+  },
+
   // CampaignCreated event — used to extract on-chain campaign ID from receipt
   {
     name: 'CampaignCreated',

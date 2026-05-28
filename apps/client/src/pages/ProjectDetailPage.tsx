@@ -8,9 +8,11 @@ import LoadingScreen from '../components/common/LoadingScreen'
 import OnboardingModal from '../components/common/OnboardingModal'
 import {
   HiUsers, HiChartBar, HiCheckCircle, HiClock, HiInformationCircle,
-  HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle,
+  HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle, HiGlobeAlt, HiUser,
 } from 'react-icons/hi2'
-import { useWriteContract, useAccount, usePublicClient } from 'wagmi'
+import { FaGithub } from 'react-icons/fa6'
+import { useAccount, usePublicClient } from 'wagmi'
+import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { parseEther, parseUnits } from 'viem'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI, USDC_ADDRESS, ERC20_APPROVE_ABI } from '../config/contracts'
 import { apiFetch } from '../lib/api'
@@ -40,7 +42,7 @@ const MILESTONE_STATUS_COLOR: Record<string, string> = {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { isConnected, address } = useAccount()
-  const { writeContractAsync } = useWriteContract()
+  const { writeWithSimulate } = useSimulatedWrite()
   const publicClient = usePublicClient()
 
   const [campaign, setCampaign] = useState<Campaign | null>(null)
@@ -104,7 +106,7 @@ export default function ProjectDetailPage() {
           }) as bigint
           if (allowance < amount) {
             setContributingStep('approving')
-            const approveTx = await writeContractAsync({
+            const approveTx = await writeWithSimulate({
               address: USDC_ADDRESS,
               abi: ERC20_APPROVE_ABI,
               functionName: 'approve',
@@ -114,14 +116,14 @@ export default function ProjectDetailPage() {
           }
         }
         setContributingStep('contributing')
-        await writeContractAsync({
+        await writeWithSimulate({
           address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
           functionName: 'contributeUSDC',
           args: [BigInt(campaign.onChainId), amount],
         })
       } else {
         setContributingStep('contributing')
-        await writeContractAsync({
+        await writeWithSimulate({
           address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
           functionName: 'contributeETH',
           args: [BigInt(campaign.onChainId)],
@@ -156,7 +158,6 @@ export default function ProjectDetailPage() {
   const goal = Number(campaign.goalAmount)
   const progress = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0
   const isActive = ['ACTIVE', 'FUNDED'].includes(campaign.status)
-  const creatorInitial = (campaign.creator.name || campaign.creator.walletAddress).slice(0, 1).toUpperCase()
 
   const daysLeft = campaign.deadline
     ? Math.ceil((new Date(campaign.deadline).getTime() - Date.now()) / 86400000)
@@ -178,23 +179,25 @@ export default function ProjectDetailPage() {
       <div className="project-detail-page">
         <div className="container">
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div className="project-detail-topbar">
             <Link to="/explore" className="project-back-link" style={{ margin: 0 }}>
               <HiArrowLeft /> Back to Explore
             </Link>
-            {/* F5 — share + U5 how-it-works buttons */}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="project-detail-actions">
               <button
+                type="button"
+                className="project-ghost-btn"
                 onClick={() => setShowOnboarding(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.75rem', background: 'transparent', border: '1px solid var(--color-border, rgba(255,255,255,0.1))', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}
               >
-                <HiQuestionMarkCircle /> How it works
+                <HiQuestionMarkCircle aria-hidden /> <span>How it works</span>
               </button>
               <button
+                type="button"
+                className={`project-ghost-btn${shareCopied ? ' is-success' : ''}`}
                 onClick={handleShare}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.75rem', background: 'transparent', border: '1px solid var(--color-border, rgba(255,255,255,0.1))', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}
               >
-                <HiShare /> {shareCopied ? '✓ Copied!' : 'Share'}
+                {shareCopied ? <HiCheckCircle aria-hidden /> : <HiShare aria-hidden />}
+                <span>{shareCopied ? 'Link copied' : 'Share'}</span>
               </button>
             </div>
           </div>
@@ -396,10 +399,10 @@ export default function ProjectDetailPage() {
               <div className="project-creator-card">
                 <div className="creator-card-title">Creator</div>
                 <div className="creator-info">
-                  <div className="creator-avatar">{creatorInitial}</div>
+                  <div className="creator-avatar" aria-label="Creator"><HiUser /></div>
                   <div>
                     <div className="creator-name">
-                      {campaign.creator.name || 'Anonymous'}
+                      {campaign.creator.name || shortenAddress(campaign.creator.walletAddress)}
                     </div>
                     <div className="creator-address">
                       {shortenAddress(campaign.creator.walletAddress)}
@@ -414,13 +417,13 @@ export default function ProjectDetailPage() {
                   <div className="info-card-title">Links</div>
                   <div className="project-detail-links">
                     {campaign.website && (
-                      <a href={campaign.website} target="_blank" rel="noopener noreferrer" className="project-link">
-                        🌐 Website
+                      <a href={campaign.website} target="_blank" rel="noopener noreferrer" className="project-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <HiGlobeAlt size={15} /> Website
                       </a>
                     )}
                     {campaign.githubUrl && (
-                      <a href={campaign.githubUrl} target="_blank" rel="noopener noreferrer" className="project-link">
-                        📦 GitHub
+                      <a href={campaign.githubUrl} target="_blank" rel="noopener noreferrer" className="project-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <FaGithub size={14} /> GitHub
                       </a>
                     )}
                   </div>

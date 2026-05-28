@@ -9,6 +9,7 @@
     "seed": "ts-node -P tsconfig.seed.json --transpile-only prisma/seed.ts"
   },
   "scripts": {
+    "seed:demo": "ts-node -P tsconfig.seed.json --transpile-only scripts/seed-demo.ts",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

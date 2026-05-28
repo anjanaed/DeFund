@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useWriteContract } from 'wagmi'
+import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
+import { toast } from 'sonner'
 import { HiArrowLeft, HiShieldCheck, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiExclamationTriangle } from 'react-icons/hi2'
 import { FaGithub, FaTwitter, FaDiscord } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
@@ -12,28 +13,36 @@ import '../../Admin.css'
 export default function AdminRiskDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { writeContractAsync } = useWriteContract()
+  const { writeWithSimulate } = useSimulatedWrite()
 
   const [campaign, setCampaign] = useState<any>(null)
   const [proposal, setProposal] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [refundStatus, setRefundStatus] = useState<'idle' | 'proposing' | 'approving' | 'error'>('idle')
-  const [refundError, setRefundError] = useState('')
-  const [blockStatus, setBlockStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
-  const [blockError, setBlockError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [refundStatus, setRefundStatus] = useState<'idle' | 'proposing' | 'approving'>('idle')
+  const [blockPending, setBlockPending] = useState(false)
 
   const loadData = () => {
+    setLoadError('')
     return Promise.all([
-      apiFetch(`/admin/projects/${id}`).then((r) => r.json()),
+      apiFetch(`/admin/projects/${id}`).then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.message || `Server error ${r.status}`)
+        return body
+      }),
       apiFetch(`/admin/projects/${id}/refund-proposal`).then((r) =>
-        r.ok ? r.json() : null,
+        r.ok ? r.json().catch(() => null) : null,
       ),
     ])
       .then(([campaignData, proposalData]) => {
         setCampaign(campaignData)
         setProposal(proposalData)
       })
-      .catch(() => setRefundError('Failed to load campaign'))
+      .catch((err: any) => {
+        const msg = err?.message || 'Failed to load campaign'
+        setLoadError(msg)
+        toast.error(msg)
+      })
       .finally(() => setLoading(false))
   }
 
@@ -43,67 +52,58 @@ export default function AdminRiskDetailsPage() {
   }, [id])
 
   const handleProposeRefund = async () => {
-    if (!campaign?.onChainId) {
-      setRefundError('Campaign has no on-chain ID')
-      setRefundStatus('error')
-      return
-    }
+    if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID'); return }
     setRefundStatus('proposing')
-    setRefundError('')
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'proposeRefund',
         args: [BigInt(campaign.onChainId)],
       })
+      toast.success('Refund proposed. A second admin must confirm.')
       setRefundStatus('idle')
-      // Indexer may take a few seconds to catch up; reload data
       setTimeout(loadData, 3000)
     } catch (err: any) {
-      setRefundError(parseContractError(err))
-      setRefundStatus('error')
+      toast.error(parseContractError(err))
+      setRefundStatus('idle')
     }
   }
 
   const handleApproveRefund = async () => {
-    if (!campaign?.onChainId) {
-      setRefundError('Campaign has no on-chain ID')
-      setRefundStatus('error')
-      return
-    }
+    if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID'); return }
     setRefundStatus('approving')
-    setRefundError('')
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'approveRefund',
         args: [BigInt(campaign.onChainId)],
       })
+      toast.success('Refund approved. Contributors can now claim their funds.')
       setRefundStatus('idle')
       setTimeout(loadData, 3000)
     } catch (err: any) {
-      setRefundError(parseContractError(err))
-      setRefundStatus('error')
+      toast.error(parseContractError(err))
+      setRefundStatus('idle')
     }
   }
 
   const handleBlock = async () => {
     if (!confirm('Block this campaign? It will be marked FLAGGED in the database.')) return
-    setBlockStatus('pending')
-    setBlockError('')
+    setBlockPending(true)
     try {
       const res = await apiFetch(`/admin/projects/${id}/block`, { method: 'POST' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message || 'Block failed')
       }
-      setBlockStatus('success')
+      toast.success('Campaign blocked and marked as FLAGGED.')
       loadData()
     } catch (err: any) {
-      setBlockStatus('error')
-      setBlockError(err.message || 'Failed to block campaign')
+      toast.error(err.message || 'Failed to block campaign')
+    } finally {
+      setBlockPending(false)
     }
   }
 
@@ -122,7 +122,14 @@ export default function AdminRiskDetailsPage() {
   }
 
   if (!campaign) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-error)' }}>Campaign not found.</div>
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-error)' }}>
+        {loadError || 'Campaign not found.'}
+        <div style={{ marginTop: '12px' }}>
+          <button onClick={() => { setLoading(true); loadData() }} style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', cursor: 'pointer', fontSize: '13px' }}>Retry</button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -153,14 +160,14 @@ export default function AdminRiskDetailsPage() {
           <div className="admin-stat-icon" style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34D399' }}><HiCurrencyDollar /></div>
           <div>
             <div className="admin-stat-label">Total Raised</div>
-            <div className="admin-stat-value">{campaign.raisedAmount?.toFixed(4)} {campaign.paymentToken}</div>
+            <div className="admin-stat-value">{Number(campaign.raisedAmount ?? 0).toFixed(4)} {campaign.paymentToken}</div>
           </div>
         </div>
         <div className="admin-stat-card">
           <div className="admin-stat-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}><HiShieldCheck /></div>
           <div>
             <div className="admin-stat-label">Goal Amount</div>
-            <div className="admin-stat-value">{campaign.goalAmount?.toLocaleString()} {campaign.paymentToken}</div>
+            <div className="admin-stat-value">{Number(campaign.goalAmount ?? 0).toLocaleString()} {campaign.paymentToken}</div>
           </div>
         </div>
       </div>
@@ -185,7 +192,7 @@ export default function AdminRiskDetailsPage() {
                   </div>
                   <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '12px', lineHeight: '1.5' }}>{m.description || '—'}</p>
                   <div style={{ display: 'flex', gap: '24px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                    <div>Amount: <span style={{ fontWeight: '500', color: 'var(--color-text-primary)' }}>{m.amount?.toLocaleString()} {campaign.paymentToken}</span></div>
+                    <div>Amount: <span style={{ fontWeight: '500', color: 'var(--color-text-primary)' }}>{Number(m.amount ?? 0).toLocaleString()} {campaign.paymentToken}</span></div>
                     {m.deadline && <div>Due: <span style={{ fontWeight: '500', color: 'var(--color-text-primary)' }}>{new Date(m.deadline).toLocaleDateString()}</span></div>}
                   </div>
                   {m.proofUrl && (
@@ -217,7 +224,7 @@ export default function AdminRiskDetailsPage() {
                 {(campaign.contributions || []).slice(0, 10).map((c: any) => (
                   <tr key={c.id}>
                     <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{c.contributor?.walletAddress?.slice(0, 8)}...{c.contributor?.walletAddress?.slice(-4)}</td>
-                    <td style={{ color: 'var(--color-success)', fontWeight: '600' }}>+{c.amount?.toFixed(4)} {campaign.paymentToken}</td>
+                    <td style={{ color: 'var(--color-success)', fontWeight: '600' }}>+{Number(c.amount ?? 0).toFixed(4)} {campaign.paymentToken}</td>
                     <td>{new Date(c.timestamp).toLocaleDateString()}</td>
                     <td><span className={`admin-badge ${c.refunded ? 'warning' : 'success'}`}>{c.refunded ? 'Refunded' : 'Active'}</span></td>
                   </tr>
@@ -259,15 +266,10 @@ export default function AdminRiskDetailsPage() {
             <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
               Block a suspicious campaign to flag it on the platform. The on-chain flagCampaign() must be signed separately if needed.
             </p>
-            {blockError && (
-              <div style={{ padding: '8px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>
-                {blockError}
-              </div>
-            )}
             <button
               className="btn"
               onClick={handleBlock}
-              disabled={isBlocked || blockStatus === 'pending'}
+              disabled={isBlocked || blockPending}
               style={{
                 width: '100%', padding: '10px', fontSize: '14px',
                 background: isBlocked ? 'var(--color-bg-subtle)' : 'white',
@@ -275,10 +277,10 @@ export default function AdminRiskDetailsPage() {
                 color: isBlocked ? 'var(--color-text-secondary)' : 'var(--color-error)',
                 borderRadius: '6px', fontWeight: '600',
                 opacity: isBlocked ? 0.6 : 1,
-                cursor: (isBlocked || blockStatus === 'pending') ? 'not-allowed' : 'pointer',
+                cursor: (isBlocked || blockPending) ? 'not-allowed' : 'pointer',
               }}
             >
-              {isBlocked ? 'Already Flagged' : blockStatus === 'pending' ? 'Blocking…' : 'Block Campaign'}
+              {isBlocked ? 'Already Flagged' : blockPending ? 'Blocking…' : 'Block Campaign'}
             </button>
           </div>
 
@@ -316,12 +318,6 @@ export default function AdminRiskDetailsPage() {
                 )}
               </div>
             )}
-            {refundStatus === 'error' && (
-              <div style={{ padding: '10px 12px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', fontSize: '13px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <HiXCircle /> {refundError}
-              </div>
-            )}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

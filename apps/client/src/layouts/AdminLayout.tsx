@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { HiChartPie, HiClipboardDocumentCheck, HiShieldCheck, HiChartBar, HiArrowLeftOnRectangle, HiUsers, HiArrowUturnLeft } from 'react-icons/hi2'
+import { HiChartPie, HiClipboardDocumentCheck, HiShieldCheck, HiChartBar, HiArrowLeftOnRectangle, HiUsers, HiArrowUturnLeft, HiScale } from 'react-icons/hi2'
 import { useAuth } from '../context/AuthContext'
 import '../Admin.css'
 
@@ -14,6 +14,7 @@ export default function AdminLayout() {
     { path: '/admin/risk', label: 'Project Monitoring', icon: HiShieldCheck },
     { path: '/admin/milestones', label: 'Milestone Oversight', icon: HiChartBar },
     { path: '/admin/refund-proposals', label: 'Refund Proposals', icon: HiArrowUturnLeft },
+    { path: '/admin/governance', label: 'Governance', icon: HiScale },
     { path: '/admin/users', label: 'User Management', icon: HiUsers },
   ]
 

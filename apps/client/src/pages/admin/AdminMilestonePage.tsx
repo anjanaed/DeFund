@@ -149,9 +149,10 @@ export default function AdminMilestonePage() {
               <tr><td colSpan={4} style={{ padding: 0 }}><Spinner label="Loading milestones…" /></td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No milestones found.</td></tr>
-            ) : filtered.map((item) => {
+            ) : filtered.map((item, idx) => {
               const dl = votingEndLabel(item.votingEndTime, item.status)
               const approval = approvalPercent(item.votesFor, item.votesAgainst)
+              const showCampaign = idx === 0 || filtered[idx - 1].campaign.id !== item.campaign.id
               return (
                 <tr
                   key={item.id}
@@ -159,8 +160,11 @@ export default function AdminMilestonePage() {
                   style={{ cursor: 'pointer' }}
                 >
                   <td>
-                    <div style={{ fontWeight: '600', marginBottom: '2px' }}>{item.campaign.title}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{item.title}</div>
+                    {showCampaign
+                      ? <div style={{ fontWeight: '600', marginBottom: '2px' }}>{item.campaign.title}</div>
+                      : <div style={{ fontWeight: '600', marginBottom: '2px', color: 'transparent', userSelect: 'none', fontSize: '11px' }}>↳</div>
+                    }
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', paddingLeft: showCampaign ? 0 : '12px' }}>{item.title}</div>
                   </td>
                   <td>
                     <div>{item.votingEndTime ? new Date(item.votingEndTime).toLocaleDateString() : '—'}</div>

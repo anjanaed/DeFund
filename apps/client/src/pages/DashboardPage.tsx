@@ -6,7 +6,7 @@ import ProofModal from '../components/common/ProofModal'
 import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
 import TxBanner from '../components/common/TxBanner'
 import LoadingScreen from '../components/common/LoadingScreen'
-import { useWriteContract } from 'wagmi'
+import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
@@ -53,7 +53,7 @@ export default function DashboardPage() {
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set())
   const [txError, setTxError] = useState<string | null>(null)
 
-  const { writeContractAsync } = useWriteContract()
+  const { writeWithSimulate } = useSimulatedWrite()
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -90,7 +90,7 @@ export default function DashboardPage() {
     if (item.onChainId == null) { setTxError('This milestone is not yet deployed on-chain.'); return }
     setVotingTx({ id: item.id, approve })
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'voteOnMilestone',
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
     setClaimingId(item.id)
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'claimRefund',

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { HiPaperAirplane, HiPencil, HiTrash, HiArrowUturnLeft, HiCheck, HiXMark, HiHandThumbUp, HiFire } from 'react-icons/hi2'
+import { HiPaperAirplane, HiPencil, HiTrash, HiArrowUturnLeft, HiCheck, HiXMark, HiHandThumbUp, HiHandThumbDown } from 'react-icons/hi2'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../common/Spinner'
 
-type ReactionType = 'LIKE' | 'FIRE'
+type ReactionType = 'LIKE' | 'DISLIKE'
 
 interface Reaction {
   id: string
@@ -249,9 +249,9 @@ export default function ProjectForum({ projectId }: Props) {
     const canDelete = !m.isDeleted && (user?.id === m.user.id || isAdmin)
     const wasEdited = !m.isDeleted && new Date(m.updatedAt).getTime() - new Date(m.createdAt).getTime() > 1000
     const likeCount = m.reactions.filter((r) => r.type === 'LIKE').length
-    const fireCount = m.reactions.filter((r) => r.type === 'FIRE').length
+    const dislikeCount = m.reactions.filter((r) => r.type === 'DISLIKE').length
     const userLiked = !!user && m.reactions.some((r) => r.userId === user.id && r.type === 'LIKE')
-    const userFired = !!user && m.reactions.some((r) => r.userId === user.id && r.type === 'FIRE')
+    const userDisliked = !!user && m.reactions.some((r) => r.userId === user.id && r.type === 'DISLIKE')
     const busy = busyMessageId === m.id
     const isEditing = editingId === m.id
     const isReplying = replyTo === m.id
@@ -344,19 +344,19 @@ export default function ProjectForum({ projectId }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => handleReact(m.id, 'FIRE')}
+              onClick={() => handleReact(m.id, 'DISLIKE')}
               disabled={!isAuthenticated}
-              title={isAuthenticated ? 'Fire' : 'Sign in to react'}
+              title={isAuthenticated ? 'Dislike' : 'Sign in to react'}
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
                 padding: '4px 8px', fontSize: '12px',
-                background: userFired ? 'rgba(249,115,22,0.1)' : 'transparent',
+                background: userDisliked ? 'rgba(239,68,68,0.1)' : 'transparent',
                 border: '1px solid var(--color-border)', borderRadius: '12px',
-                color: userFired ? '#f97316' : 'var(--color-text-secondary)',
+                color: userDisliked ? 'var(--color-error)' : 'var(--color-text-secondary)',
                 cursor: isAuthenticated ? 'pointer' : 'not-allowed',
               }}
             >
-              <HiFire size={14} /> {fireCount}
+              <HiHandThumbDown size={14} /> {dislikeCount}
             </button>
 
             {!isReply && isAuthenticated && (

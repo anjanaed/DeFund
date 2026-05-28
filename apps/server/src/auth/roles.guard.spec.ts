@@ -41,9 +41,9 @@ describe('RolesGuard', () => {
   });
 
   it('allows access when user has one of multiple required roles', () => {
-    reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN, UserRole.CREATOR]);
+    reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN, UserRole.USER]);
 
-    expect(guard.canActivate(makeContext('CREATOR'))).toBe(true);
+    expect(guard.canActivate(makeContext('USER'))).toBe(true);
   });
 
   it('denies access when user role does not match any required role', () => {

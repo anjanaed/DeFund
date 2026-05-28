@@ -26,6 +26,8 @@ import AdminRiskDetailsPage from './pages/admin/AdminRiskDetailsPage'
 import AdminMilestoneDetailsPage from './pages/admin/AdminMilestoneDetailsPage'
 import AdminRefundProposalsPage from './pages/admin/AdminRefundProposalsPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AdminGovernancePage from './pages/admin/AdminGovernancePage'
+import { Toaster } from 'sonner'
 
 const queryClient = new QueryClient()
 
@@ -35,6 +37,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Router>
+            <Toaster position="top-right" richColors closeButton />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<LandingPage />} />
@@ -64,6 +67,7 @@ function App() {
                   <Route path="milestones/:id" element={<AdminMilestoneDetailsPage />} />
                   <Route path="refund-proposals" element={<AdminRefundProposalsPage />} />
                   <Route path="users" element={<AdminUsersPage />} />
+                  <Route path="governance" element={<AdminGovernancePage />} />
                 </Route>
               </Route>
 

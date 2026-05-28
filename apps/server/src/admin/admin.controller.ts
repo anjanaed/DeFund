@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -9,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { FlagCampaignDto } from './dto/flag-campaign.dto';
-import { SetUserRoleDto } from './dto/set-user-role.dto';
+import { ProposeRoleChangeDto } from './dto/propose-role-change.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -180,15 +181,6 @@ export class AdminController {
     return this.admin.getReleaseProposalForMilestone(id);
   }
 
-  @Post('users/:id/set-role')
-  setUserRole(
-    @Param('id') id: string,
-    @Body() dto: SetUserRoleDto,
-    @CurrentUser() user: { userId: string },
-  ) {
-    return this.admin.setUserRole(id, dto.role, user.userId);
-  }
-
   @Get('users')
   getUsers(
     @Query('search') search?: string,
@@ -196,5 +188,73 @@ export class AdminController {
     @Query('limit') limit?: string,
   ) {
     return this.admin.getUsers(search, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
+  }
+
+  // ─── Governance: Multi-Sig Admin Role Proposals ─────────────────────────────
+
+  @Post('governance/role-proposals')
+  proposeRoleChange(
+    @Body() dto: ProposeRoleChangeDto,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.proposeRoleChange(dto.targetUserId, dto.targetRole, user.walletAddress);
+  }
+
+  @Post('governance/role-proposals/:id/confirm')
+  confirmRoleChange(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.confirmRoleChange(id, user.walletAddress);
+  }
+
+  @Delete('governance/role-proposals/:id')
+  cancelRoleProposal(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.cancelRoleProposal(id, user.walletAddress);
+  }
+
+  @Get('governance/role-proposals')
+  getRoleProposals(@Query('pending') pending?: string) {
+    return this.admin.getRoleProposals(pending === 'true');
+  }
+
+  // ─── Governance: Multi-Sig Campaign Approval ────────────────────────────────
+
+  @Post('projects/:id/propose-approval')
+  proposeApproval(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.proposeApproval(id, user.walletAddress);
+  }
+
+  @Post('projects/:id/confirm-approval')
+  confirmApproval(
+    @Param('id') id: string,
+    @Body() body: { onChainId: number },
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.confirmApproval(id, body.onChainId, user.walletAddress);
+  }
+
+  @Get('projects/:id/approval-proposal')
+  getApprovalProposal(@Param('id') id: string) {
+    return this.admin.getApprovalProposal(id);
+  }
+
+  @Delete('projects/:id/approval-proposal')
+  cancelApprovalProposal(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.cancelApprovalProposal(id, user.walletAddress);
+  }
+
+  @Get('governance/pending-approvals')
+  getPendingApprovalProposals() {
+    return this.admin.getPendingApprovalProposals();
   }
 }

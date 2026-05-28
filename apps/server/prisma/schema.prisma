@@ -16,7 +16,6 @@ datasource db {
 enum UserRole {
   USER
   ADMIN
-  CREATOR
 }
 
 enum CampaignStatus {
@@ -54,12 +53,13 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  createdCampaigns Campaign[]      @relation("CreatedCampaigns")
-  contributions    Contribution[]
-  votes            Vote[]
-  messages         Message[]
-  reactions        Reaction[]
-  notifications    Notification[]
+  createdCampaigns   Campaign[]          @relation("CreatedCampaigns")
+  contributions      Contribution[]
+  votes              Vote[]
+  messages           Message[]
+  reactions          Reaction[]
+  notifications      Notification[]
+  adminRoleProposals AdminRoleProposal[]
 }
 
 model Campaign {
@@ -97,6 +97,7 @@ model Campaign {
   forum            Forum?
   refundProposals  RefundProposal[]
   flagProposals    FlagProposal[]
+  approvalProposal CampaignApprovalProposal?
 }
 
 model RefundProposal {
@@ -231,6 +232,7 @@ model Message {
 
 enum ReactionType {
   LIKE
+  DISLIKE
   FIRE
 }
 
@@ -278,6 +280,30 @@ enum NotificationType {
   REFUND_APPROVED
   FLAG_PROPOSED
   RELEASE_FUNDS_PROPOSED
+  ADMIN_ROLE_PROPOSED
+  CAMPAIGN_APPROVAL_PROPOSED
+}
+
+model CampaignApprovalProposal {
+  id         String   @id @default(uuid())
+  proposer   String   // wallet address of first admin
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+
+  campaignId String   @unique  // one active proposal per campaign
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model AdminRoleProposal {
+  id           String    @id @default(uuid())
+  targetUserId String
+  targetRole   UserRole
+  proposer     String    // wallet address of proposing admin
+  confirmer    String?   // wallet address of confirming admin; null until executed
+  executed     Boolean   @default(false)
+  proposedAt   DateTime  @default(now())
+
+  targetUser User @relation(fields: [targetUserId], references: [id])
 }
 
 model Notification {

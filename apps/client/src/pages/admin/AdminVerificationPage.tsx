@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HiMagnifyingGlass } from 'react-icons/hi2'
+import { HiMagnifyingGlass, HiClock } from 'react-icons/hi2'
 import Spinner from '../../components/common/Spinner'
 import { apiFetch } from '../../lib/api'
 import '../../Admin.css'
@@ -16,14 +16,19 @@ interface Campaign {
 export default function AdminVerificationPage() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Campaign[]>([])
+  const [pendingApprovalIds, setPendingApprovalIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    apiFetch('/admin/verification')
-      .then((r) => r.json())
-      .then((data) => setProjects(Array.isArray(data) ? data : []))
-      .catch(() => setProjects([]))
+    Promise.all([
+      apiFetch('/admin/verification').then((r) => r.json()),
+      apiFetch('/admin/governance/pending-approvals').then((r) => r.json()).catch(() => []),
+    ]).then(([data, approvals]) => {
+      setProjects(Array.isArray(data?.items) ? data.items : [])
+      const ids = new Set<string>(Array.isArray(approvals) ? approvals.map((a: any) => a.campaignId) : [])
+      setPendingApprovalIds(ids)
+    }).catch(() => setProjects([]))
       .finally(() => setLoading(false))
   }, [])
 
@@ -66,7 +71,7 @@ export default function AdminVerificationPage() {
                 <th>Project Name</th>
                 <th>Wallet Address</th>
                 <th>Submitted</th>
-                <th>Status</th>
+                <th>Approval</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -83,7 +88,13 @@ export default function AdminVerificationPage() {
                   </td>
                   <td>{new Date(project.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <span className="admin-badge warning">PENDING</span>
+                    {pendingApprovalIds.has(project.id) ? (
+                      <span className="admin-badge warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <HiClock size={12} /> Proposed
+                      </span>
+                    ) : (
+                      <span className="admin-badge neutral">Not proposed</span>
+                    )}
                   </td>
                   <td>
                     <button
@@ -91,7 +102,7 @@ export default function AdminVerificationPage() {
                       style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '6px' }}
                       onClick={(e) => { e.stopPropagation(); navigate(`/admin/verification/${project.id}`) }}
                     >
-                      Review
+                      {pendingApprovalIds.has(project.id) ? 'Review & Deploy' : 'Review'}
                     </button>
                   </td>
                 </tr>

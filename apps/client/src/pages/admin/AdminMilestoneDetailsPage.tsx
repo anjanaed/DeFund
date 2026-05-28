@@ -1,26 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useWriteContract, useAccount } from 'wagmi'
+import { useAccount } from 'wagmi'
+import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
 import { HiArrowLeft, HiClock, HiDocumentText, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiExclamationTriangle, HiUserCircle } from 'react-icons/hi2'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
 import { parseContractError } from '../../lib/errors'
+import { toast } from 'sonner'
 import '../../Admin.css'
 
 export default function AdminMilestoneDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { writeContractAsync } = useWriteContract()
+  const { writeWithSimulate } = useSimulatedWrite()
   const { address: connectedAddress } = useAccount()
 
   const [milestone, setMilestone] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [finalizeStatus, setFinalizeStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
-  const [finalizeMessage, setFinalizeMessage] = useState('')
+  const [finalizePending, setFinalizePending] = useState(false)
+  const [releasePending, setReleasePending] = useState(false)
   const [releaseProposal, setReleaseProposal] = useState<any>(null)
-  const [releaseStatus, setReleaseStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
-  const [releaseMessage, setReleaseMessage] = useState('')
 
   useEffect(() => {
     apiFetch(`/admin/milestones/${id}`)
@@ -32,16 +32,15 @@ export default function AdminMilestoneDetailsPage() {
           .then((p) => setReleaseProposal(p))
           .catch(() => {})
       })
-      .catch(() => setFinalizeMessage('Failed to load milestone'))
+      .catch(() => toast.error('Failed to load milestone'))
       .finally(() => setLoading(false))
   }, [id])
 
   const handleProposeRelease = async () => {
     if (!milestone?.onChainId) return
-    setReleaseStatus('pending')
-    setReleaseMessage('')
+    setReleasePending(true)
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'proposeReleaseFunds',
@@ -49,65 +48,54 @@ export default function AdminMilestoneDetailsPage() {
       })
       const p = await apiFetch(`/admin/milestones/${id}/release/proposal`).then((r) => r.ok ? r.json() : null).catch(() => null)
       setReleaseProposal(p)
-      setReleaseStatus('success')
-      setReleaseMessage('Release proposed. A second admin must confirm.')
+      toast.success('Release proposed. A second admin must confirm.')
     } catch (err: any) {
-      setReleaseStatus('error')
-      setReleaseMessage(parseContractError(err))
+      toast.error(parseContractError(err))
+    } finally {
+      setReleasePending(false)
     }
   }
 
   const handleConfirmRelease = async () => {
     if (!milestone?.onChainId) return
-    setReleaseStatus('pending')
-    setReleaseMessage('')
+    setReleasePending(true)
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'confirmReleaseFunds',
         args: [BigInt(milestone.onChainId)],
       })
-      setReleaseStatus('success')
-      setReleaseMessage('Funds released on-chain to creator.')
+      toast.success('Funds released on-chain to creator.')
       setMilestone((m: any) => m ? { ...m, status: 'COMPLETED' } : m)
       setReleaseProposal((p: any) => p ? { ...p, executed: true } : p)
     } catch (err: any) {
-      setReleaseStatus('error')
-      setReleaseMessage(parseContractError(err))
+      toast.error(parseContractError(err))
+    } finally {
+      setReleasePending(false)
     }
   }
 
   const handleFinalizeVoting = async () => {
-    if (!milestone?.onChainId) {
-      setFinalizeMessage('Milestone has no on-chain ID')
-      setFinalizeStatus('error')
-      return
-    }
-    setFinalizeStatus('pending')
-    setFinalizeMessage('')
+    if (!milestone?.onChainId) { toast.error('Milestone has no on-chain ID'); return }
+    setFinalizePending(true)
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'finalizeMilestoneVoting',
         args: [BigInt(milestone.onChainId)],
       })
-      setFinalizeStatus('success')
-      setFinalizeMessage('Voting finalized on-chain. Refreshing in a few seconds…')
-      // Reload from API so the actual vote result (APPROVED or REJECTED) is shown
+      toast.success('Voting finalized on-chain. Refreshing status…')
       setTimeout(() => {
         apiFetch(`/admin/milestones/${id}`)
           .then((r) => r.json())
-          .then((data) => {
-            setMilestone(data)
-            setFinalizeMessage(`Voting finalized — milestone is now ${data.status}.`)
-          })
-          .catch(() => setFinalizeMessage('Voting finalized. Refresh the page to see the updated status.'))
+          .then((data) => { setMilestone(data); setFinalizePending(false) })
+          .catch(() => setFinalizePending(false))
       }, 5000)
     } catch (err: any) {
-      setFinalizeStatus('error')
-      setFinalizeMessage(parseContractError(err))
+      toast.error(parseContractError(err))
+      setFinalizePending(false)
     }
   }
 
@@ -147,18 +135,6 @@ export default function AdminMilestoneDetailsPage() {
           <p className="admin-page-subtitle">Milestone Oversight • ID: #{id}</p>
         </div>
       </div>
-
-      {finalizeMessage && (
-        <div style={{
-          padding: '10px 14px', borderRadius: '6px', marginBottom: '24px', fontSize: '14px',
-          background: finalizeStatus === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-          border: `1px solid ${finalizeStatus === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
-          color: finalizeStatus === 'error' ? 'var(--color-error)' : '#15803d',
-          display: 'flex', alignItems: 'center', gap: '8px',
-        }}>
-          {finalizeStatus === 'error' ? <HiXCircle /> : <HiCheckCircle />} {finalizeMessage}
-        </div>
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '32px' }}>
 
@@ -245,16 +221,16 @@ export default function AdminMilestoneDetailsPage() {
                 <button
                   className="btn"
                   onClick={handleFinalizeVoting}
-                  disabled={finalizeStatus === 'pending' || finalizeStatus === 'success'}
+                  disabled={finalizePending}
                   style={{
                     width: '100%', padding: '10px', fontSize: '14px',
                     background: 'var(--color-primary)', border: 'none', color: 'white',
                     borderRadius: '6px', fontWeight: '600',
-                    opacity: (finalizeStatus === 'pending' || finalizeStatus === 'success') ? 0.5 : 1,
-                    cursor: (finalizeStatus === 'pending' || finalizeStatus === 'success') ? 'not-allowed' : 'pointer',
+                    opacity: finalizePending ? 0.5 : 1,
+                    cursor: finalizePending ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {finalizeStatus === 'pending' ? 'Signing...' : finalizeStatus === 'success' ? 'Finalized ✓' : 'Finalize Voting'}
+                  {finalizePending ? 'Signing...' : 'Finalize Voting'}
                 </button>
               </div>
             )}
@@ -301,10 +277,10 @@ export default function AdminMilestoneDetailsPage() {
                     <button
                       className="btn"
                       onClick={handleProposeRelease}
-                      disabled={releaseStatus === 'pending'}
-                      style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'var(--color-success)', border: 'none', color: 'white', borderRadius: '6px', fontWeight: '600', opacity: releaseStatus === 'pending' ? 0.6 : 1, cursor: releaseStatus === 'pending' ? 'not-allowed' : 'pointer' }}
+                      disabled={releasePending}
+                      style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'var(--color-success)', border: 'none', color: 'white', borderRadius: '6px', fontWeight: '600', opacity: releasePending ? 0.6 : 1, cursor: releasePending ? 'not-allowed' : 'pointer' }}
                     >
-                      {releaseStatus === 'pending' ? 'Signing…' : 'Propose Release'}
+                      {releasePending ? 'Signing…' : 'Propose Release'}
                     </button>
                   )}
                   {pendingProposal && isProposer && (
@@ -316,16 +292,11 @@ export default function AdminMilestoneDetailsPage() {
                     <button
                       className="btn"
                       onClick={handleConfirmRelease}
-                      disabled={releaseStatus === 'pending'}
-                      style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'var(--color-success)', border: 'none', color: 'white', borderRadius: '6px', fontWeight: '600', opacity: releaseStatus === 'pending' ? 0.6 : 1, cursor: releaseStatus === 'pending' ? 'not-allowed' : 'pointer' }}
+                      disabled={releasePending}
+                      style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'var(--color-success)', border: 'none', color: 'white', borderRadius: '6px', fontWeight: '600', opacity: releasePending ? 0.6 : 1, cursor: releasePending ? 'not-allowed' : 'pointer' }}
                     >
-                      {releaseStatus === 'pending' ? 'Signing…' : 'Confirm Release'}
+                      {releasePending ? 'Signing…' : 'Confirm Release'}
                     </button>
-                  )}
-                  {releaseMessage && (
-                    <p style={{ fontSize: '12px', marginTop: '8px', color: releaseStatus === 'error' ? 'var(--color-error)' : 'var(--color-text-secondary)' }}>
-                      {releaseMessage}
-                    </p>
                   )}
                 </div>
               )

@@ -1,14 +1,3 @@
-/**
- * H6 — Maps known Solidity revert strings and wallet errors to human-readable messages.
- *
- * Usage:
- *   import { parseContractError } from '@/lib/errors'
- *   // ...
- *   } catch (err) {
- *     toast.error(parseContractError(err))
- *   }
- */
-
 const CONTRACT_ERROR_MAP: Record<string, string> = {
   // Voting
   'Voting period not ended': 'Voting is still in progress — wait until the voting period ends.',
@@ -26,7 +15,6 @@ const CONTRACT_ERROR_MAP: Record<string, string> = {
 
   // Campaign state
   'Campaign not active': 'This campaign is not active. It may have been cancelled or completed.',
-  'Campaign not funded': 'This campaign has not reached its funding goal yet.',
   'Campaign goal already reached': 'This campaign has already reached its funding goal.',
   'Campaign deadline passed': 'The contribution deadline for this campaign has passed.',
   'Campaign already cancelled': 'This campaign has already been cancelled.',
@@ -44,56 +32,87 @@ const CONTRACT_ERROR_MAP: Record<string, string> = {
   'No pending proposal': 'No pending proposal was found for this action.',
   'Not an admin': 'You must be an admin to perform this action.',
 
-  // Access control
+  // Access control (string reverts + OZ v5 decoded custom errors)
   'Pausable: paused': 'The contract is currently paused. Please try again later.',
   'AccessControl': 'You do not have permission to perform this action.',
+  'AccessControlUnauthorizedAccount': 'You do not have the required on-chain role. Ask the contract owner to run grant-admin for your wallet.',
 
   // Expire campaign
-  'Campaign not funded': 'This campaign is not in the Funded state.',
+  'Campaign not funded': 'This campaign is not in the Funded state (must be Funded to expire).',
   'Campaign deadline not reached': 'The campaign deadline has not passed yet.',
   'All milestones have been submitted': 'All milestones have been submitted — this campaign cannot be expired.',
 
-  // Generic wallet
+  // Generic wallet / gas
   'user rejected': 'Transaction was rejected in your wallet.',
   'User rejected': 'Transaction was rejected in your wallet.',
-  'nonce too high': 'Transaction nonce mismatch — please reset your wallet\'s nonce in MetaMask (Settings → Advanced).',
-  'nonce too low': 'Transaction nonce mismatch — please reset your wallet\'s nonce in MetaMask (Settings → Advanced).',
+  'denied transaction': 'Transaction was rejected in your wallet.',
+  'nonce too high': "Transaction nonce mismatch — please reset your wallet's nonce in MetaMask (Settings → Advanced).",
+  'nonce too low': "Transaction nonce mismatch — please reset your wallet's nonce in MetaMask (Settings → Advanced).",
   'insufficient funds': 'Insufficient funds in your wallet to cover this transaction and gas fees.',
   'gas required exceeds': 'This transaction would exceed the gas limit. Please try again.',
+  'gas limit too high': 'Gas estimation failed — the transaction may revert. Check inputs and try again.',
+  'exceeds block gas limit': 'This transaction exceeds the block gas limit.',
+  'intrinsic gas too low': 'Gas estimate was too low — please try again.',
 };
 
+/** Collect every string field from the error and its full cause chain. */
+function collectMessages(err: unknown, depth = 0): string[] {
+  if (!err || depth > 6) return [];
+  const obj = err as Record<string, any>;
+  const parts: string[] = [];
+  for (const key of ['shortMessage', 'message', 'reason', 'details', 'data']) {
+    if (typeof obj[key] === 'string' && obj[key]) parts.push(obj[key]);
+  }
+  if (obj.cause) parts.push(...collectMessages(obj.cause, depth + 1));
+  return parts;
+}
+
 /**
- * Extracts a human-readable error message from a viem/ethers/wagmi error.
- * Falls back to a generic "Transaction failed" message for unmapped errors.
+ * Extracts a human-readable error message from a viem/wagmi error.
+ * Walks the full cause chain so nested revert reasons are always found.
  */
 export function parseContractError(err: unknown): string {
   if (!err) return 'An unknown error occurred.';
 
-  // viem/wagmi error shapes
-  const errObj = err as Record<string, any>;
+  if (import.meta.env.DEV) console.error('[contract error]', err);
 
-  // Check shortMessage first (viem), then message
-  const rawMessage: string =
-    errObj.shortMessage ||
-    errObj.message ||
-    errObj.reason ||
-    String(err);
+  const messages = collectMessages(err);
+  const combined = messages.join('\n');
 
-  // Walk the error map
+  // 1. Check the error map against the combined text
   for (const [key, friendly] of Object.entries(CONTRACT_ERROR_MAP)) {
-    if (rawMessage.includes(key)) return friendly;
+    if (combined.includes(key)) return friendly;
   }
 
-  // Try to extract the revert reason from "execution reverted: <reason>"
-  const revertMatch = rawMessage.match(/execution reverted:?\s*"?([^"]+)"?/i);
-  if (revertMatch) {
-    const reason = revertMatch[1].trim();
-    // Check map again with extracted reason
-    for (const [key, friendly] of Object.entries(CONTRACT_ERROR_MAP)) {
-      if (reason.includes(key)) return friendly;
+  // 2. Extract the revert reason from common viem/RPC formats:
+  //    "reverted with the following reason:\n<reason>"
+  //    "execution reverted: <reason>"
+  //    "reverted: <reason>"
+  const revertPatterns = [
+    /reverted with the following reason:\s*\n?(.+)/i,
+    /execution reverted:?\s*"?([^"\n]+)"?/i,
+    /reverted:\s*"?([^"\n]+)"?/i,
+    /Error: ([^\n]+)/,
+  ];
+
+  for (const pattern of revertPatterns) {
+    const match = combined.match(pattern);
+    if (match) {
+      const reason = match[1].trim();
+      // Check map with extracted reason
+      for (const [key, friendly] of Object.entries(CONTRACT_ERROR_MAP)) {
+        if (reason.includes(key)) return friendly;
+      }
+      // Show raw reason if it looks like a business rule (short, no stack trace)
+      if (reason.length < 120 && !reason.includes(' at ') && !reason.includes('(0x')) {
+        return `Transaction failed: ${reason}`;
+      }
     }
-    // Show the raw reason if it looks like a business-rule message (short, no stack)
-    if (reason.length < 120 && !reason.includes('at ')) return `Transaction failed: ${reason}`;
+  }
+
+  // Last-resort: check for known error selectors that couldn't be decoded from ABI
+  if (combined.includes('0xe2517d3f')) {
+    return 'You do not have the required on-chain role. Ask the contract owner to run grant-admin for your wallet.';
   }
 
   return 'Transaction failed — please check your wallet and try again.';

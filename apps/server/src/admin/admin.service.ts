@@ -5,11 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CampaignStatus, MilestoneStatus, UserRole } from '../generated/prisma';
+import { CampaignStatus, MilestoneStatus, NotificationType, UserRole } from '../generated/prisma';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async getStats() {
     const [pending, flagged, rejected, totalRaisedAgg] = await Promise.all([
@@ -199,20 +203,12 @@ export class AdminService {
     if (!campaign) throw new NotFoundException('Campaign not found');
 
     // Admin called createCampaign() on-chain and passes back the resulting on-chain ID.
-    // Link the DB campaign, mark it approved/active, and promote the creator to CREATOR role
-    // so they have a verified-creator badge for future campaigns.
-    // [H2] Also return the creator's wallet address so callers can confirm what was passed
+    // [H2] Return the creator's wallet address so callers can confirm what was passed
     // as _creator on-chain.
-    await this.prisma.$transaction([
-      this.prisma.campaign.update({
-        where: { id },
-        data: { onChainId, isAdminApproved: true, status: CampaignStatus.ACTIVE },
-      }),
-      this.prisma.user.update({
-        where: { id: campaign.creatorId },
-        data: { role: UserRole.CREATOR },
-      }),
-    ]);
+    await this.prisma.campaign.update({
+      where: { id },
+      data: { onChainId, isAdminApproved: true, status: CampaignStatus.ACTIVE },
+    });
 
     return { success: true, onChainId, creatorWallet: campaign.creator.walletAddress };
   }
@@ -304,21 +300,33 @@ export class AdminService {
   }
 
   async getMilestones(page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
-    const [milestones, total] = await Promise.all([
-      this.prisma.milestone.findMany({
-        skip,
-        take: limit,
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          campaign: { select: { id: true, title: true } },
-          _count: { select: { votes: true } },
+    // Oversight should show the *current* milestone for every active campaign —
+    // the first one (by creation order) that hasn't completed yet. The next
+    // milestone in a campaign isn't shown until the previous one is COMPLETED.
+    const campaigns = await this.prisma.campaign.findMany({
+      where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } },
+      select: {
+        id: true,
+        title: true,
+        milestones: {
+          where: { status: { not: MilestoneStatus.COMPLETED } },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          include: { _count: { select: { votes: true } } },
         },
-      }),
-      this.prisma.milestone.count(),
-    ]);
+      },
+    });
 
-    const ids = milestones.map((m) => m.id);
+    const allCurrent = campaigns
+      .filter((c) => c.milestones.length > 0)
+      .map((c) => ({ ...c.milestones[0], campaign: { id: c.id, title: c.title } }))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    const total = allCurrent.length;
+    const skip = (page - 1) * limit;
+    const paged = allCurrent.slice(skip, skip + limit);
+
+    const ids = paged.map((m) => m.id);
     const groups = ids.length
       ? await this.prisma.vote.groupBy({
           by: ['milestoneId', 'choice'],
@@ -335,12 +343,12 @@ export class AdminService {
       counts.set(g.milestoneId, entry);
     }
 
-    const items = milestones.map((m) => {
+    const items = paged.map((m) => {
       const c = counts.get(m.id) ?? { for: 0, against: 0 };
       return { ...m, votesFor: c.for, votesAgainst: c.against };
     });
 
-    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return { items, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
 
   async getMilestone(id: string) {
@@ -417,19 +425,175 @@ export class AdminService {
     return proposal ?? null;
   }
 
-  async setUserRole(userId: string, role: string, currentUserId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
+  // ─── Governance: Multi-Sig Admin Role Proposals ─────────────────────────────
 
-    if (
-      userId === currentUserId &&
-      user.role === UserRole.ADMIN &&
-      role !== UserRole.ADMIN
-    ) {
-      throw new ForbiddenException('Admins cannot demote themselves');
+  async proposeRoleChange(targetUserId: string, targetRole: UserRole, proposerWalletAddress: string) {
+    const target = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!target) throw new NotFoundException('User not found');
+
+    if (target.walletAddress.toLowerCase() === proposerWalletAddress.toLowerCase()) {
+      throw new ForbiddenException('Cannot propose a role change for yourself');
     }
 
-    return this.prisma.user.update({ where: { id: userId }, data: { role: role as any } });
+    const existing = await this.prisma.adminRoleProposal.findFirst({
+      where: { targetUserId, executed: false },
+    });
+    if (existing) throw new BadRequestException('A pending role proposal already exists for this user');
+
+    const proposal = await this.prisma.adminRoleProposal.create({
+      data: { targetUserId, targetRole, proposer: proposerWalletAddress },
+      include: { targetUser: { select: { id: true, name: true, walletAddress: true, role: true } } },
+    });
+
+    this.notifications.notifyAdmins(
+      NotificationType.ADMIN_ROLE_PROPOSED,
+      'Admin Role Proposal Awaiting Confirmation',
+      `A proposal to change ${target.name || target.walletAddress} to ${targetRole} needs a second admin to confirm`,
+      { proposalId: proposal.id, targetUserId, targetRole },
+      `ADMIN_ROLE_PROPOSED:${proposal.id}`,
+    ).catch(() => {});
+
+    return proposal;
+  }
+
+  async confirmRoleChange(proposalId: string, confirmerWalletAddress: string) {
+    const proposal = await this.prisma.adminRoleProposal.findUnique({
+      where: { id: proposalId },
+      include: { targetUser: { select: { id: true, name: true, walletAddress: true, role: true } } },
+    });
+    if (!proposal) throw new NotFoundException('Proposal not found');
+    if (proposal.executed) throw new BadRequestException('Proposal already executed');
+
+    if (proposal.proposer.toLowerCase() === confirmerWalletAddress.toLowerCase()) {
+      throw new ForbiddenException('The same admin cannot confirm their own proposal — a different admin must confirm');
+    }
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.adminRoleProposal.update({
+        where: { id: proposalId },
+        data: { executed: true, confirmer: confirmerWalletAddress },
+        include: { targetUser: { select: { id: true, name: true, walletAddress: true, role: true } } },
+      }),
+      this.prisma.user.update({
+        where: { id: proposal.targetUserId },
+        data: { role: proposal.targetRole },
+      }),
+    ]);
+
+    return updated;
+  }
+
+  async cancelRoleProposal(proposalId: string, callerWalletAddress: string) {
+    const proposal = await this.prisma.adminRoleProposal.findUnique({ where: { id: proposalId } });
+    if (!proposal) throw new NotFoundException('Proposal not found');
+    if (proposal.executed) throw new BadRequestException('Cannot cancel an executed proposal');
+    if (proposal.proposer.toLowerCase() !== callerWalletAddress.toLowerCase()) {
+      throw new ForbiddenException('Only the proposer can cancel this proposal');
+    }
+
+    await this.prisma.adminRoleProposal.delete({ where: { id: proposalId } });
+    return { success: true };
+  }
+
+  async getRoleProposals(pending?: boolean) {
+    const where = pending ? { executed: false } : {};
+    return this.prisma.adminRoleProposal.findMany({
+      where,
+      include: { targetUser: { select: { id: true, name: true, walletAddress: true, role: true } } },
+      orderBy: { proposedAt: 'desc' },
+    });
+  }
+
+  // ─── Governance: Multi-Sig Campaign Approval ────────────────────────────────
+
+  async proposeApproval(campaignId: string, proposerWallet: string) {
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: { approvalProposal: true },
+    });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    if (campaign.status !== 'PENDING') throw new BadRequestException('Campaign is not in PENDING status');
+    if (campaign.approvalProposal && !campaign.approvalProposal.executed) {
+      throw new BadRequestException('A pending approval proposal already exists for this campaign');
+    }
+
+    // Delete any previously executed proposal so we can create a fresh one
+    if (campaign.approvalProposal?.executed) {
+      await this.prisma.campaignApprovalProposal.delete({ where: { campaignId } });
+    }
+
+    const proposal = await this.prisma.campaignApprovalProposal.create({
+      data: { campaignId, proposer: proposerWallet },
+    });
+
+    this.notifications.notifyAdmins(
+      NotificationType.CAMPAIGN_APPROVAL_PROPOSED,
+      'Campaign Approval Awaiting Second Admin',
+      `Campaign "${campaign.title}" has been reviewed by one admin and needs a second admin to confirm deployment.`,
+      { campaignId, campaignTitle: campaign.title },
+      `CAMPAIGN_APPROVAL_PROPOSED:${campaignId}`,
+    ).catch(() => {});
+
+    return proposal;
+  }
+
+  async confirmApproval(campaignId: string, onChainId: number, confirmerWallet: string) {
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        approvalProposal: true,
+        creator: { select: { walletAddress: true } },
+      },
+    });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    if (!campaign.approvalProposal || campaign.approvalProposal.executed) {
+      throw new BadRequestException('No pending approval proposal for this campaign');
+    }
+    if (campaign.approvalProposal.proposer.toLowerCase() === confirmerWallet.toLowerCase()) {
+      throw new ForbiddenException('The same admin cannot confirm their own proposal — a different admin must confirm');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.campaign.update({
+        where: { id: campaignId },
+        data: { onChainId, isAdminApproved: true, status: 'ACTIVE' },
+      }),
+      this.prisma.campaignApprovalProposal.update({
+        where: { campaignId },
+        data: { executed: true },
+      }),
+    ]);
+
+    await this.logAudit(confirmerWallet, 'APPROVE_CAMPAIGN', 'campaign', campaignId, campaign.title, { onChainId });
+
+    return { success: true, onChainId, creatorWallet: campaign.creator.walletAddress };
+  }
+
+  async getApprovalProposal(campaignId: string) {
+    const proposal = await this.prisma.campaignApprovalProposal.findUnique({
+      where: { campaignId },
+    });
+    return proposal ?? null;
+  }
+
+  async cancelApprovalProposal(campaignId: string, callerWallet: string) {
+    const proposal = await this.prisma.campaignApprovalProposal.findUnique({ where: { campaignId } });
+    if (!proposal) throw new NotFoundException('No approval proposal found for this campaign');
+    if (proposal.executed) throw new BadRequestException('Cannot cancel an executed proposal');
+    if (proposal.proposer.toLowerCase() !== callerWallet.toLowerCase()) {
+      throw new ForbiddenException('Only the proposer can cancel this proposal');
+    }
+
+    await this.prisma.campaignApprovalProposal.delete({ where: { campaignId } });
+    return { success: true };
+  }
+
+  async getPendingApprovalProposals() {
+    return this.prisma.campaignApprovalProposal.findMany({
+      where: { executed: false },
+      include: { campaign: { select: { id: true, title: true, status: true, createdAt: true } } },
+      orderBy: { proposedAt: 'desc' },
+    });
   }
 
   async getUsers(search?: string, page = 1, limit = 20) {

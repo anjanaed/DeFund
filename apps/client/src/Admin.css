@@ -166,7 +166,7 @@
 }
 
 .admin-stat-value {
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   font-weight: 700;
   color: var(--color-text-primary);
   margin-bottom: var(--space-2);

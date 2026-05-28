@@ -62,7 +62,7 @@ async function main() {
       data: {
         walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
         name: 'Max Verstappen',
-        role: UserRole.CREATOR,
+        role: UserRole.USER,
         isVerified: true,
         bio: 'DeFi protocol developer & blockchain engineer',
         githubHandle: 'maxverstappen',
@@ -73,7 +73,7 @@ async function main() {
       data: {
         walletAddress: '0xB100000000000000000000000000000000000001',
         name: 'Alex Chen',
-        role: UserRole.CREATOR,
+        role: UserRole.USER,
         isVerified: true,
         bio: 'Open-source game engine developer',
         githubHandle: 'alexchen-dev',
@@ -83,7 +83,7 @@ async function main() {
       data: {
         walletAddress: '0xC200000000000000000000000000000000000002',
         name: 'Sarah Kim',
-        role: UserRole.CREATOR,
+        role: UserRole.USER,
         isVerified: true,
         bio: 'NFT platform builder & digital artist',
         githubHandle: 'sarahkim-nft',
@@ -94,7 +94,7 @@ async function main() {
       data: {
         walletAddress: '0xD300000000000000000000000000000000000003',
         name: 'David Park',
-        role: UserRole.CREATOR,
+        role: UserRole.USER,
         isVerified: true,
         bio: 'Privacy-focused analytics engineer',
         githubHandle: 'davidpark-oss',
@@ -104,7 +104,7 @@ async function main() {
       data: {
         walletAddress: '0xE400000000000000000000000000000000000004',
         name: 'Lisa Thompson',
-        role: UserRole.CREATOR,
+        role: UserRole.USER,
         isVerified: true,
         bio: 'Distributed systems & storage protocol researcher',
         githubHandle: 'lisathompson',
@@ -114,7 +114,7 @@ async function main() {
       data: {
         walletAddress: '0xF500000000000000000000000000000000000005',
         name: 'Michael Ross',
-        role: UserRole.CREATOR,
+        role: UserRole.USER,
         isVerified: true,
         bio: 'DAO governance architect & community builder',
         githubHandle: 'michaelross-dao',

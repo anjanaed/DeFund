@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CampaignStatus, MilestoneStatus, UserRole } from '../generated/prisma';
 
 const makeCampaign = (overrides: Partial<Record<string, any>> = {}) => ({
@@ -84,7 +85,19 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
   },
+  adminRoleProposal: {
+    findFirst: jest.fn(),
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findMany: jest.fn(),
+  },
   $transaction: jest.fn(),
+};
+
+const mockNotifications = {
+  notifyAdmins: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('AdminService', () => {
@@ -97,6 +110,7 @@ describe('AdminService', () => {
       providers: [
         AdminService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
 
@@ -305,30 +319,23 @@ describe('AdminService', () => {
   });
 
   describe('approveCampaign', () => {
-    it('updates campaign status to ACTIVE and promotes creator to CREATOR role', async () => {
+    it('updates campaign status to ACTIVE and returns creatorWallet', async () => {
       const campaign = makeCampaign();
       mockPrisma.campaign.findUnique.mockResolvedValue(campaign);
-      mockPrisma.$transaction.mockResolvedValue([{}, {}]);
+      mockPrisma.campaign.update.mockResolvedValue({});
 
       const result = await service.approveCampaign('campaign-1', 42);
 
       // [H2] creatorWallet is now included so the frontend can pass it to createCampaign
       expect(result).toEqual({ success: true, onChainId: 42, creatorWallet: '0xdeadbeef' });
-      // $transaction is called once with the two update operations
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      // campaign.update and user.update are invoked to build the array passed to $transaction
       expect(mockPrisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'campaign-1' },
           data: expect.objectContaining({ onChainId: 42, status: CampaignStatus.ACTIVE }),
         }),
       );
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: campaign.creatorId },
-          data: { role: UserRole.CREATOR },
-        }),
-      );
+      // CREATOR role promotion removed — no user.update call
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when campaign does not exist', async () => {
@@ -466,10 +473,14 @@ describe('AdminService', () => {
   });
 
   describe('getMilestones', () => {
-    it('returns paginated milestones with vote tallies', async () => {
-      const milestones = [makeMilestone({ id: 'm1' })];
-      mockPrisma.milestone.findMany.mockResolvedValue(milestones);
-      mockPrisma.milestone.count.mockResolvedValue(1);
+    it('returns the current milestone per campaign with vote tallies', async () => {
+      mockPrisma.campaign.findMany.mockResolvedValue([
+        {
+          id: 'campaign-1',
+          title: 'Test Campaign',
+          milestones: [makeMilestone({ id: 'm1' })],
+        },
+      ]);
       mockPrisma.vote.groupBy.mockResolvedValue([
         { milestoneId: 'm1', choice: true, _count: { _all: 3 } },
         { milestoneId: 'm1', choice: false, _count: { _all: 1 } },
@@ -483,15 +494,32 @@ describe('AdminService', () => {
     });
 
     it('returns zero vote tallies when no votes exist', async () => {
-      const milestones = [makeMilestone({ id: 'm1' })];
-      mockPrisma.milestone.findMany.mockResolvedValue(milestones);
-      mockPrisma.milestone.count.mockResolvedValue(1);
+      mockPrisma.campaign.findMany.mockResolvedValue([
+        {
+          id: 'campaign-1',
+          title: 'Test Campaign',
+          milestones: [makeMilestone({ id: 'm1' })],
+        },
+      ]);
       mockPrisma.vote.groupBy.mockResolvedValue([]);
 
       const result = await service.getMilestones(1, 20);
 
       expect(result.items[0].votesFor).toBe(0);
       expect(result.items[0].votesAgainst).toBe(0);
+    });
+
+    it('skips campaigns whose milestones are all completed', async () => {
+      mockPrisma.campaign.findMany.mockResolvedValue([
+        { id: 'campaign-1', title: 'Done Campaign', milestones: [] },
+        { id: 'campaign-2', title: 'In-Flight', milestones: [makeMilestone({ id: 'm2' })] },
+      ]);
+      mockPrisma.vote.groupBy.mockResolvedValue([]);
+
+      const result = await service.getMilestones(1, 20);
+
+      expect(result.total).toBe(1);
+      expect(result.items[0].id).toBe('m2');
     });
   });
 
@@ -561,34 +589,98 @@ describe('AdminService', () => {
     });
   });
 
-  describe('setUserRole', () => {
-    it('updates user role successfully', async () => {
-      const user = makeUser({ id: 'user-2', role: UserRole.USER });
-      mockPrisma.user.findUnique.mockResolvedValue(user);
-      mockPrisma.user.update.mockResolvedValue({ ...user, role: UserRole.CREATOR });
+  describe('proposeRoleChange', () => {
+    it('creates a proposal and notifies admins', async () => {
+      const target = makeUser({ id: 'user-2', walletAddress: '0xtarget' });
+      const proposal = { id: 'prop-1', targetUserId: 'user-2', targetRole: UserRole.ADMIN, proposer: '0xadmin', confirmer: null, executed: false, proposedAt: new Date(), targetUser: target };
+      mockPrisma.user.findUnique.mockResolvedValue(target);
+      mockPrisma.adminRoleProposal.findFirst.mockResolvedValue(null);
+      mockPrisma.adminRoleProposal.create.mockResolvedValue(proposal);
 
-      const result = await service.setUserRole('user-2', UserRole.CREATOR, 'admin-user');
+      const result = await service.proposeRoleChange('user-2', UserRole.ADMIN, '0xadmin');
 
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: { role: UserRole.CREATOR },
-        }),
+      expect(result).toEqual(proposal);
+      expect(mockPrisma.adminRoleProposal.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { targetUserId: 'user-2', targetRole: UserRole.ADMIN, proposer: '0xadmin' } }),
       );
+      expect(mockNotifications.notifyAdmins).toHaveBeenCalled();
     });
 
-    it('throws ForbiddenException when an admin tries to demote themselves', async () => {
-      const adminUser = makeUser({ id: 'admin-1', role: UserRole.ADMIN });
-      mockPrisma.user.findUnique.mockResolvedValue(adminUser);
+    it('throws ForbiddenException when proposer targets themselves', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(makeUser({ walletAddress: '0xadmin' }));
 
-      await expect(
-        service.setUserRole('admin-1', UserRole.USER, 'admin-1'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.proposeRoleChange('user-1', UserRole.ADMIN, '0xadmin')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when a pending proposal already exists', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(makeUser({ walletAddress: '0xtarget' }));
+      mockPrisma.adminRoleProposal.findFirst.mockResolvedValue({ id: 'existing', executed: false });
+
+      await expect(service.proposeRoleChange('user-2', UserRole.ADMIN, '0xadmin')).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when user does not exist', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.setUserRole('bad-id', UserRole.USER, 'admin-1')).rejects.toThrow(NotFoundException);
+      await expect(service.proposeRoleChange('bad-id', UserRole.ADMIN, '0xadmin')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('confirmRoleChange', () => {
+    it('executes the role change and marks proposal as executed', async () => {
+      const proposal = { id: 'prop-1', targetUserId: 'user-2', targetRole: UserRole.ADMIN, proposer: '0xadmin1', confirmer: null, executed: false, targetUser: makeUser({ id: 'user-2' }) };
+      const updated = { ...proposal, executed: true, confirmer: '0xadmin2' };
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue(proposal);
+      mockPrisma.$transaction.mockResolvedValue([updated, {}]);
+
+      const result = await service.confirmRoleChange('prop-1', '0xadmin2');
+
+      expect(result).toEqual(updated);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the same admin tries to confirm their own proposal', async () => {
+      const proposal = { id: 'prop-1', targetUserId: 'user-2', targetRole: UserRole.ADMIN, proposer: '0xadmin', confirmer: null, executed: false, targetUser: makeUser() };
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue(proposal);
+
+      await expect(service.confirmRoleChange('prop-1', '0xadmin')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when proposal is already executed', async () => {
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue({ id: 'prop-1', executed: true });
+
+      await expect(service.confirmRoleChange('prop-1', '0xadmin2')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws NotFoundException when proposal does not exist', async () => {
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue(null);
+
+      await expect(service.confirmRoleChange('bad-id', '0xadmin2')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('cancelRoleProposal', () => {
+    it('deletes the proposal when called by the proposer', async () => {
+      const proposal = { id: 'prop-1', proposer: '0xadmin', executed: false };
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue(proposal);
+      mockPrisma.adminRoleProposal.delete.mockResolvedValue(proposal);
+
+      const result = await service.cancelRoleProposal('prop-1', '0xadmin');
+
+      expect(result).toEqual({ success: true });
+      expect(mockPrisma.adminRoleProposal.delete).toHaveBeenCalledWith({ where: { id: 'prop-1' } });
+    });
+
+    it('throws ForbiddenException when a non-proposer tries to cancel', async () => {
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue({ id: 'prop-1', proposer: '0xadmin1', executed: false });
+
+      await expect(service.cancelRoleProposal('prop-1', '0xadmin2')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when proposal is already executed', async () => {
+      mockPrisma.adminRoleProposal.findUnique.mockResolvedValue({ id: 'prop-1', proposer: '0xadmin', executed: true });
+
+      await expect(service.cancelRoleProposal('prop-1', '0xadmin')).rejects.toThrow(BadRequestException);
     });
   });
 

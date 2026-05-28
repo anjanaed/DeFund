@@ -48,7 +48,7 @@ export default function AdminRiskPage() {
     setLoading(true)
     apiFetch('/admin/projects')
       .then((r) => r.json())
-      .then((data) => !cancelled && setProjects(Array.isArray(data) ? data : []))
+      .then((data) => !cancelled && setProjects(Array.isArray(data?.items) ? data.items : []))
       .catch(() => !cancelled && setError('Failed to load projects'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }

@@ -10,9 +10,9 @@ import {
   HiCurrencyDollar, HiChartBar, HiUsers, HiCheckCircle, HiClock,
   HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray,
   HiNoSymbol, HiMegaphone, HiPlusCircle, HiRocketLaunch, HiScale,
-  HiThumbUp, HiThumbDown, HiExclamationTriangle, HiChartPie,
+  HiHandThumbUp, HiHandThumbDown, HiExclamationTriangle, HiChartPie,
 } from 'react-icons/hi2'
-import { useWriteContract } from 'wagmi'
+import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
@@ -71,7 +71,7 @@ export default function CreatorStudioPage() {
   const [updateFeedback, setUpdateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
 
-  const { writeContractAsync } = useWriteContract()
+  const { writeWithSimulate } = useSimulatedWrite()
 
   const loadCampaigns = () => {
     if (!isAuthenticated) return
@@ -85,7 +85,7 @@ export default function CreatorStudioPage() {
 
   const handleSubmitProof = async (proofIpfsHash: string) => {
     if (!proofModal?.onChainId) throw new Error('Milestone not yet on-chain.')
-    await writeContractAsync({
+    await writeWithSimulate({
       address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
       functionName: 'submitMilestoneForVoting',
       args: [BigInt(proofModal.onChainId), proofIpfsHash],
@@ -102,7 +102,7 @@ export default function CreatorStudioPage() {
     }
     setCancelConfirmId(null)
     try {
-      await writeContractAsync({
+      await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'cancelCampaign', args: [BigInt(campaign.onChainId)],
       })
@@ -445,8 +445,8 @@ export default function CreatorStudioPage() {
                               {approvePct !== null && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d' }}><HiThumbUp size={12} /> Approve {approvePct}%</span>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-error)' }}>Reject {rejectPct}% <HiThumbDown size={12} /></span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d' }}><HiHandThumbUp size={12} /> Approve {approvePct}%</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-error)' }}>Reject {rejectPct}% <HiHandThumbDown size={12} /></span>
                                   </div>
                                   <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(239,68,68,0.2)', overflow: 'hidden' }}>
                                     <div style={{ height: '100%', width: `${approvePct}%`, background: '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
