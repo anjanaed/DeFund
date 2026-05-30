@@ -7,6 +7,7 @@ import { FaGithub, FaTwitter, FaDiscord } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { parseContractError } from '../../lib/errors'
 import '../../Admin.css'
 
@@ -21,6 +22,7 @@ export default function AdminRiskDetailsPage() {
   const [loadError, setLoadError] = useState('')
   const [refundStatus, setRefundStatus] = useState<'idle' | 'proposing' | 'approving'>('idle')
   const [blockPending, setBlockPending] = useState(false)
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false)
 
   const loadData = () => {
     setLoadError('')
@@ -90,7 +92,6 @@ export default function AdminRiskDetailsPage() {
   }
 
   const handleBlock = async () => {
-    if (!confirm('Block this campaign? It will be marked FLAGGED in the database.')) return
     setBlockPending(true)
     try {
       const res = await apiFetch(`/admin/projects/${id}/block`, { method: 'POST' })
@@ -268,7 +269,7 @@ export default function AdminRiskDetailsPage() {
             </p>
             <button
               className="btn"
-              onClick={handleBlock}
+              onClick={() => setShowBlockConfirm(true)}
               disabled={isBlocked || blockPending}
               style={{
                 width: '100%', padding: '10px', fontSize: '14px',
@@ -365,6 +366,16 @@ export default function AdminRiskDetailsPage() {
 
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showBlockConfirm}
+        onClose={() => setShowBlockConfirm(false)}
+        onConfirm={() => { setShowBlockConfirm(false); handleBlock() }}
+        title="Block Campaign"
+        message="This will mark the campaign as FLAGGED in the database. The on-chain flagCampaign() transaction must be signed separately if needed."
+        confirmLabel="Block Campaign"
+        variant="danger"
+      />
     </div>
   )
 }

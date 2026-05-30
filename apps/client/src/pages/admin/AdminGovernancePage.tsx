@@ -7,6 +7,7 @@ import {
 } from 'react-icons/hi2'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { toast } from 'sonner'
 import '../../Admin.css'
 
@@ -32,6 +33,7 @@ export default function AdminGovernancePage() {
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionPending, setActionPending] = useState<string | null>(null)
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -75,7 +77,6 @@ export default function AdminGovernancePage() {
   }
 
   const handleCancel = async (proposalId: string) => {
-    if (!confirm('Cancel this proposal?')) return
     setActionPending(proposalId)
     try {
       const res = await apiFetch(`/admin/governance/role-proposals/${proposalId}`, { method: 'DELETE' })
@@ -205,7 +206,7 @@ export default function AdminGovernancePage() {
                               <HiClock size={12} style={{ display: 'inline', marginRight: '4px' }} />Awaiting another admin
                             </button>
                             <button
-                              onClick={() => handleCancel(p.id)}
+                              onClick={() => setCancelConfirmId(p.id)}
                               disabled={isPending}
                               style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--color-error)', background: 'white', color: 'var(--color-error)', cursor: isPending ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: isPending ? 0.5 : 1 }}
                             >
@@ -269,6 +270,16 @@ export default function AdminGovernancePage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal
+        isOpen={cancelConfirmId !== null}
+        onClose={() => setCancelConfirmId(null)}
+        onConfirm={() => { const id = cancelConfirmId!; setCancelConfirmId(null); handleCancel(id) }}
+        title="Cancel Role Proposal"
+        message="This will cancel the pending role change proposal. The proposer can submit a new one at any time."
+        confirmLabel="Cancel Proposal"
+        variant="warning"
+      />
     </div>
   )
 }

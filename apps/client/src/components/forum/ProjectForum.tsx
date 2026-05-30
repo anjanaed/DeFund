@@ -3,6 +3,7 @@ import { HiPaperAirplane, HiPencil, HiTrash, HiArrowUturnLeft, HiCheck, HiXMark,
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../common/Spinner'
+import ConfirmModal from '../common/ConfirmModal'
 
 type ReactionType = 'LIKE' | 'DISLIKE'
 
@@ -61,6 +62,7 @@ export default function ProjectForum({ projectId }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [busyMessageId, setBusyMessageId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const fetchPage = async (cursor: string | null) => {
     const qs = new URLSearchParams({ limit: String(PAGE_SIZE) })
@@ -198,7 +200,6 @@ export default function ProjectForum({ projectId }: Props) {
 
   const handleDelete = async (messageId: string) => {
     if (!isAuthenticated) return
-    if (!confirm('Delete this message? It will be marked as deleted but kept in the thread.')) return
     setBusyMessageId(messageId)
     setError('')
     try {
@@ -380,7 +381,7 @@ export default function ProjectForum({ projectId }: Props) {
             {canDelete && (
               <button
                 type="button"
-                onClick={() => handleDelete(m.id)}
+                onClick={() => setDeleteConfirmId(m.id)}
                 disabled={busy}
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '12px', background: 'transparent', border: 'none', color: 'var(--color-error)', cursor: busy ? 'not-allowed' : 'pointer' }}
               >
@@ -480,6 +481,16 @@ export default function ProjectForum({ projectId }: Props) {
       ) : (
         <p className="connect-wallet-note">Sign in to join the discussion.</p>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { const id = deleteConfirmId!; setDeleteConfirmId(null); handleDelete(id) }}
+        title="Delete Message"
+        message="This message will be marked as deleted and hidden from the thread. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

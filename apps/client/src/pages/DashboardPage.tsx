@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import { HiChartBar, HiLockClosed, HiCheckCircle, HiClock, HiXCircle, HiEye, HiRocketLaunch, HiBolt, HiScale } from 'react-icons/hi2'
 import ProofModal from '../components/common/ProofModal'
+import ConfirmModal from '../components/common/ConfirmModal'
 import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
 import TxBanner from '../components/common/TxBanner'
 import LoadingScreen from '../components/common/LoadingScreen'
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [claimingId, setClaimingId] = useState<string | null>(null)
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set())
   const [txError, setTxError] = useState<string | null>(null)
+  const [claimConfirmItem, setClaimConfirmItem] = useState<ReclaimItem | null>(null)
 
   const { writeWithSimulate } = useSimulatedWrite()
 
@@ -104,20 +106,19 @@ export default function DashboardPage() {
     }
   }
 
-  const handleClaim = async (item: ReclaimItem) => {
+  const handleClaimRequest = (item: ReclaimItem) => {
     if (item.onChainId == null) { setTxError('Campaign is not on-chain.'); return }
+    setClaimConfirmItem(item)
+  }
 
-    // P4 — show estimated refund before signing
-    const estimatedRefund = (item.totalContributed * 0.95).toFixed(4)
-    if (!window.confirm(`You will receive approximately ${estimatedRefund} (95% of your contribution). Proceed?`)) return
-
+  const handleClaimExecute = async (item: ReclaimItem) => {
     setClaimingId(item.id)
     try {
       await writeWithSimulate({
         address: CAMPAIGN_FACTORY_ADDRESS,
         abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'claimRefund',
-        args: [BigInt(item.onChainId)],
+        args: [BigInt(item.onChainId!)],
       })
       setClaimedIds(prev => new Set(prev).add(item.id))
     } catch (err) {
@@ -358,7 +359,7 @@ export default function DashboardPage() {
                     <button
                       className="btn btn-primary reclaim-btn"
                       disabled={claimingId === item.id}
-                      onClick={() => handleClaim(item)}
+                      onClick={() => handleClaimRequest(item)}
                     >
                       {claimingId === item.id ? 'Confirming...' : `Reclaim ${fmt(item.totalContributed)}`}
                     </button>
@@ -369,6 +370,19 @@ export default function DashboardPage() {
           )}
         </div>
 
+        <ConfirmModal
+          isOpen={claimConfirmItem !== null}
+          onClose={() => setClaimConfirmItem(null)}
+          onConfirm={() => {
+            const item = claimConfirmItem!
+            setClaimConfirmItem(null)
+            handleClaimExecute(item)
+          }}
+          title="Confirm Refund Claim"
+          message={`You will receive approximately $${claimConfirmItem ? (claimConfirmItem.totalContributed * 0.95).toFixed(4) : ''} — 95% of your contribution. This action is irreversible.`}
+          confirmLabel="Claim Refund"
+          variant="warning"
+        />
         <ProofModal isOpen={showProofModal} onClose={() => setShowProofModal(false)} title={selectedProof?.title || ''} proofContent={selectedProof?.content || ''} />
       </div>
     </div>

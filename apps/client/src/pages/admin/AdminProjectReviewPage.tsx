@@ -9,6 +9,7 @@ import { FaTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { parseContractError } from '../../lib/errors'
 import '../../Admin.css'
 
@@ -24,6 +25,8 @@ export default function AdminProjectReviewPage() {
   const [pending, setPending] = useState(false)
   const [flagProposal, setFlagProposal] = useState<any>(null)
   const [approvalProposal, setApprovalProposal] = useState<any>(null)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showCancelProposalConfirm, setShowCancelProposalConfirm] = useState(false)
 
   const loadProposals = async () => {
     const [flag, approval] = await Promise.all([
@@ -57,7 +60,6 @@ export default function AdminProjectReviewPage() {
   }
 
   const handleCancelApprovalProposal = async () => {
-    if (!confirm('Cancel this approval proposal?')) return
     setPending(true)
     try {
       const res = await apiFetch(`/admin/projects/${id}/approval-proposal`, { method: 'DELETE' })
@@ -122,7 +124,6 @@ export default function AdminProjectReviewPage() {
 
   const handleCancel = async () => {
     if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID.'); return }
-    if (!window.confirm('Cancel this campaign on-chain? Contributors will be able to propose refunds.')) return
     setPending(true)
     try {
       await writeWithSimulate({ address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI, functionName: 'cancelCampaign', args: [BigInt(campaign.onChainId)] })
@@ -264,7 +265,7 @@ export default function AdminProjectReviewPage() {
               {pendingApprovalProposal && isApprovalProposer && (
                 <>
                   <button disabled style={{ background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: 0.6, cursor: 'not-allowed' }}>Awaiting Another Admin</button>
-                  <button className="btn" onClick={handleCancelApprovalProposal} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Cancel Proposal</button>
+                  <button className="btn" onClick={() => setShowCancelProposalConfirm(true)} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Cancel Proposal</button>
                 </>
               )}
 
@@ -279,7 +280,7 @@ export default function AdminProjectReviewPage() {
         )}
         {['ACTIVE', 'FUNDED'].includes(campaign.status) && campaign.onChainId != null && (
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button className="btn" onClick={handleCancel} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>
+            <button className="btn" onClick={() => setShowCancelConfirm(true)} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>
               {pending ? 'Signing...' : 'Cancel Campaign'}
             </button>
           </div>
@@ -370,6 +371,25 @@ export default function AdminProjectReviewPage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showCancelConfirm}
+        onClose={() => setShowCancelConfirm(false)}
+        onConfirm={() => { setShowCancelConfirm(false); handleCancel() }}
+        title="Cancel Campaign"
+        message="This will cancel the campaign on-chain. Contributors will be able to propose refunds. This action cannot be undone."
+        confirmLabel="Cancel Campaign"
+        variant="danger"
+      />
+      <ConfirmModal
+        isOpen={showCancelProposalConfirm}
+        onClose={() => setShowCancelProposalConfirm(false)}
+        onConfirm={() => { setShowCancelProposalConfirm(false); handleCancelApprovalProposal() }}
+        title="Cancel Approval Proposal"
+        message="This will remove the pending approval proposal. The campaign will need to go through the two-admin approval process again."
+        confirmLabel="Cancel Proposal"
+        variant="warning"
+      />
     </div>
   )
 }
