@@ -234,10 +234,10 @@ export class AdminController {
   @Post('projects/:id/confirm-approval')
   confirmApproval(
     @Param('id') id: string,
-    @Body() body: { onChainId: number },
+    @Body() body: { onChainId: number; milestoneOnChainIds: number[] },
     @CurrentUser() user: { walletAddress: string },
   ) {
-    return this.admin.confirmApproval(id, body.onChainId, user.walletAddress);
+    return this.admin.confirmApproval(id, body.onChainId, body.milestoneOnChainIds ?? [], user.walletAddress);
   }
 
   @Get('projects/:id/approval-proposal')

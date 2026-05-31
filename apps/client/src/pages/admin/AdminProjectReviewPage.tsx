@@ -6,6 +6,7 @@ import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
 import { toast } from 'sonner'
 import { HiArrowLeft, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiCurrencyDollar, HiExclamationTriangle, HiUserCircle, HiClock } from 'react-icons/hi2'
 import { FaTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
+import RepoIcon from '../../components/common/RepoIcon'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
@@ -83,7 +84,9 @@ export default function AdminProjectReviewPage() {
       const contractMilestones = (campaign.milestones ?? []).map((m: any) => ({
         ipfsHash: keccak256(toBytes(m.title + m.description)),
         amountRequired: toWei(m.amount),
-        deadline: deadlineTs,
+        deadline: m.deadline
+          ? BigInt(Math.floor(new Date(m.deadline).getTime() / 1000))
+          : deadlineTs,
       }))
       const fundGoal = contractMilestones.reduce((sum: bigint, m: any) => sum + m.amountRequired, BigInt(0))
 
@@ -105,9 +108,16 @@ export default function AdminProjectReviewPage() {
       }
       if (onChainId === undefined) throw new Error('Could not read campaign ID from receipt')
 
+      const milestoneOnChainIds = await publicClient.readContract({
+        address: CAMPAIGN_FACTORY_ADDRESS,
+        abi: CAMPAIGN_FACTORY_ABI,
+        functionName: 'getCampaignMilestones',
+        args: [BigInt(onChainId)],
+      }) as bigint[]
+
       await apiFetch(`/admin/projects/${id}/confirm-approval`, {
         method: 'POST',
-        body: JSON.stringify({ onChainId }),
+        body: JSON.stringify({ onChainId, milestoneOnChainIds: milestoneOnChainIds.map(Number) }),
       })
 
       toast.success(`Campaign deployed on-chain (ID: ${onChainId}). View: https://sepolia.etherscan.io/tx/${txHash}`, { duration: 8000 })
@@ -325,7 +335,12 @@ export default function AdminProjectReviewPage() {
                     <div style={{ fontWeight: '600' }}>{idx + 1}. {m.title}</div>
                     <div style={{ fontWeight: '700', color: 'var(--color-primary)' }}>{m.amount?.toLocaleString()} {campaign.paymentToken}</div>
                   </div>
-                  <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: 0 }}>{m.description || '—'}</p>
+                  <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>{m.description || '—'}</p>
+                  {m.deadline && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <HiClock size={12} /> Due {new Date(m.deadline).toLocaleDateString()}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -334,27 +349,75 @@ export default function AdminProjectReviewPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div className="admin-table-card" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)' }}>Social Links</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)' }}>Project Links</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
               {[
-                { icon: <HiGlobeAlt />, label: 'Website', url: campaign.websiteUrl },
-                { icon: <FaGithub />, label: 'GitHub', url: campaign.githubUrl },
-                { icon: <FaTwitter />, label: 'Twitter/X', url: campaign.twitterUrl },
-                { icon: <FaDiscord />, label: 'Discord', url: campaign.discordUrl },
+                { icon: <HiGlobeAlt />, label: 'Website', url: campaign.website },
+                { icon: <RepoIcon url={campaign.repositoryUrl} size={15} />, label: 'Repository', url: campaign.repositoryUrl },
               ].map(({ icon, label, url }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', flexShrink: 0 }}>
                     {icon} {label}
                   </div>
                   {url ? (
-                    <a href={url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', fontSize: '13px' }}>
-                      <span className="admin-badge success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiCheckCircle /> Provided</span>
+                    <a href={url} target="_blank" rel="noreferrer"
+                      style={{ color: 'var(--color-primary)', fontSize: '12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'rtl', textAlign: 'right' }}
+                      title={url}
+                    >
+                      {url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
                     </a>
                   ) : (
-                    <span className="admin-badge neutral" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiXCircle /> Missing</span>
+                    <span className="admin-badge neutral" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiXCircle /> Not provided</span>
                   )}
                 </div>
               ))}
+            </div>
+
+            {campaign.license && (
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <HiDocumentText /> License
+                </div>
+                <span className="admin-badge success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <HiCheckCircle /> {campaign.license}
+                </span>
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '14px' }}>
+                Creator Verification
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {[
+                  { icon: <FaTwitter />, label: 'X / Twitter', handle: campaign.creator?.twitterHandle, prefix: '@', href: (h: string) => `https://x.com/${h}` },
+                  { icon: <FaDiscord />, label: 'Discord', handle: campaign.creator?.discordHandle, prefix: '', href: null },
+                  { icon: <FaGithub />, label: 'GitHub', handle: campaign.creator?.githubHandle, prefix: '@', href: (h: string) => `https://github.com/${h}` },
+                ].map(({ icon, label, handle, prefix, href }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                      {icon} {label}
+                    </div>
+                    {handle ? (
+                      href ? (
+                        <a href={href(handle)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                          <span className="admin-badge success" style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                            <HiCheckCircle /> {prefix}{handle}
+                          </span>
+                        </a>
+                      ) : (
+                        <span className="admin-badge success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <HiCheckCircle /> {prefix}{handle}
+                        </span>
+                      )
+                    ) : (
+                      <span className="admin-badge neutral" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <HiXCircle /> Not verified
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

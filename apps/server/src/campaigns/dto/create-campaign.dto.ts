@@ -1,14 +1,23 @@
 import {
   IsArray,
+  IsDateString,
+  IsIn,
   IsInt,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   ValidateNested,
   Min,
   ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+const OSS_LICENSES = [
+  'MIT', 'Apache-2.0', 'GPL-3.0', 'AGPL-3.0', 'GPL-2.0',
+  'LGPL-2.1', 'MPL-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'Other',
+];
 
 export class CreateMilestoneDto {
   @IsString()
@@ -20,6 +29,10 @@ export class CreateMilestoneDto {
   @IsNumber()
   @Min(0)
   amount: number;
+
+  @IsOptional()
+  @IsDateString()
+  deadline?: string;
 }
 
 export class CreateCampaignDto {
@@ -44,9 +57,13 @@ export class CreateCampaignDto {
   @IsString()
   website?: string;
 
+  @IsNotEmpty()
+  @IsUrl()
+  repositoryUrl: string;
+
   @IsOptional()
-  @IsString()
-  githubUrl?: string;
+  @IsIn(OSS_LICENSES)
+  license?: string;
 
   @IsOptional()
   @IsInt()

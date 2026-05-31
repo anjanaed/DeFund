@@ -272,7 +272,7 @@ async function main() {
             title:       m.title,
             description: m.description,
             amount:      parseFloat(m.amountETH),
-            status:      MilestoneStatus.PENDING,
+            status:      MilestoneStatus.ONGOING,
           })),
         },
       },

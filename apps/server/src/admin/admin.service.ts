@@ -537,7 +537,7 @@ export class AdminService {
     return proposal;
   }
 
-  async confirmApproval(campaignId: string, onChainId: number, confirmerWallet: string) {
+  async confirmApproval(campaignId: string, onChainId: number, milestoneOnChainIds: number[], confirmerWallet: string) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -553,6 +553,13 @@ export class AdminService {
       throw new ForbiddenException('The same admin cannot confirm their own proposal — a different admin must confirm');
     }
 
+    // Fetch milestones in creation order — must match the order passed to createCampaign() on-chain
+    const milestones = await this.prisma.milestone.findMany({
+      where: { campaignId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+
     await this.prisma.$transaction([
       this.prisma.campaign.update({
         where: { id: campaignId },
@@ -562,9 +569,19 @@ export class AdminService {
         where: { campaignId },
         data: { executed: true },
       }),
+      // Bind each DB milestone to its on-chain ID; first is ONGOING, the rest are NOT_STARTED
+      ...milestones.map((m, i) =>
+        this.prisma.milestone.update({
+          where: { id: m.id },
+          data: {
+            onChainId: milestoneOnChainIds[i] ?? null,
+            status: i === 0 ? MilestoneStatus.ONGOING : MilestoneStatus.NOT_STARTED,
+          },
+        }),
+      ),
     ]);
 
-    await this.logAudit(confirmerWallet, 'APPROVE_CAMPAIGN', 'campaign', campaignId, campaign.title, { onChainId });
+    await this.logAudit(confirmerWallet, 'APPROVE_CAMPAIGN', 'campaign', campaignId, campaign.title, { onChainId, milestoneOnChainIds });
 
     return { success: true, onChainId, creatorWallet: campaign.creator.walletAddress };
   }

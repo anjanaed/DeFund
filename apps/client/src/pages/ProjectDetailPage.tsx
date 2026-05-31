@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useParams, Link } from 'react-router-dom'
+import RepoIcon from '../components/common/RepoIcon'
 import AppNavbar from '../components/layout/AppNavbar'
 import ProofModal from '../components/common/ProofModal'
 import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
@@ -10,7 +12,6 @@ import {
   HiUsers, HiChartBar, HiCheckCircle, HiClock, HiInformationCircle,
   HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle, HiGlobeAlt, HiUser,
 } from 'react-icons/hi2'
-import { FaGithub } from 'react-icons/fa6'
 import { useAccount, usePublicClient } from 'wagmi'
 import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { parseEther, parseUnits } from 'viem'
@@ -22,13 +23,13 @@ import { parseContractError } from '../lib/errors'
 interface Campaign {
   id: string; title: string; description: string; category: string; status: string
   raisedAmount: string; goalAmount: string; paymentToken: string; deadline: string | null
-  website: string | null; githubUrl: string | null; onChainId: number | null
+  website: string | null; repositoryUrl: string | null; license: string | null; onChainId: number | null
   creator: { id: string; name: string | null; walletAddress: string }
   _count: { milestones: number; contributions: number }
 }
 interface Milestone {
   id: string; title: string; description: string; status: string
-  amount: string; onChainId: number | null; proofUrl: string | null
+  amount: string; onChainId: number | null; proofUrl: string | null; deadline: string | null
 }
 interface Update { id: string; title: string; content: string; createdAt: string }
 
@@ -36,7 +37,11 @@ const fmt = (n: number) => `$${Number(n).toLocaleString()}`
 const shortenAddress = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`
 
 const MILESTONE_STATUS_COLOR: Record<string, string> = {
-  APPROVED: 'approved', COMPLETED: 'approved', VOTING: 'active', PENDING: 'pending', REJECTED: 'pending',
+  NOT_STARTED: '',
+  ONGOING: 'pending',
+  APPROVED: 'approved', COMPLETED: 'approved',
+  VOTING: 'active',
+  REJECTED: 'pending',
 }
 
 export default function ProjectDetailPage() {
@@ -132,8 +137,11 @@ export default function ProjectDetailPage() {
       }
       setContributionDone(true)
       setContributionAmount('')
+      toast.success('Contribution confirmed!', { description: 'Your contribution is secured on-chain.' })
     } catch (err) {
-      setTxError(parseContractError(err))
+      const errMsg = parseContractError(err)
+      setTxError(errMsg)
+      toast.error(errMsg)
     } finally {
       setContributing(false)
       setContributingStep(null)
@@ -262,6 +270,11 @@ export default function ProjectDetailPage() {
                             </div>
                             <p className="project-milestone-description">{m.description}</p>
                             <div className="project-milestone-amount">{fmt(Number(m.amount))}</div>
+                            {m.deadline && (
+                              <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                <HiClock size={12} /> Due {new Date(m.deadline).toLocaleDateString()}
+                              </div>
+                            )}
                           </div>
                         </div>
                         {m.proofUrl && (
@@ -412,7 +425,7 @@ export default function ProjectDetailPage() {
               </div>
 
               {/* Links Card */}
-              {(campaign.website || campaign.githubUrl) && (
+              {(campaign.website || campaign.repositoryUrl) && (
                 <div className="project-info-card">
                   <div className="info-card-title">Links</div>
                   <div className="project-detail-links">
@@ -421,12 +434,17 @@ export default function ProjectDetailPage() {
                         <HiGlobeAlt size={15} /> Website
                       </a>
                     )}
-                    {campaign.githubUrl && (
-                      <a href={campaign.githubUrl} target="_blank" rel="noopener noreferrer" className="project-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <FaGithub size={14} /> GitHub
+                    {campaign.repositoryUrl && (
+                      <a href={campaign.repositoryUrl} target="_blank" rel="noopener noreferrer" className="project-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <RepoIcon url={campaign.repositoryUrl} size={14} /> Repository
                       </a>
                     )}
                   </div>
+                  {campaign.license && (
+                    <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      License: <strong>{campaign.license}</strong>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

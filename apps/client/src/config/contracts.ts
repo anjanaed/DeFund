@@ -298,6 +298,15 @@ export const CAMPAIGN_FACTORY_ABI = [
     inputs: [],
   },
 
+  // getCampaignMilestones(campaignId) — returns ordered array of milestone on-chain IDs
+  {
+    name: 'getCampaignMilestones',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256[]' }],
+  },
+
   // CampaignCreated event — used to extract on-chain campaign ID from receipt
   {
     name: 'CampaignCreated',

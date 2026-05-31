@@ -25,7 +25,7 @@ const makeCampaign = (overrides: Partial<Record<string, any>> = {}) => ({
 const makeMilestone = (overrides: Partial<Record<string, any>> = {}) => ({
   id: 'milestone-1',
   title: 'Milestone 1',
-  status: MilestoneStatus.PENDING,
+  status: MilestoneStatus.ONGOING,
   amount: 2000,
   campaignId: 'campaign-1',
   updatedAt: new Date(),
@@ -298,7 +298,7 @@ describe('AdminService', () => {
         releasedAmount: 2000,
         milestones: [
           { id: 'm1', title: 'M1', amount: 5000, status: MilestoneStatus.COMPLETED },
-          { id: 'm2', title: 'M2', amount: 5000, status: MilestoneStatus.PENDING },
+          { id: 'm2', title: 'M2', amount: 5000, status: MilestoneStatus.ONGOING },
         ],
       });
       mockPrisma.campaign.findUnique.mockResolvedValue(campaign);
@@ -557,7 +557,7 @@ describe('AdminService', () => {
 
     it('throws BadRequestException when milestone is not APPROVED', async () => {
       mockPrisma.milestone.findUnique.mockResolvedValue(
-        makeMilestone({ status: MilestoneStatus.PENDING, onChainId: 3 }),
+        makeMilestone({ status: MilestoneStatus.ONGOING, onChainId: 3 }),
       );
 
       await expect(service.proposeReleaseFunds('milestone-1')).rejects.toThrow(BadRequestException);

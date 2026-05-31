@@ -17,7 +17,7 @@ export const landingFeatures = [
     },
     {
       title: 'Verified Projects',
-      description: 'Admins verified creators with transparent identities and verified GitHub repositories.'
+      description: 'Admins verify creators with transparent identities and verified public repositories.'
     },
     {
       title: 'Milestone Tracking',
@@ -37,7 +37,7 @@ export const landingSteps = [
     {
       id: '01',
       title: 'Project Verification',
-      description: 'Creators submit projects with defined milestones. Admins verify authenticity through wallet signing and GitHub validation.'
+      description: 'Creators submit projects with defined milestones. Admins verify authenticity through wallet signing and repository validation.'
     },
     {
       id: '02',

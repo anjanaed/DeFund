@@ -10,7 +10,7 @@ interface MilestoneRow {
   title: string
   description?: string
   amount: number | string
-  status: 'PENDING' | 'VOTING' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
+  status: 'NOT_STARTED' | 'ONGOING' | 'VOTING' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
   votingEndTime: string | null
   votesFor: number | string
   votesAgainst: number | string
@@ -28,7 +28,8 @@ interface MilestonesPage {
 
 function votingEndLabel(end: string | null, status: string): { text: string; overdue: boolean } {
   if (!end) {
-    if (status === 'PENDING') return { text: 'Awaiting submission', overdue: false }
+    if (status === 'ONGOING') return { text: 'Awaiting submission', overdue: false }
+    if (status === 'NOT_STARTED') return { text: 'Not yet unlocked', overdue: false }
     if (status === 'COMPLETED' || status === 'APPROVED') return { text: 'Closed', overdue: false }
     return { text: '—', overdue: false }
   }
@@ -57,7 +58,9 @@ function statusBadge(status: string): 'success' | 'warning' | 'error' | 'neutral
     case 'APPROVED':
     case 'COMPLETED':
       return 'success'
-    case 'PENDING':
+    case 'NOT_STARTED':
+    case 'ONGOING':
+      return 'neutral'
     case 'VOTING':
       return 'warning'
     case 'REJECTED':

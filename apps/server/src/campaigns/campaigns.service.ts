@@ -135,7 +135,12 @@ export class CampaignsService {
         onChainId: onChainId ?? null,
         transactionHash: transactionHash ?? null,
         paymentToken: paymentToken ?? 'ETH',
-        milestones: { create: milestones },
+        milestones: {
+          create: milestones.map(m => ({
+            ...m,
+            deadline: m.deadline ? new Date(m.deadline) : undefined,
+          })),
+        },
         forum: { create: {} },
       },
       include: { milestones: true },

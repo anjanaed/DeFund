@@ -5,7 +5,7 @@ export default function HowItWorks() {
     {
       number: '01',
       title: 'Project Verification',
-      description: 'Creators submit projects with defined milestones. Admins verify authenticity through wallet signing and GitHub validation'
+      description: 'Creators submit open-source projects with defined milestones. Admins verify authenticity through wallet signing and repository validation.'
     },
     {
       number: '02',

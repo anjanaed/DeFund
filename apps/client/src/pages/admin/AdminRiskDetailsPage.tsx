@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
 import { toast } from 'sonner'
 import { HiArrowLeft, HiShieldCheck, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiExclamationTriangle } from 'react-icons/hi2'
-import { FaGithub, FaTwitter, FaDiscord } from 'react-icons/fa6'
+import { FaTwitter, FaDiscord } from 'react-icons/fa6'
+import RepoIcon from '../../components/common/RepoIcon'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
@@ -245,10 +246,8 @@ export default function AdminRiskDetailsPage() {
             <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)' }}>Social Links</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {[
-                { icon: <HiGlobeAlt color="var(--color-text-secondary)" />, label: 'Website', url: campaign.websiteUrl },
-                { icon: <FaGithub color="var(--color-text-secondary)" />, label: 'GitHub', url: campaign.githubUrl },
-                { icon: <FaTwitter color="var(--color-text-secondary)" />, label: 'Twitter/X', url: campaign.twitterUrl },
-                { icon: <FaDiscord color="var(--color-text-secondary)" />, label: 'Discord', url: campaign.discordUrl },
+                { icon: <HiGlobeAlt color="var(--color-text-secondary)" />, label: 'Website', url: campaign.website },
+                { icon: <RepoIcon url={campaign.repositoryUrl} size={15} />, label: 'Repository', url: campaign.repositoryUrl },
               ].map(({ icon, label, url }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>{icon} {label}</div>

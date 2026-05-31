@@ -6,6 +6,7 @@ interface SubmitProofModalProps {
   onClose: () => void
   milestoneTitle: string
   isResubmission: boolean
+  isKickoff?: boolean
   onSubmit: (proofIpfsHash: string) => Promise<void>
 }
 
@@ -14,6 +15,7 @@ export default function SubmitProofModal({
   onClose,
   milestoneTitle,
   isResubmission,
+  isKickoff = false,
   onSubmit,
 }: SubmitProofModalProps) {
   const [proof, setProof] = useState('')
@@ -86,14 +88,18 @@ export default function SubmitProofModal({
             <textarea
               className="form-input"
               rows={4}
-              placeholder="Paste your IPFS hash or a description of the completed work..."
+              placeholder={isKickoff
+                ? 'Link your kickoff deliverable: technical spec, repo scaffold, design mockups, or roadmap...'
+                : 'Paste your IPFS hash or a description of the completed work...'}
               value={proof}
               onChange={e => setProof(e.target.value)}
               disabled={status === 'submitting' || status === 'done'}
               style={{ resize: 'vertical' }}
             />
             <p className="form-hint" style={{ marginTop: '6px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-              Upload your proof to IPFS and paste the CID here, or describe the work completed.
+              {isKickoff
+                ? 'For your kickoff milestone, link the spec/repo/mockups you prepared, or paste an IPFS CID.'
+                : 'Upload your proof to IPFS and paste the CID here, or describe the work completed.'}
             </p>
           </div>
 

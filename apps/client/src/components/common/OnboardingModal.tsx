@@ -20,21 +20,21 @@ const STEPS: Step[] = [
     title: 'Milestone-Based Funding',
     description: 'Your money is never handed over all at once.',
     detail:
-      'Campaigns are broken into milestones. Funds are held in a smart contract and only released to creators when each milestone is completed and approved by voters — including you.',
+      'Campaigns are broken into milestones. Funds are held in a smart contract and only released to creators when each milestone is completed and approved by voters, including you.',
   },
   {
     emoji: '🗳️',
     title: 'Your Vote Matters',
     description: 'Contributors vote on whether each milestone was achieved.',
     detail:
-      'When a creator submits proof of completion, a 7-day voting period opens. Your voting weight is proportional to your contribution — the more you back, the more say you have.',
+      'When a creator submits proof of completion, a 7-day voting period opens. Your voting weight is proportional to your contribution, the more you back, the more say you have.',
   },
   {
     emoji: '🛡️',
     title: 'Protected Investment',
     description: 'You can always reclaim your funds if things go wrong.',
     detail:
-      'If a campaign is cancelled, flagged, or fails, you can claim 95% of your contribution back directly from the smart contract — no middlemen, no waiting for approvals.',
+      'If a campaign is cancelled, flagged, or fails, you can claim 95% of your contribution back directly from the smart contract, no middlemen, no waiting for approvals.',
   },
   {
     emoji: '🔗',

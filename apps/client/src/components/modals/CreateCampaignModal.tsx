@@ -1,14 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { HiXMark, HiPlus, HiCheckCircle, HiExclamationTriangle } from 'react-icons/hi2'
 import { FaXTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
 import { keccak256, toBytes } from 'viem'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 
+const OSS_LICENSES = [
+  'MIT', 'Apache-2.0', 'GPL-3.0', 'AGPL-3.0', 'GPL-2.0',
+  'LGPL-2.1', 'MPL-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'Other',
+]
+
 interface Milestone {
   title: string
   description: string
   amount: string
+  deadline: string
 }
 
 interface CreateCampaignModalProps {
@@ -24,7 +31,8 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     title: '',
     description: '',
     category: 'DeFi',
-    githubUrl: '',
+    repositoryUrl: '',
+    license: '',
     website: '',
     deadline: '',
     paymentToken: '0', // 0=ETH, 1=USDC
@@ -37,7 +45,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
   })
 
   const [milestones, setMilestones] = useState<Milestone[]>([
-    { title: '', description: '', amount: '' },
+    { title: '', description: '', amount: '', deadline: '' },
   ])
 
   const [txStatus, setTxStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle')
@@ -45,11 +53,24 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
   const [socialError, setSocialError] = useState<string | null>(null)
 
+  // Auto-fill the last milestone's deadline with the campaign deadline
+  useEffect(() => {
+    if (!formData.deadline) return
+    setMilestones(prev => {
+      const last = prev[prev.length - 1]
+      if (last.deadline === '' || last.deadline === prev[prev.length - 1].deadline) {
+        const updated = [...prev]
+        updated[updated.length - 1] = { ...last, deadline: formData.deadline }
+        return updated
+      }
+      return prev
+    })
+  }, [formData.deadline])
+
   const handleConnect = async (platform: 'twitter' | 'discord' | 'github') => {
     if (socials[platform].connected || !isAuthenticated) return
     setSocialError(null)
     setConnectingPlatform(platform)
-    // Open popup synchronously inside the click handler — browsers block window.open after await
     const popup = window.open('', `${platform}-oauth`, 'width=600,height=700,left=400,top=100')
     try {
       const res = await apiFetch(`/auth/${platform}/initiate`)
@@ -77,6 +98,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
         popup?.close()
         if (e.data.success) {
           setSocials(prev => ({ ...prev, [platform]: { connected: true, username: e.data.username } }))
+          toast.success(`Connected as ${e.data.username}`)
         } else {
           setSocialError(`${platform} verification failed: ${e.data.error || 'unknown error'}`)
         }
@@ -101,7 +123,9 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     setMilestones(updated)
   }
 
-  const addMilestone = () => setMilestones([...milestones, { title: '', description: '', amount: '' }])
+  const addMilestone = () => {
+    setMilestones([...milestones, { title: '', description: '', amount: '', deadline: '' }])
+  }
 
   const removeMilestone = (index: number) => {
     if (milestones.length > 1) setMilestones(milestones.filter((_, i) => i !== index))
@@ -111,6 +135,14 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     (sum, m) => sum + (parseFloat(m.amount) || 0),
     0,
   )
+
+  // Kickoff guidance: nudge creators to keep milestone 1 a small, cheap-to-prove
+  // first deliverable. Soft warning only — never blocks submission.
+  const KICKOFF_SOFT_CAP_PCT = 20
+  const firstMsPct = totalMilestoneAmount > 0
+    ? ((parseFloat(milestones[0]?.amount) || 0) / totalMilestoneAmount) * 100
+    : 0
+  const kickoffTooLarge = milestones.length > 1 && firstMsPct > KICKOFF_SOFT_CAP_PCT
 
   const isUsdc = formData.paymentToken === '1'
   const tokenLabel = isUsdc ? 'USDC' : 'ETH'
@@ -134,18 +166,36 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
       return
     }
 
-    // Validate milestone amounts are all set
     const invalidMs = milestones.some(m => !m.amount || parseFloat(m.amount) <= 0)
     if (invalidMs) {
       setErrorMsg('All milestone amounts must be greater than zero.')
       return
     }
 
-    try {
-      // Compute a deterministic ipfsHash from title+description — stored in DB so
-      // the admin approval page can pass it to createCampaign() on-chain later.
-      const ipfsHash = keccak256(toBytes(formData.title + formData.description))
+    // Validate per-milestone deadlines: sequential and within campaign deadline
+    for (let i = 0; i < milestones.length; i++) {
+      if (!milestones[i].deadline) {
+        setErrorMsg(`Milestone ${i + 1} needs a deadline.`)
+        return
+      }
+      const msTs = new Date(milestones[i].deadline).getTime()
+      if (i > 0 && msTs <= new Date(milestones[i - 1].deadline).getTime()) {
+        setErrorMsg(`Milestone ${i + 1} deadline must be after milestone ${i}.`)
+        return
+      }
+      if (msTs > new Date(formData.deadline).getTime()) {
+        setErrorMsg(`Milestone ${i + 1} deadline cannot be after the campaign deadline.`)
+        return
+      }
+    }
 
+    if (!formData.license) {
+      setErrorMsg('Please select an open-source license.')
+      return
+    }
+
+    try {
+      const ipfsHash = keccak256(toBytes(formData.title + formData.description))
       setTxStatus('saving')
 
       const res = await apiFetch('/projects', {
@@ -157,13 +207,15 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
           goalAmount: totalMilestoneAmount,
           deadline: formData.deadline,
           website: formData.website || undefined,
-          githubUrl: formData.githubUrl || undefined,
+          repositoryUrl: formData.repositoryUrl,
+          license: formData.license,
           paymentToken: isUsdc ? 'USDC' : 'ETH',
           ipfsHash,
           milestones: milestones.map(m => ({
             title: m.title,
             description: m.description,
             amount: parseFloat(m.amount),
+            deadline: m.deadline || undefined,
           })),
         }),
       })
@@ -174,18 +226,21 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
         throw new Error(err.message || 'Failed to submit campaign')
       }
 
-      setTxStatus('done')
-      setTimeout(() => {
-        onSuccess?.()
-        onClose()
-        setTxStatus('idle')
-        setFormData({ title: '', description: '', category: 'DeFi', githubUrl: '', website: '', deadline: '', paymentToken: '0' })
-        setMilestones([{ title: '', description: '', amount: '' }])
-      }, 1500)
+      toast.success('Campaign submitted for review!', {
+        description: 'An admin will review and approve your campaign shortly.',
+      })
+      onSuccess?.()
+      onClose()
+      setTxStatus('idle')
+      setFormData({ title: '', description: '', category: 'DeFi', repositoryUrl: '', license: '', website: '', deadline: '', paymentToken: '0' })
+      setMilestones([{ title: '', description: '', amount: '', deadline: '' }])
+      setSocials({ twitter: { connected: false, username: '' }, discord: { connected: false, username: '' }, github: { connected: false, username: '' } })
     } catch (err: any) {
       console.error(err)
       setTxStatus('error')
-      setErrorMsg(err?.message || 'Submission failed')
+      const msg = err?.message || 'Submission failed'
+      setErrorMsg(msg)
+      toast.error(msg)
     }
   }
 
@@ -200,13 +255,15 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     error: 'Submit for Review',
   }
 
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content create-campaign-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h2 className="modal-title">Create New Campaign</h2>
-            <p className="modal-subtitle">Set up your project with milestone-based funding</p>
+            <p className="modal-subtitle">Set up your open-source project with milestone-based funding</p>
           </div>
           <button className="modal-close-btn" onClick={onClose} type="button">
             <HiXMark />
@@ -265,7 +322,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
                 <input
                   type="date" name="deadline" className="form-input"
                   value={formData.deadline} onChange={handleInputChange} required
-                  min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                  min={tomorrow}
                 />
               </div>
 
@@ -282,7 +339,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
               </div>
             </div>
 
-            {/* Verification */}
+            {/* Identity & Verification */}
             <div className="form-section">
               <h3 className="form-section-title">Identity & Verification</h3>
 
@@ -316,16 +373,27 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
               </div>
 
               <div className="form-group">
-                <label className="form-label">Project Repository & Website</label>
+                <label className="form-label">Repository URL</label>
                 <input
-                  type="url" name="githubUrl" className="form-input"
-                  style={{ marginBottom: '12px' }}
-                  placeholder="GitHub Repository URL"
-                  value={formData.githubUrl} onChange={handleInputChange} required
+                  type="url" name="repositoryUrl" className="form-input"
+                  placeholder="Repository URL (GitHub, GitLab, Bitbucket, etc.)"
+                  value={formData.repositoryUrl} onChange={handleInputChange} required
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Open Source License</label>
+                <select name="license" className="form-select" value={formData.license} onChange={handleInputChange} required>
+                  <option value="">Select a license...</option>
+                  {OSS_LICENSES.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Website URL <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span></label>
                 <input
                   type="url" name="website" className="form-input"
-                  placeholder="Website URL (Optional)"
+                  placeholder="https://yourproject.io"
                   value={formData.website} onChange={handleInputChange}
                 />
               </div>
@@ -340,11 +408,39 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
                 </button>
               </div>
 
+              <p
+                className="form-hint"
+                style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0 0 14px', lineHeight: 1.5 }}
+              >
+                Make your <strong>first milestone a small “kickoff”</strong>: a deliverable you can show
+                {' '}<em>before</em> funding (technical spec, repo scaffold, design mockups, roadmap). Keeping it a
+                small share of your goal lets contributors approve it quickly so you can start building.
+              </p>
+
               <div className="milestones-list">
                 {milestones.map((milestone, index) => (
                   <div key={index} className="milestone-form-card">
                     <div className="milestone-form-header">
-                      <h4 className="milestone-form-title">Milestone {index + 1}</h4>
+                      <h4 className="milestone-form-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Milestone {index + 1}
+                        {index === 0 && (
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              letterSpacing: '0.02em',
+                              textTransform: 'uppercase',
+                              color: 'var(--color-primary)',
+                              background: 'rgba(99,102,241,0.1)',
+                              border: '1px solid rgba(99,102,241,0.25)',
+                              borderRadius: '999px',
+                              padding: '2px 8px',
+                            }}
+                          >
+                            Kickoff
+                          </span>
+                        )}
+                      </h4>
                       {milestones.length > 1 && (
                         <button type="button" className="remove-milestone-btn" onClick={() => removeMilestone(index)}>
                           <HiXMark />
@@ -364,21 +460,49 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
                     <div className="form-group">
                       <label className="form-label">Description</label>
                       <textarea
-                        className="form-textarea" placeholder="What will be delivered?" rows={3}
+                        className="form-textarea"
+                        placeholder={index === 0
+                          ? 'e.g. published technical spec, public repo scaffold, design mockups, project roadmap'
+                          : 'What will be delivered?'}
+                        rows={3}
                         value={milestone.description}
                         onChange={e => handleMilestoneChange(index, 'description', e.target.value)} required
                       />
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Required Amount ({tokenLabel})</label>
-                      <input
-                        type="number" className="form-input" placeholder="e.g. 1.5"
-                        step="any" min="0"
-                        value={milestone.amount}
-                        onChange={e => handleMilestoneChange(index, 'amount', e.target.value)} required
-                      />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Required Amount ({tokenLabel})</label>
+                        <input
+                          type="number" className="form-input" placeholder="e.g. 1.5"
+                          step="any" min="0"
+                          value={milestone.amount}
+                          onChange={e => handleMilestoneChange(index, 'amount', e.target.value)} required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Milestone Deadline</label>
+                        <input
+                          type="date" className="form-input"
+                          value={milestone.deadline}
+                          onChange={e => handleMilestoneChange(index, 'deadline', e.target.value)}
+                          min={index > 0 ? milestones[index - 1].deadline || tomorrow : tomorrow}
+                          max={formData.deadline || undefined}
+                          required
+                        />
+                      </div>
                     </div>
+
+                    {index === 0 && kickoffTooLarge && (
+                      <p style={{ fontSize: '12px', color: 'var(--color-warning, #eab308)', marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: 1.4 }}>
+                        <HiExclamationTriangle style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <span>
+                          Your kickoff milestone is {Math.round(firstMsPct)}% of the goal. Consider keeping it under
+                          {' '}{KICKOFF_SOFT_CAP_PCT}% so contributors approve it quickly and you can start sooner.
+                        </span>
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -407,7 +531,6 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
           </div>
         )}
 
-        {/* TX status bar */}
         {isSubmitting && (
           <div
             style={{
@@ -433,7 +556,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
             disabled={isSubmitting || txStatus === 'done'}
             style={{ opacity: isSubmitting ? 0.7 : 1 }}
           >
-            {txStatus === 'done' ? <><HiCheckCircle /> Submitted for Review!</> : statusLabel[txStatus]}
+            {statusLabel[txStatus]}
           </button>
         </div>
       </div>

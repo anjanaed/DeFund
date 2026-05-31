@@ -65,7 +65,7 @@ export default function LandingPage() {
     {
       icon: HiDocumentCheck,
       title: 'Verified Projects',
-      description: 'Admins verified creators with transparent identities and verified GitHub repositories.'
+      description: 'Admins verify creators with transparent identities and verified public repositories.'
     },
     {
       icon: HiChartBar,

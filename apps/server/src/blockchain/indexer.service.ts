@@ -444,18 +444,20 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
     const milestone = await this.prisma.milestone.findFirst({
       where: { onChainId: milestoneOnChainId },
-      include: { campaign: { select: { id: true, paymentToken: true } } },
+      include: {
+        campaign: {
+          select: { id: true, paymentToken: true },
+        },
+      },
     });
     if (!milestone) return;
 
-    // Format amount according to campaign payment token
     const isUsdc = milestone.campaign.paymentToken === 'USDC';
     const amount = isUsdc
       ? parseFloat(ethers.formatUnits(amountRaw, 6))
       : parseFloat(ethers.formatEther(amountRaw));
 
-    // Mark milestone as COMPLETED (funds have been released to creator)
-    // Increment campaign's releasedAmount — do NOT touch raisedAmount
+    // Mark milestone as COMPLETED and update campaign releasedAmount
     await Promise.all([
       this.prisma.milestone.update({
         where: { id: milestone.id },
@@ -466,6 +468,21 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
         data: { releasedAmount: { increment: amount } },
       }),
     ]);
+
+    // Unlock the next NOT_STARTED milestone in sequence
+    const campaignMilestones = await this.prisma.milestone.findMany({
+      where: { campaignId: milestone.campaignId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, status: true },
+    });
+    const idx = campaignMilestones.findIndex(m => m.id === milestone.id);
+    const next = campaignMilestones[idx + 1];
+    if (next && next.status === MilestoneStatus.NOT_STARTED) {
+      await this.prisma.milestone.update({
+        where: { id: next.id },
+        data: { status: MilestoneStatus.ONGOING },
+      });
+    }
   }
 
   private async onRefundProposed(log: ethers.EventLog) {

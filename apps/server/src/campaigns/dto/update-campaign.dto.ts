@@ -1,4 +1,4 @@
-import { IsArray, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdateCampaignDto {
   @IsOptional()
@@ -28,5 +28,9 @@ export class UpdateCampaignDto {
 
   @IsOptional()
   @IsString()
-  githubUrl?: string;
+  repositoryUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  license?: string;
 }

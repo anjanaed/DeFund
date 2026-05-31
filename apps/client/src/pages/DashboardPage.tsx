@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import { HiChartBar, HiLockClosed, HiCheckCircle, HiClock, HiXCircle, HiEye, HiRocketLaunch, HiBolt, HiScale } from 'react-icons/hi2'
@@ -99,8 +100,11 @@ export default function DashboardPage() {
         args: [BigInt(item.onChainId), approve],
       })
       setVotedIds(prev => new Set(prev).add(item.id))
+      toast.success(approve ? 'Voted to approve!' : 'Voted to reject!')
     } catch (err) {
-      setTxError(parseContractError(err))
+      const errMsg = parseContractError(err)
+      setTxError(errMsg)
+      toast.error(errMsg)
     } finally {
       setVotingTx(null)
     }
@@ -121,8 +125,11 @@ export default function DashboardPage() {
         args: [BigInt(item.onChainId!)],
       })
       setClaimedIds(prev => new Set(prev).add(item.id))
+      toast.success('Refund claimed!', { description: '95% of your contribution has been returned.' })
     } catch (err) {
-      setTxError(parseContractError(err))
+      const errMsg = parseContractError(err)
+      setTxError(errMsg)
+      toast.error(errMsg)
     } finally {
       setClaimingId(null)
     }
@@ -230,64 +237,126 @@ export default function DashboardPage() {
                   <p>You're all caught up! Your votes will appear here when a milestone you contributed to enters the voting phase.</p>
                 </div>
               ) : votingRequired.map(item => {
-                // U2 — compute voting power from the contributor's contribution to this campaign
                 const myContrib = contributions
                   .filter(c => c.campaign.id === item.campaign.id)
                   .reduce((sum, c) => sum + Number(c.amount), 0)
                 const totalRaised = Number(item.campaign.raisedAmount ?? 0)
                 const votingPower = totalRaised > 0 ? ((myContrib / totalRaised) * 100).toFixed(2) : null
+                const isBusy = votingTx?.id === item.id
+                const voted = votedIds.has(item.id)
 
                 return (
-                <div key={item.id} className="voting-card">
-                  <div className="voting-card-header">
-                    <div>
-                      <h3 className="voting-project-title">{item.campaign.title}</h3>
-                      <p className="voting-milestone-title">{item.title}</p>
-                      {/* U2 — voting power badge */}
-                      {votingPower !== null && (
-                        <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                          <HiScale style={{ color: 'var(--color-primary)' }} />
-                          <span>Your voting weight: <strong>{myContrib.toFixed(4)}</strong> ({votingPower}% of total votes)</span>
-                        </div>
-                      )}
-                    </div>
-                    {item.votingEndTime && (
-                      <div className="voting-deadline">
-                        <HiClock />
-                        {new Date(item.votingEndTime) > new Date()
-                          ? `${Math.ceil((new Date(item.votingEndTime).getTime() - Date.now()) / 86400000)}d left`
-                          : 'Ended'}
-                      </div>
+                <div key={item.id} style={{
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 12,
+                  padding: '20px 24px',
+                  marginBottom: 16,
+                }}>
+                  {/* Top row — campaign + power badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)' }}>
+                      {item.campaign.title}
+                    </span>
+                    {votingPower !== null && (
+                      <span style={{
+                        fontSize: 11, fontWeight: 700,
+                        color: 'var(--color-primary)',
+                        background: 'rgba(99,102,241,0.08)',
+                        border: '1px solid rgba(99,102,241,0.2)',
+                        borderRadius: 20, padding: '2px 10px',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        <HiScale style={{ display: 'inline', marginRight: 3, verticalAlign: 'middle' }} />
+                        {votingPower}% vote weight
+                      </span>
                     )}
                   </div>
-                  <p className="voting-description">{item.description}</p>
+
+                  {/* Milestone title */}
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px' }}>
+                    {item.title}
+                  </h3>
+
+                  {/* Description */}
+                  <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', margin: '0 0 4px', lineHeight: 1.6 }}>
+                    {item.description}
+                  </p>
+
+                  {/* Live voting status */}
                   {item.onChainId != null && (
                     <MilestoneVotingStatus
                       milestoneOnChainId={item.onChainId}
                       paymentToken={item.campaign.paymentToken}
                     />
                   )}
-                  <div className="voting-actions">
+
+                  {/* Action row */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                     {item.proofUrl && (
-                      <button className="btn-vote view-proof" onClick={() => { setSelectedProof({ title: item.title, content: item.proofUrl! }); setShowProofModal(true) }}>
-                        <HiEye /> View Proof
+                      <button
+                        onClick={() => { setSelectedProof({ title: item.title, content: item.proofUrl! }); setShowProofModal(true) }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '8px 14px', fontSize: 13, fontWeight: 600,
+                          background: 'transparent', border: '1px solid var(--color-border)',
+                          borderRadius: 8, cursor: 'pointer', color: 'var(--color-text-secondary)',
+                        }}
+                      >
+                        <HiEye size={15} /> View Proof
                       </button>
                     )}
-                    {votedIds.has(item.id) ? (
-                      <span style={{ fontSize: '13px', color: 'var(--color-success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <HiCheckCircle /> Vote submitted
+
+                    {voted ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--color-success)', marginLeft: 4 }}>
+                        <HiCheckCircle size={16} /> Vote recorded
                       </span>
                     ) : (
                       <>
-                        <button className="btn-vote approve" disabled={votingTx?.id === item.id} onClick={() => handleVote(item, true)} style={{ opacity: votingTx?.id === item.id ? 0.6 : 1 }}>
-                          <HiCheckCircle />{votingTx?.id === item.id && votingTx.approve ? 'Confirming...' : 'Approve'}
+                        <button
+                          disabled={isBusy}
+                          onClick={() => handleVote(item, true)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '8px 18px', fontSize: 13, fontWeight: 700,
+                            background: isBusy ? 'var(--color-bg-subtle)' : '#16a34a',
+                            color: isBusy ? 'var(--color-text-secondary)' : '#fff',
+                            border: 'none', borderRadius: 8, cursor: isBusy ? 'not-allowed' : 'pointer',
+                            opacity: isBusy ? 0.6 : 1, transition: 'opacity 0.15s',
+                          }}
+                        >
+                          <HiCheckCircle size={15} />
+                          {isBusy && votingTx?.approve ? 'Confirming…' : 'Approve'}
                         </button>
-                        <button className="btn-vote reject" disabled={votingTx?.id === item.id} onClick={() => handleVote(item, false)} style={{ opacity: votingTx?.id === item.id ? 0.6 : 1 }}>
-                          <HiXCircle />{votingTx?.id === item.id && !votingTx.approve ? 'Confirming...' : 'Reject'}
+                        <button
+                          disabled={isBusy}
+                          onClick={() => handleVote(item, false)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '8px 18px', fontSize: 13, fontWeight: 700,
+                            background: 'transparent',
+                            color: isBusy ? 'var(--color-text-secondary)' : 'var(--color-error)',
+                            border: `1px solid ${isBusy ? 'var(--color-border)' : 'var(--color-error)'}`,
+                            borderRadius: 8, cursor: isBusy ? 'not-allowed' : 'pointer',
+                            opacity: isBusy ? 0.6 : 1, transition: 'opacity 0.15s',
+                          }}
+                        >
+                          <HiXCircle size={15} />
+                          {isBusy && !votingTx?.approve ? 'Confirming…' : 'Reject'}
                         </button>
                       </>
                     )}
-                    <Link to={`/project/${item.campaign.id}`} className="btn-vote details">View Project</Link>
+
+                    <Link
+                      to={`/project/${item.campaign.id}`}
+                      style={{
+                        marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
+                        fontSize: 13, fontWeight: 600, color: 'var(--color-primary)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      View Project →
+                    </Link>
                   </div>
                 </div>
               )})}

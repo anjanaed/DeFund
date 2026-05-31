@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
 import CreateCampaignModal from '../components/modals/CreateCampaignModal'
@@ -10,7 +11,7 @@ import {
   HiCurrencyDollar, HiChartBar, HiUsers, HiCheckCircle, HiClock,
   HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray,
   HiNoSymbol, HiMegaphone, HiPlusCircle, HiRocketLaunch, HiScale,
-  HiHandThumbUp, HiHandThumbDown, HiExclamationTriangle, HiChartPie,
+  HiHandThumbUp, HiHandThumbDown, HiExclamationTriangle, HiChartPie, HiLockClosed,
 } from 'react-icons/hi2'
 import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
@@ -21,6 +22,7 @@ import { parseContractError } from '../lib/errors'
 interface Milestone {
   id: string; title: string; status: string; amount: string
   onChainId: number | null; proofUrl: string | null; submissionCount: number
+  deadline?: string | null
   votingEndTime?: string | null
   approveWeight?: string | null; rejectWeight?: string | null; totalVoteWeight?: string | null
   adminNote?: string | null
@@ -39,13 +41,16 @@ interface CreatorCampaign {
 const fmt = (n: number) => `$${Number(n).toLocaleString()}`
 
 const STATUS_ICON: Record<string, any> = {
+  NOT_STARTED: HiLockClosed,
+  ONGOING: HiInformationCircle,
   APPROVED: HiCheckCircle, COMPLETED: HiCheckCircle,
   VOTING: HiClock, REJECTED: HiXCircle,
-  PENDING: HiInformationCircle,
 }
 const STATUS_COLOR: Record<string, string> = {
+  NOT_STARTED: 'neutral',
+  ONGOING: 'neutral',
   APPROVED: 'success', COMPLETED: 'success',
-  VOTING: 'warning', REJECTED: 'error', PENDING: 'neutral',
+  VOTING: 'warning', REJECTED: 'error',
 }
 
 export default function CreatorStudioPage() {
@@ -54,7 +59,7 @@ export default function CreatorStudioPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showProofModal, setShowProofModal] = useState(false)
   const [selectedProof, setSelectedProof] = useState<{ title: string; content: string } | null>(null)
-  const [proofModal, setProofModal] = useState<{ milestoneId: string; onChainId: number | null; title: string; isResubmission: boolean } | null>(null)
+  const [proofModal, setProofModal] = useState<{ milestoneId: string; onChainId: number | null; title: string; isResubmission: boolean; isKickoff: boolean } | null>(null)
 
   const [campaigns, setCampaigns] = useState<CreatorCampaign[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,6 +96,7 @@ export default function CreatorStudioPage() {
       args: [BigInt(proofModal.onChainId), proofIpfsHash],
     })
     setSubmittedIds(prev => new Set(prev).add(proofModal.milestoneId))
+    toast.success('Proof submitted! The 7-day voting period has started.')
     setProofModal(null)
   }
 
@@ -106,9 +112,12 @@ export default function CreatorStudioPage() {
         address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
         functionName: 'cancelCampaign', args: [BigInt(campaign.onChainId)],
       })
+      toast.success('Campaign cancelled.')
       loadCampaigns()
     } catch (err: any) {
-      setTxError(parseContractError(err))
+      const errMsg = parseContractError(err)
+      setTxError(errMsg)
+      toast.error(errMsg)
     }
   }
 
@@ -147,9 +156,12 @@ export default function CreatorStudioPage() {
       setUpdateTitle('')
       setUpdateContent('')
       setShowUpdateForm(false)
+      toast.success('Update posted!')
       setUpdateFeedback({ type: 'success', message: 'Update posted successfully.' })
     } catch (err: any) {
-      setUpdateFeedback({ type: 'error', message: err.message || 'Failed to post update' })
+      const updateErr = err.message || 'Failed to post update'
+      toast.error(updateErr)
+      setUpdateFeedback({ type: 'error', message: updateErr })
     } finally {
       setPostingUpdate(false)
     }
@@ -189,7 +201,13 @@ export default function CreatorStudioPage() {
               <h1 className="creator-studio-title">Creator Studio</h1>
               <p className="creator-studio-subtitle">Manage your campaigns and milestones</p>
             </div>
-            <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>+ New Campaign</button>
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsModalOpen(true)}
+              style={{ borderRadius: '99px', padding: '10px 24px', fontSize: '14px', fontWeight: '700', gap: '8px', letterSpacing: '-0.01em' }}
+            >
+              <HiPlusCircle size={18} /> New Campaign
+            </button>
           </div>
 
           {/* Stats */}
@@ -344,7 +362,7 @@ export default function CreatorStudioPage() {
                       const Icon = STATUS_ICON[m.status] || HiInformationCircle
                       const isApproved = m.status === 'APPROVED' || m.status === 'COMPLETED'
                       const isRejected = m.status === 'REJECTED'
-                      const canSubmit = (m.status === 'PENDING') && !submittedIds.has(m.id)
+                      const canSubmit = m.status === 'ONGOING' && !submittedIds.has(m.id)
                       const canResubmit = isRejected && m.submissionCount < 3 && !submittedIds.has(m.id)
                       const permanentlyRejected = isRejected && m.submissionCount >= 3
 
@@ -373,6 +391,11 @@ export default function CreatorStudioPage() {
                               <div className="creator-milestone-amount">
                                 {fmt(Number(m.amount))} <span className="required-text">required</span>
                               </div>
+                              {m.deadline && (
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                  <HiClock size={12} /> Due {new Date(m.deadline).toLocaleDateString()}
+                                </div>
+                              )}
                             </div>
 
                             <div className="creator-milestone-action">
@@ -393,14 +416,14 @@ export default function CreatorStudioPage() {
 
                               {/* Submit proof (first time) */}
                               {canSubmit && (
-                                <button className="creator-submit-proof-btn" onClick={() => setProofModal({ milestoneId: m.id, onChainId: m.onChainId, title: m.title, isResubmission: false })}>
+                                <button className="creator-submit-proof-btn" onClick={() => setProofModal({ milestoneId: m.id, onChainId: m.onChainId, title: m.title, isResubmission: false, isKickoff: idx === 0 })}>
                                   <HiArrowUpTray /> Submit Proof
                                 </button>
                               )}
 
                               {/* Resubmit proof */}
                               {canResubmit && (
-                                <button className="creator-submit-proof-btn" onClick={() => setProofModal({ milestoneId: m.id, onChainId: m.onChainId, title: m.title, isResubmission: true })}
+                                <button className="creator-submit-proof-btn" onClick={() => setProofModal({ milestoneId: m.id, onChainId: m.onChainId, title: m.title, isResubmission: true, isKickoff: idx === 0 })}
                                   style={{ background: 'var(--color-warning, #eab308)', borderColor: 'var(--color-warning, #eab308)', color: '#000' }}>
                                   <HiArrowUpTray /> Resubmit Proof
                                 </button>
@@ -410,6 +433,13 @@ export default function CreatorStudioPage() {
                               {permanentlyRejected && (
                                 <span style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <HiNoSymbol /> Max attempts reached
+                                </span>
+                              )}
+
+                              {/* Locked — waiting on previous milestone to complete */}
+                              {m.status === 'NOT_STARTED' && !submittedIds.has(m.id) && (
+                                <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <HiLockClosed /> Unlocks when previous milestone is completed
                                 </span>
                               )}
 
@@ -583,7 +613,7 @@ export default function CreatorStudioPage() {
       <CreateCampaignModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={loadCampaigns} />
       <ProofModal isOpen={showProofModal} onClose={() => setShowProofModal(false)} title={selectedProof?.title || ''} proofContent={selectedProof?.content || ''} />
       {proofModal && (
-        <SubmitProofModal isOpen onClose={() => setProofModal(null)} milestoneTitle={proofModal.title} isResubmission={proofModal.isResubmission} onSubmit={handleSubmitProof} />
+        <SubmitProofModal isOpen onClose={() => setProofModal(null)} milestoneTitle={proofModal.title} isResubmission={proofModal.isResubmission} isKickoff={proofModal.isKickoff} onSubmit={handleSubmitProof} />
       )}
     </div>
   )

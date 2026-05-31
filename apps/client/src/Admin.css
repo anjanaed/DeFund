@@ -75,8 +75,9 @@
 }
 
 .admin-nav-item.active {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
+  box-shadow: 0 2px 8px rgba(91, 33, 182, 0.25);
 }
 
 .admin-sidebar-footer {
@@ -96,19 +97,20 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border);
-  background: white;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.06);
   border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  font-weight: 500;
+  color: var(--color-error);
+  font-weight: 600;
+  font-size: var(--text-sm);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: all 0.15s;
 }
 
 .admin-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
   border-color: var(--color-error);
-  color: var(--color-error);
 }
 
 /* Page Headers */
@@ -140,13 +142,15 @@
   padding: var(--space-6);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
   position: relative;
-  transition: box-shadow var(--transition), transform var(--transition);
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
 }
 
 .admin-stat-card:hover {
-  box-shadow: 0 6px 18px rgba(91, 33, 182, 0.10);
+  border-color: var(--color-border-purple);
+  box-shadow: 0 6px 24px rgba(91, 33, 182, 0.12);
   transform: translateY(-1px);
 }
 
@@ -188,7 +192,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
 }
 
 .admin-table-header {

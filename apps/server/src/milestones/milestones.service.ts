@@ -46,10 +46,10 @@ export class MilestonesService {
     if (milestone.campaign.creatorId !== userId) throw new ForbiddenException();
 
     // H7 — only allow proof submission when milestone is actionable by the creator
-    const submittableStatuses: MilestoneStatus[] = [MilestoneStatus.PENDING, MilestoneStatus.REJECTED];
+    const submittableStatuses: MilestoneStatus[] = [MilestoneStatus.ONGOING, MilestoneStatus.REJECTED];
     if (!submittableStatuses.includes(milestone.status)) {
       throw new BadRequestException(
-        `Cannot submit proof for a milestone in '${milestone.status}' status. Proof can only be submitted when the milestone is PENDING or REJECTED.`,
+        `Cannot submit proof for a milestone in '${milestone.status}' status. Proof can only be submitted when the milestone is ONGOING or REJECTED.`,
       );
     }
 

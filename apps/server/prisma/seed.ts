@@ -201,7 +201,7 @@ Our mission is to democratize access to financial services by providing a trustl
       isAdminApproved: true,
       deadline: new Date('2026-09-30'),
       website: 'https://defilending.io',
-      githubUrl: 'https://github.com/maxverstappen/defi-lending',
+      repositoryUrl: 'https://github.com/maxverstappen/defi-lending',
       creatorId: max.id,
       milestones: {
         create: [
@@ -227,7 +227,7 @@ Our mission is to democratize access to financial services by providing a trustl
             description:
               'Complete third-party security audit and mainnet deployment. Final testing and preparation for public launch.',
             amount: 45000,
-            status: MilestoneStatus.PENDING,
+            status: MilestoneStatus.ONGOING,
           },
         ],
       },
@@ -271,7 +271,7 @@ This engine will power the next generation of fully on-chain games, enabling tru
       status: CampaignStatus.ACTIVE,
       isAdminApproved: true,
       deadline: new Date('2026-12-31'),
-      githubUrl: 'https://github.com/alexchen-dev/blockchain-game-engine',
+      repositoryUrl: 'https://github.com/alexchen-dev/blockchain-game-engine',
       creatorId: alex.id,
       milestones: {
         create: [
@@ -280,7 +280,7 @@ This engine will power the next generation of fully on-chain games, enabling tru
             description:
               'Build the foundational engine architecture, including the blockchain abstraction layer, asset registry, and game loop integration with on-chain state.',
             amount: 120000,
-            status: MilestoneStatus.PENDING,
+            status: MilestoneStatus.ONGOING,
           },
         ],
       },
@@ -309,7 +309,7 @@ Our marketplace puts creators first, ensuring royalties are always honoured and 
       isAdminApproved: true,
       deadline: new Date('2026-10-31'),
       website: 'https://nftmarketplace.example',
-      githubUrl: 'https://github.com/sarahkim-nft/nft-marketplace',
+      repositoryUrl: 'https://github.com/sarahkim-nft/nft-marketplace',
       creatorId: sarah.id,
       milestones: {
         create: [
@@ -327,14 +327,14 @@ Our marketplace puts creators first, ensuring royalties are always honoured and 
             description:
               'Build the responsive marketplace UI with wallet integration, collection browsing, and listing/buying flows.',
             amount: 30000,
-            status: MilestoneStatus.PENDING,
+            status: MilestoneStatus.ONGOING,
           },
           {
             title: 'Launch & Marketing',
             description:
               'Public mainnet launch, creator onboarding campaign, partnerships with established NFT artists, and community building.',
             amount: 25000,
-            status: MilestoneStatus.PENDING,
+            status: MilestoneStatus.ONGOING,
           },
         ],
       },
@@ -362,7 +362,7 @@ We believe analytics should be a tool that benefits both developers and users, n
       status: CampaignStatus.ACTIVE,
       isAdminApproved: true,
       deadline: new Date('2026-05-31'),
-      githubUrl: 'https://github.com/davidpark-oss/web3-analytics',
+      repositoryUrl: 'https://github.com/davidpark-oss/web3-analytics',
       creatorId: david.id,
       milestones: {
         create: [
@@ -419,7 +419,7 @@ Our goal is to make decentralized storage as easy to use as cloud storage, while
       status: CampaignStatus.ACTIVE,
       isAdminApproved: true,
       deadline: new Date('2027-03-31'),
-      githubUrl: 'https://github.com/lisathompson/decentral-storage',
+      repositoryUrl: 'https://github.com/lisathompson/decentral-storage',
       creatorId: lisa.id,
       milestones: {
         create: [
@@ -428,7 +428,7 @@ Our goal is to make decentralized storage as easy to use as cloud storage, while
             description:
               'Design the storage protocol specification, implement the proof-of-storage mechanism, and deliver a working MVP with basic put/get operations.',
             amount: 150000,
-            status: MilestoneStatus.PENDING,
+            status: MilestoneStatus.ONGOING,
           },
         ],
       },
@@ -457,7 +457,7 @@ Already battle-tested with two DAOs managing over $2M in treasury assets.`,
       isAdminApproved: true,
       deadline: new Date('2026-03-31'),
       website: 'https://daogov.example',
-      githubUrl: 'https://github.com/michaelross-dao/dao-governance',
+      repositoryUrl: 'https://github.com/michaelross-dao/dao-governance',
       creatorId: michael.id,
       milestones: {
         create: [

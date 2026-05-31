@@ -28,7 +28,8 @@ enum CampaignStatus {
 }
 
 enum MilestoneStatus {
-  PENDING
+  NOT_STARTED
+  ONGOING
   VOTING
   APPROVED
   REJECTED
@@ -73,10 +74,11 @@ model Campaign {
   releasedAmount  Decimal @default(0) @db.Decimal(18, 2)
   paymentToken    String  @default("ETH")
 
-  status    CampaignStatus @default(PENDING)
-  deadline  DateTime?
-  website   String?
-  githubUrl String?
+  status        CampaignStatus @default(PENDING)
+  deadline      DateTime?
+  website       String?
+  repositoryUrl String?
+  license       String?
 
   contractAddress  String?
   transactionHash  String?
@@ -146,8 +148,9 @@ model Milestone {
   title       String
   description String
   amount      Decimal         @db.Decimal(18, 2)
-  status      MilestoneStatus @default(PENDING)
+  status      MilestoneStatus @default(ONGOING)
 
+  deadline        DateTime?
   proofUrl        String?
   onChainId       Int?      @unique
   votingEndTime   DateTime?

@@ -21,7 +21,7 @@ export default function Features() {
     {
       icon: HiCheckBadge,
       title: 'Verified Projects',
-      description: 'Admin-verified creators with transparent roadmaps and verified GitHub repositories'
+      description: 'Admin-verified creators with transparent roadmaps and verified public repositories'
     },
     {
       icon: HiChartBar,
