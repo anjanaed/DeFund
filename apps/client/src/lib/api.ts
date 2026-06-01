@@ -7,13 +7,15 @@ export async function apiFetch(
 ): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  // For multipart uploads, let the browser set Content-Type (with the boundary).
+  const isFormData = options.body instanceof FormData
   try {
     return await fetch(`${API_BASE}${path}`, {
       ...options,
       signal: controller.signal,
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(options.headers as Record<string, string>),
       },
     })

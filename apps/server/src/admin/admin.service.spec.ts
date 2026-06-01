@@ -118,18 +118,18 @@ describe('AdminService', () => {
   });
 
   describe('getStats', () => {
-    it('returns pending, flagged, rejected counts and totalRaised', async () => {
+    it('returns pending, flagged, active counts and totalRaised', async () => {
       mockPrisma.campaign.count
         .mockResolvedValueOnce(3)   // pending
         .mockResolvedValueOnce(2)   // flagged
-        .mockResolvedValueOnce(1);  // rejected (FAILED)
+        .mockResolvedValueOnce(5);  // active (ACTIVE + FUNDED)
       mockPrisma.campaign.aggregate.mockResolvedValue({ _sum: { raisedAmount: 99000 } });
 
       const result = await service.getStats();
 
       expect(result.pending).toBe(3);
       expect(result.flagged).toBe(2);
-      expect(result.rejected).toBe(1);
+      expect(result.active).toBe(5);
       expect(result.totalRaised).toBe(99000);
     });
 

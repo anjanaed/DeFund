@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useDisconnect } from 'wagmi'
+import { apiFetch } from '../lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
@@ -35,11 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (walletAddress: string, signFn: (message: string) => Promise<string>) => {
-    // Step 1: get nonce
-    const nonceRes = await fetch(`${API_BASE}/auth/nonce`, {
+    // Step 1: get nonce (apiFetch applies a request timeout so the UI can never
+    // hang indefinitely if the server stalls)
+    const nonceRes = await apiFetch('/auth/nonce', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ walletAddress }),
     })
     if (!nonceRes.ok) throw new Error('Failed to get nonce')
@@ -49,10 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signature = await signFn(nonce)
 
     // Step 3: verify signature — server sets HttpOnly cookie, returns user info
-    const verifyRes = await fetch(`${API_BASE}/auth/verify`, {
+    const verifyRes = await apiFetch('/auth/verify', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ walletAddress, signature }),
     })
     if (!verifyRes.ok) throw new Error('Signature verification failed')

@@ -297,9 +297,9 @@ The frontend is available at `http://localhost:5173`. The API is at `http://loca
 
 **Network:** Ethereum Sepolia testnet
 
-**CampaignFactory:** `0xcf27d48aF79423C0e370f6f97AF500B1C886Fb90`
+**CampaignFactory:** `0x6DBc11007EF0CB56BAE89347b5Bf99597BE7a945`
 
-**Deployed at block:** 10938930
+**Deployed at block:** 10968726
 
 **USDC (Sepolia):** `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
 

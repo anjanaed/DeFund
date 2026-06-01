@@ -39,6 +39,7 @@ export default () => ({
   ),
   startBlock: parseInt(process.env.START_BLOCK ?? '0', 10) || 0,
   ipfsGateway: process.env.IPFS_GATEWAY || 'https://ipfs.io/ipfs/',
+  pinataJwt: process.env.PINATA_JWT || '',
   operatorPrivateKey: requirePrivKey('OPERATOR_PRIVATE_KEY', process.env.OPERATOR_PRIVATE_KEY),
   adminPrivateKey: process.env.ADMIN_PRIVATE_KEY
     ? requirePrivKey('ADMIN_PRIVATE_KEY', process.env.ADMIN_PRIVATE_KEY)

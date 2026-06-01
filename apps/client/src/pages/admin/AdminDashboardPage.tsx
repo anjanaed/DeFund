@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HiClock, HiFlag, HiChartBar, HiXCircle, HiMagnifyingGlass, HiClipboardDocumentList } from 'react-icons/hi2'
+import { HiClock, HiFlag, HiChartBar, HiMagnifyingGlass, HiClipboardDocumentList, HiRocketLaunch, HiCubeTransparent } from 'react-icons/hi2'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../../components/common/Spinner'
 import '../../Admin.css'
@@ -7,7 +7,7 @@ import '../../Admin.css'
 interface AdminStats {
   pending: number
   flagged: number
-  rejected: number
+  active: number
   totalRaised: number
 }
 
@@ -73,9 +73,10 @@ function shortHash(hash: string | null): string {
 }
 
 const AUDIT_ACTION_LABEL: Record<string, { label: string; color: string }> = {
-  APPROVE_CAMPAIGN:       { label: 'Approved campaign',      color: '#15803d' },
-  REJECT_CAMPAIGN:        { label: 'Rejected campaign',      color: 'var(--color-error)' },
-  CONFIRM_FLAG:           { label: 'Confirmed flag',         color: '#b45309' },
+  APPROVE_CAMPAIGN:       { label: 'Approved campaign',        color: '#15803d' },
+  REJECT_CAMPAIGN:        { label: 'Rejected campaign',        color: 'var(--color-error)' },
+  REQUEST_CHANGES:        { label: 'Requested changes',        color: '#d97706' },
+  CONFIRM_FLAG:           { label: 'Confirmed flag',           color: '#b45309' },
   CONFIRM_RELEASE_FUNDS:  { label: 'Released milestone funds', color: '#0369a1' },
 }
 
@@ -158,10 +159,10 @@ export default function AdminDashboardPage() {
   const filteredTransactions = txPage?.items ?? []
 
   const statCards = [
-    { label: 'Pending Verification', value: stats?.pending ?? '—', subtitle: 'Projects awaiting approval', icon: HiClock, trend: 'neutral' },
+    { label: 'Active Projects', value: stats?.active ?? '—', subtitle: 'Live and funded campaigns', icon: HiRocketLaunch, trend: 'positive' },
+    { label: 'Pending Verification', value: stats?.pending ?? '—', subtitle: 'Awaiting admin approval', icon: HiClock, trend: 'neutral' },
+    { label: 'Total Raised', value: stats ? `$${stats.totalRaised.toFixed(2)}` : '—', subtitle: 'Across all campaigns', icon: HiChartBar, trend: 'positive' },
     { label: 'Flagged Projects', value: stats?.flagged ?? '—', subtitle: 'Require attention', icon: HiFlag, trend: 'negative' },
-    { label: 'Total Raised', value: stats ? `${stats.totalRaised.toFixed(2)}` : '—', subtitle: 'Across all campaigns', icon: HiChartBar, trend: 'positive' },
-    { label: 'Failed Projects', value: stats?.rejected ?? '—', subtitle: 'Rejected or expired', icon: HiXCircle, trend: 'neutral' },
   ]
 
   return (
@@ -191,7 +192,7 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px', marginBottom: '32px', alignItems: 'start' }}>
         <div className="admin-table-card">
           <div className="admin-table-header">
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Recent Activity</h3>
@@ -202,21 +203,35 @@ export default function AdminDashboardPage() {
             ) : activity.length === 0 ? (
               <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>No recent activity.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {activity.slice(0, 8).map((item) => {
-                  const label = item.type === 'campaign'
-                    ? `${item.title} → ${item.status}`
-                    : `Milestone "${item.title}" (${item.campaign?.title ?? 'campaign'}) → ${item.status}`
-                  return (
-                    <div key={`${item.type}-${item.id}`} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', marginTop: '6px', background: `var(--color-${activityStatusColor(item.status)})` }} />
-                      <div>
-                        <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '4px' }}>{label}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>{timeAgo(item.updatedAt)}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {activity
+                  .filter((item) => {
+                    if (item.type === 'campaign') return true
+                    return ['VOTING', 'APPROVED', 'REJECTED', 'COMPLETED'].includes(item.status)
+                  })
+                  .slice(0, 8)
+                  .map((item) => {
+                    const label = item.type === 'campaign'
+                      ? item.title
+                      : `${item.title} — ${item.campaign?.title ?? ''}`
+                    const sublabel = item.type === 'campaign'
+                      ? `Campaign ${item.status.toLowerCase()}`
+                      : `Milestone ${item.status.toLowerCase()}`
+                    return (
+                      <div key={`${item.type}-${item.id}`} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: `var(--color-${activityStatusColor(item.status)})` }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: '500', fontSize: '13px', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', gap: '8px' }}>
+                            <span>{sublabel}</span>
+                            <span>·</span>
+                            <span>{timeAgo(item.updatedAt)}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })
+                }
               </div>
             )}
           </div>
@@ -226,11 +241,11 @@ export default function AdminDashboardPage() {
           <div className="admin-table-header">
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>System Status</h3>
           </div>
-          <div style={{ padding: '24px' }}>
+          <div style={{ padding: '20px 24px' }}>
             {loading ? (
               <Spinner label="Checking system status…" />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {[
                   {
                     name: 'Blockchain RPC',
@@ -245,20 +260,26 @@ export default function AdminDashboardPage() {
                   {
                     name: 'Event Indexer',
                     status: health?.indexer.isStale ? 'Stale (>3 min)' : health?.indexer.lastPollAt ? 'Active' : 'Inactive',
-                    color: health?.indexer.isStale ? 'warning' : 'success',
+                    color: health?.indexer.isStale ? 'warning' : health?.indexer.lastPollAt ? 'success' : 'neutral',
+                  },
+                  {
+                    name: 'Last Indexed Block',
+                    status: health?.indexer.lastBlockProcessed ? `#${health.indexer.lastBlockProcessed.toLocaleString()}` : '—',
+                    color: health?.indexer.lastPollAt ? 'success' : 'neutral',
+                    icon: HiCubeTransparent,
                   },
                 ].map((item, index) => (
                   <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>{item.name}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: `var(--color-${item.color})` }} />
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>{item.status}</span>
+                    <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{item.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: `var(--color-${item.color})` }} />
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>{item.status}</span>
                     </div>
                   </div>
                 ))}
                 {health?.indexer.lastPollAt && (
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
-                    Last block: #{health.indexer.lastBlockProcessed} · polled {timeAgo(health.indexer.lastPollAt)}
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', paddingTop: '4px', borderTop: '1px solid var(--color-border)' }}>
+                    Polled {timeAgo(health.indexer.lastPollAt)}
                   </div>
                 )}
               </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import {
-  HiShieldCheck, HiArrowUturnLeft, HiExclamationTriangle,
+  HiArrowUturnLeft, HiExclamationTriangle,
   HiCheckCircle, HiXCircle, HiUserCircle, HiClock,
 } from 'react-icons/hi2'
 import { apiFetch } from '../../lib/api'

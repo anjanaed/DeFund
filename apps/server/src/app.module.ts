@@ -16,6 +16,7 @@ import { AdminModule } from './admin/admin.module';
 import { SocialAuthModule } from './social-auth/social-auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
+import { IpfsModule } from './ipfs/ipfs.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -38,6 +39,7 @@ import configuration from './config/configuration';
     SocialAuthModule,
     NotificationsModule,
     HealthModule,
+    IpfsModule,
   ],
   controllers: [AppController],
   providers: [

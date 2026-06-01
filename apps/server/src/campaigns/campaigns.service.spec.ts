@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { IpfsService } from '../ipfs/ipfs.service';
 import { CampaignStatus } from '../generated/prisma';
 
 const makeCampaign = (overrides: Partial<Record<string, any>> = {}) => ({
@@ -41,6 +42,14 @@ const mockPrisma = {
   },
 };
 
+// IPFS pinning is disabled in unit tests; createCampaign keeps the fallback hash.
+const mockIpfs = {
+  isConfigured: jest.fn().mockReturnValue(false),
+  pinJSON: jest.fn(),
+  pinFile: jest.fn(),
+  gatewayUrl: jest.fn((cid: string) => `https://ipfs.io/ipfs/${cid}`),
+};
+
 describe('CampaignsService', () => {
   let service: CampaignsService;
 
@@ -51,6 +60,7 @@ describe('CampaignsService', () => {
       providers: [
         CampaignsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: IpfsService, useValue: mockIpfs },
       ],
     }).compile();
 
@@ -212,7 +222,7 @@ describe('CampaignsService', () => {
 
       expect(result).toEqual(milestones);
       expect(mockPrisma.milestone.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { createdAt: 'asc' } }),
+        expect.objectContaining({ orderBy: { order: 'asc' } }),
       );
     });
 

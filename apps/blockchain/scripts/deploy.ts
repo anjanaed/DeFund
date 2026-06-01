@@ -22,9 +22,20 @@ async function main() {
   await factory.waitForDeployment();
 
   const address = await factory.getAddress();
+  const deployTx = factory.deploymentTransaction();
+  const receipt = deployTx ? await deployTx.wait() : null;
+  const deployBlock = receipt?.blockNumber ?? 0;
+
   console.log("\nCampaignFactory deployed to:", address);
+  console.log("Deploy block:", deployBlock);
+  // Machine-parseable markers for tooling
+  console.log("DEPLOYED_ADDRESS=" + address);
+  console.log("DEPLOYED_BLOCK=" + deployBlock);
   console.log(
-    "\nAdd this to apps/server/.env:\n  CAMPAIGN_FACTORY_ADDRESS=" + address
+    "\nAdd to apps/server/.env:\n  CAMPAIGN_FACTORY_ADDRESS=" +
+      address +
+      "\n  START_BLOCK=" +
+      deployBlock
   );
 }
 

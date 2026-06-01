@@ -35,6 +35,18 @@ export class CreateMilestoneDto {
   deadline?: string;
 }
 
+export class CampaignDocumentDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  cid: string;
+
+  @IsOptional()
+  @IsString()
+  mimetype?: string;
+}
+
 export class CreateCampaignDto {
   @IsString()
   title: string;
@@ -80,6 +92,19 @@ export class CreateCampaignDto {
   @IsOptional()
   @IsString()
   ipfsHash?: string;
+
+  // IPFS CIDs of campaign images.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+
+  // Supporting documents (whitepaper, pitch deck, etc.) already pinned to IPFS.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CampaignDocumentDto)
+  documents?: CampaignDocumentDto[];
 
   @IsArray()
   @ArrayMinSize(1)

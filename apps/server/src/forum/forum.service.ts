@@ -168,13 +168,15 @@ export class ForumService {
   }
 
   async updateMessage(
+    campaignId: string,
     messageId: string,
     user: { userId: string; role: UserRole },
     dto: UpdateMessageDto,
   ) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
+    const [message, campaign] = await Promise.all([
+      this.prisma.message.findUnique({ where: { id: messageId } }),
+      this.prisma.campaign.findUnique({ where: { id: campaignId }, select: { creatorId: true } }),
+    ]);
     if (!message) throw new NotFoundException('Message not found');
     if (message.isDeleted) {
       throw new BadRequestException('Cannot edit a deleted message');
@@ -182,27 +184,56 @@ export class ForumService {
     if (message.userId !== user.userId && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException('You can only edit your own messages');
     }
-    return this.prisma.message.update({
+    const updated = await this.prisma.message.update({
       where: { id: messageId },
       data: { content: this.stripHtml(dto.content) },
       include: messageInclude,
     });
+    const contribution = campaign
+      ? await this.prisma.contribution.findFirst({
+          where: { campaignId, contributorId: updated.userId },
+          select: { id: true },
+        })
+      : null;
+    return {
+      ...updated,
+      user: {
+        ...updated.user,
+        isCreator: campaign ? updated.userId === campaign.creatorId : false,
+        isContributor: !!contribution,
+      },
+    };
   }
 
-  async deleteMessage(messageId: string, user: { userId: string; role: UserRole }) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
+  async deleteMessage(campaignId: string, messageId: string, user: { userId: string; role: UserRole }) {
+    const [message, campaign] = await Promise.all([
+      this.prisma.message.findUnique({ where: { id: messageId } }),
+      this.prisma.campaign.findUnique({ where: { id: campaignId }, select: { creatorId: true } }),
+    ]);
     if (!message) throw new NotFoundException('Message not found');
-    if (message.userId !== user.userId && user.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('You can only delete your own messages');
+    if (user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can delete messages');
     }
     // Soft delete — preserves replies and thread structure
-    return this.prisma.message.update({
+    const deleted = await this.prisma.message.update({
       where: { id: messageId },
       data: { isDeleted: true, content: '' },
       include: messageInclude,
     });
+    const contribution = campaign
+      ? await this.prisma.contribution.findFirst({
+          where: { campaignId, contributorId: deleted.userId },
+          select: { id: true },
+        })
+      : null;
+    return {
+      ...deleted,
+      user: {
+        ...deleted.user,
+        isCreator: campaign ? deleted.userId === campaign.creatorId : false,
+        isContributor: !!contribution,
+      },
+    };
   }
 
   async toggleReaction(messageId: string, userId: string, type: ReactionType) {

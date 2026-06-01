@@ -25,6 +25,7 @@ enum CampaignStatus {
   COMPLETED
   FAILED
   FLAGGED
+  CHANGES_REQUESTED
 }
 
 enum MilestoneStatus {
@@ -80,12 +81,21 @@ model Campaign {
   repositoryUrl String?
   license       String?
 
+  reviewMessage    String?
+
   contractAddress  String?
   transactionHash  String?
   onChainId        Int?     @unique
   isAdminApproved  Boolean  @default(false)
   fundsReclaimed   Boolean  @default(false)
   ipfsHash         String?
+
+  // Media cached from IPFS for fast rendering. The authoritative copy is the
+  // metadata JSON referenced by `ipfsHash`; these mirror its contents so list
+  // and detail pages do not need a gateway round-trip per campaign.
+  // images holds IPFS CIDs; documents is [{ name, cid, mimetype }].
+  images     String[] @default([])
+  documents  Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -149,6 +159,8 @@ model Milestone {
   description String
   amount      Decimal         @db.Decimal(18, 2)
   status      MilestoneStatus @default(ONGOING)
+
+  order           Int       @default(0)
 
   deadline        DateTime?
   proofUrl        String?
@@ -285,6 +297,7 @@ enum NotificationType {
   RELEASE_FUNDS_PROPOSED
   ADMIN_ROLE_PROPOSED
   CAMPAIGN_APPROVAL_PROPOSED
+  CHANGES_REQUESTED
 }
 
 model CampaignApprovalProposal {

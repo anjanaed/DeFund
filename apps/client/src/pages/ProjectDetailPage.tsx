@@ -11,19 +11,23 @@ import OnboardingModal from '../components/common/OnboardingModal'
 import {
   HiUsers, HiChartBar, HiCheckCircle, HiClock, HiInformationCircle,
   HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle, HiGlobeAlt, HiUser,
+  HiDocument, HiArrowTopRightOnSquare,
 } from 'react-icons/hi2'
 import { useAccount, usePublicClient } from 'wagmi'
 import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { parseEther, parseUnits } from 'viem'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI, USDC_ADDRESS, ERC20_APPROVE_ABI } from '../config/contracts'
 import { apiFetch } from '../lib/api'
+import { ipfsUrl } from '../lib/ipfs'
 import ProjectForum from '../components/forum/ProjectForum'
 import { parseContractError } from '../lib/errors'
 
+interface CampaignDocument { name: string; cid: string; mimetype?: string }
 interface Campaign {
   id: string; title: string; description: string; category: string; status: string
   raisedAmount: string; goalAmount: string; paymentToken: string; deadline: string | null
   website: string | null; repositoryUrl: string | null; license: string | null; onChainId: number | null
+  images: string[]; documents: CampaignDocument[] | null
   creator: { id: string; name: string | null; walletAddress: string }
   _count: { milestones: number; contributions: number }
 }
@@ -233,6 +237,42 @@ export default function ProjectDetailPage() {
                   by <span>{campaign.creator.name || shortenAddress(campaign.creator.walletAddress)}</span>
                 </div>
               </div>
+
+              {/* Media & documents (fetched from IPFS) */}
+              {((campaign.images && campaign.images.length > 0) ||
+                (campaign.documents && campaign.documents.length > 0)) && (
+                <div style={{ marginBottom: 24 }}>
+                  {campaign.images && campaign.images.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+                      {campaign.images.map(cid => (
+                        <a key={cid} href={ipfsUrl(cid)} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={ipfsUrl(cid)}
+                            alt=""
+                            style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-border)' }}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {campaign.documents && campaign.documents.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {campaign.documents.map(doc => (
+                        <a
+                          key={doc.cid}
+                          href={ipfsUrl(doc.cid)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)', textDecoration: 'none', wordBreak: 'break-all' }}
+                        >
+                          <HiDocument style={{ flexShrink: 0 }} /> {doc.name}
+                          <HiArrowTopRightOnSquare size={13} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--color-primary)' }} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Tabs */}
               <div className="project-tabs">

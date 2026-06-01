@@ -472,7 +472,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     // Unlock the next NOT_STARTED milestone in sequence
     const campaignMilestones = await this.prisma.milestone.findMany({
       where: { campaignId: milestone.campaignId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { order: 'asc' },
       select: { id: true, status: true },
     });
     const idx = campaignMilestones.findIndex(m => m.id === milestone.id);

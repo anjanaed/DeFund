@@ -11,6 +11,7 @@ import {
 import { AdminService } from './admin.service';
 import { FlagCampaignDto } from './dto/flag-campaign.dto';
 import { ProposeRoleChangeDto } from './dto/propose-role-change.dto';
+import { RequestChangesDto } from './dto/request-changes.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -91,6 +92,15 @@ export class AdminController {
     @CurrentUser() user: { walletAddress: string },
   ) {
     return this.admin.rejectCampaignAudited(id, user.walletAddress);
+  }
+
+  @Post('projects/:id/request-changes')
+  requestChanges(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+    @Body() dto: RequestChangesDto,
+  ) {
+    return this.admin.requestChanges(id, user.walletAddress, dto.message);
   }
 
   @Post('projects/:id/flag')

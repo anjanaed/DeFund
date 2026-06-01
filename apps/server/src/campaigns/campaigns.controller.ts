@@ -52,6 +52,15 @@ export class CampaignsController {
     return this.campaigns.findUpdates(id);
   }
 
+  @Get('projects/:id/contributions/export')
+  @UseGuards(JwtAuthGuard)
+  exportContributions(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.campaigns.exportContributions(id, user.userId);
+  }
+
   // ── Creator ───────────────────────────────────────────────────────────────
 
   @Post('projects')
@@ -81,6 +90,15 @@ export class CampaignsController {
     @Body() dto: CreateUpdateDto,
   ) {
     return this.campaigns.createUpdate(id, user.userId, dto);
+  }
+
+  @Post('projects/:id/resubmit')
+  @UseGuards(JwtAuthGuard)
+  resubmitCampaign(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.campaigns.resubmitCampaign(id, user.userId);
   }
 
   @Get('creator/projects')

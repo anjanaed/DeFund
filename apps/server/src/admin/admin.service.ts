@@ -16,16 +16,16 @@ export class AdminService {
   ) {}
 
   async getStats() {
-    const [pending, flagged, rejected, totalRaisedAgg] = await Promise.all([
+    const [pending, flagged, active, totalRaisedAgg] = await Promise.all([
       this.prisma.campaign.count({ where: { status: CampaignStatus.PENDING } }),
       this.prisma.campaign.count({ where: { status: CampaignStatus.FLAGGED } }),
-      this.prisma.campaign.count({ where: { status: CampaignStatus.FAILED } }),
+      this.prisma.campaign.count({ where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } } }),
       this.prisma.campaign.aggregate({ _sum: { raisedAmount: true } }),
     ]);
     return {
       pending,
       flagged,
-      rejected,
+      active,
       totalRaised: Number(totalRaisedAgg._sum.raisedAmount ?? 0),
     };
   }
@@ -44,6 +44,16 @@ export class AdminService {
         },
       }),
       this.prisma.milestone.findMany({
+        where: {
+          status: {
+            in: [
+              MilestoneStatus.VOTING,
+              MilestoneStatus.APPROVED,
+              MilestoneStatus.REJECTED,
+              MilestoneStatus.COMPLETED,
+            ],
+          },
+        },
         orderBy: { updatedAt: 'desc' },
         take: 10,
         select: {
@@ -154,7 +164,7 @@ export class AdminService {
       where: { id },
       include: {
         creator: true,
-        milestones: { include: { _count: { select: { votes: true } } } },
+        milestones: { include: { _count: { select: { votes: true } } }, orderBy: { order: 'asc' } },
         contributions: {
           include: {
             contributor: { select: { walletAddress: true, name: true } },
@@ -310,7 +320,7 @@ export class AdminService {
         title: true,
         milestones: {
           where: { status: { not: MilestoneStatus.COMPLETED } },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { order: 'asc' },
           take: 1,
           include: { _count: { select: { votes: true } } },
         },
@@ -364,7 +374,10 @@ export class AdminService {
           },
         },
         votes: {
-          include: {
+          select: {
+            id: true,
+            choice: true,
+            weight: true,
             voter: { select: { walletAddress: true, name: true } },
           },
         },
@@ -553,10 +566,10 @@ export class AdminService {
       throw new ForbiddenException('The same admin cannot confirm their own proposal — a different admin must confirm');
     }
 
-    // Fetch milestones in creation order — must match the order passed to createCampaign() on-chain
+    // Fetch milestones in their defined order — must match the order passed to createCampaign() on-chain
     const milestones = await this.prisma.milestone.findMany({
       where: { campaignId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { order: 'asc' },
       select: { id: true },
     });
 
@@ -707,6 +720,40 @@ export class AdminService {
     const milestone = await this.prisma.milestone.findUnique({ where: { id }, select: { title: true } });
     await this.logAudit(callerWalletAddress, 'CONFIRM_RELEASE_FUNDS', 'milestone', id, milestone?.title);
     return result;
+  }
+
+  async requestChanges(campaignId: string, adminWallet: string, message: string): Promise<void> {
+    const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId } });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    if (campaign.status !== CampaignStatus.PENDING) {
+      throw new BadRequestException('Can only request changes on PENDING campaigns');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: CampaignStatus.CHANGES_REQUESTED, reviewMessage: message },
+      }),
+      this.prisma.adminAuditLog.create({
+        data: {
+          adminWallet,
+          action: 'REQUEST_CHANGES',
+          entityType: 'campaign',
+          entityId: campaignId,
+          entityTitle: campaign.title,
+          metadata: { message },
+        },
+      }),
+    ]);
+
+    await this.notifications.createForCampaignCreator(
+      campaignId,
+      NotificationType.CHANGES_REQUESTED,
+      'Changes Requested on Your Campaign',
+      `An admin reviewed "${campaign.title}" and requested changes: ${message.slice(0, 120)}${message.length > 120 ? '…' : ''}`,
+      { campaignId, campaignTitle: campaign.title },
+      `CHANGES_REQUESTED:${campaignId}:${Date.now()}`,
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

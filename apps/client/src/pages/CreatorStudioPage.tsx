@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Link } from 'react-router-dom'
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import AppNavbar from '../components/layout/AppNavbar'
 import CreateCampaignModal from '../components/modals/CreateCampaignModal'
+import EditCampaignModal from '../components/modals/EditCampaignModal'
 import SubmitProofModal from '../components/modals/SubmitProofModal'
 import ProofModal from '../components/common/ProofModal'
 import TxBanner from '../components/common/TxBanner'
@@ -12,6 +13,7 @@ import {
   HiInformationCircle, HiArrowUpTray, HiEye, HiXCircle, HiArrowDownTray,
   HiNoSymbol, HiMegaphone, HiPlusCircle, HiRocketLaunch, HiScale,
   HiHandThumbUp, HiHandThumbDown, HiExclamationTriangle, HiChartPie, HiLockClosed,
+  HiPencilSquare, HiArrowPath,
 } from 'react-icons/hi2'
 import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
@@ -30,10 +32,24 @@ interface Milestone {
 interface CampaignUpdate {
   id: string; title: string; content: string; createdAt: string
 }
+interface ContributionRecord {
+  id: string; amount: string; transactionHash: string; timestamp: string
+  refunded: boolean
+  contributor: { walletAddress: string; name: string | null }
+}
+interface ContributionExportData {
+  paymentToken: string
+  contributions: ContributionRecord[]
+}
 interface CreatorCampaign {
   id: string; title: string; description: string; category: string; status: string
   onChainId: number | null
   raisedAmount: string; goalAmount: string; paymentToken: string
+  deadline?: string | null
+  website?: string | null
+  repositoryUrl?: string | null
+  license?: string | null
+  reviewMessage?: string | null
   _count: { milestones: number; contributions: number }
   milestones: Milestone[]
 }
@@ -51,6 +67,158 @@ const STATUS_COLOR: Record<string, string> = {
   ONGOING: 'neutral',
   APPROVED: 'success', COMPLETED: 'success',
   VOTING: 'warning', REJECTED: 'error',
+}
+
+function AnalyticsPanel({ project, data }: { project: CreatorCampaign; data: ContributionExportData }) {
+  const sorted = [...data.contributions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  )
+
+  let running = 0
+  const cumulativeData = sorted.map(c => {
+    running += Number(c.amount)
+    return { date: c.timestamp.slice(0, 10), cumulative: parseFloat(running.toFixed(4)) }
+  })
+
+  const dailyMap: Record<string, number> = {}
+  sorted.forEach(c => {
+    const d = c.timestamp.slice(0, 10)
+    dailyMap[d] = (dailyMap[d] ?? 0) + Number(c.amount)
+  })
+  const dailyData = Object.entries(dailyMap).map(([date, amount]) => ({
+    date,
+    amount: parseFloat(amount.toFixed(4)),
+  }))
+
+  const totals: Record<string, { walletAddress: string; name: string | null; total: number }> = {}
+  data.contributions.forEach(c => {
+    const k = c.contributor.walletAddress
+    if (!totals[k]) totals[k] = { walletAddress: k, name: c.contributor.name, total: 0 }
+    totals[k].total += Number(c.amount)
+  })
+  const topContributors = Object.values(totals).sort((a, b) => b.total - a.total).slice(0, 5)
+
+  const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`
+
+  const sectionTitle = (label: string) => (
+    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>
+      {label}
+    </div>
+  )
+
+  if (data.contributions.length === 0) {
+    return (
+      <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '8px 0 16px' }}>
+        No contributions yet — charts will appear once the first contribution arrives.
+      </p>
+    )
+  }
+
+  const statusPillStyle = (status: string): React.CSSProperties => {
+    const base: React.CSSProperties = { fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '99px' }
+    switch (status) {
+      case 'ONGOING':    return { ...base, background: 'rgba(99,102,241,0.12)', color: 'var(--color-primary)' }
+      case 'NOT_STARTED': return { ...base, background: 'rgba(100,100,120,0.06)', color: 'var(--color-text-tertiary)' }
+      case 'VOTING':     return { ...base, background: 'rgba(245,158,11,0.12)', color: '#92400e' }
+      case 'APPROVED':
+      case 'COMPLETED':  return { ...base, background: 'rgba(34,197,94,0.12)', color: '#15803d' }
+      case 'REJECTED':   return { ...base, background: 'rgba(239,68,68,0.12)', color: 'var(--color-error)' }
+      default:           return { ...base, background: 'rgba(100,100,120,0.08)', color: 'var(--color-text-secondary)' }
+    }
+  }
+
+  const card: React.CSSProperties = {
+    background: 'var(--color-bg-subtle)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '8px',
+    padding: '16px',
+    minWidth: 0,
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', paddingBottom: '8px' }}>
+      {/* Cumulative Funding */}
+      <div style={card}>
+        {sectionTitle(`Cumulative Funding (${data.paymentToken})`)}
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart data={cumulativeData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id={`grad-${project.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} width={50} />
+            <Tooltip formatter={(v: number) => [`${v} ${data.paymentToken}`, 'Raised']} />
+            <Area type="monotone" dataKey="cumulative" stroke="var(--color-primary)" fill={`url(#grad-${project.id})`} strokeWidth={2} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Daily Contributions */}
+      <div style={card}>
+        {sectionTitle(`Daily Contributions (${data.paymentToken})`)}
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={dailyData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} width={50} />
+            <Tooltip formatter={(v: number) => [`${v} ${data.paymentToken}`, 'Amount']} />
+            <Bar dataKey="amount" fill="var(--color-primary)" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Top Contributors */}
+      <div style={card}>
+        {sectionTitle('Top Contributors')}
+        {topContributors.length === 0 ? (
+          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0 }}>No contributions yet.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <th style={{ textAlign: 'left', padding: '6px 0', color: 'var(--color-text-tertiary)', fontWeight: 600 }}>#</th>
+                <th style={{ textAlign: 'left', padding: '6px 0', color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Contributor</th>
+                <th style={{ textAlign: 'right', padding: '6px 0', color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topContributors.map((c, i) => (
+                <tr key={c.walletAddress} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <td style={{ padding: '7px 0', color: 'var(--color-text-tertiary)' }}>{i + 1}</td>
+                  <td style={{ padding: '7px 0', fontFamily: 'monospace', fontSize: '11px' }}>
+                    {c.name || short(c.walletAddress)}
+                  </td>
+                  <td style={{ padding: '7px 0', textAlign: 'right', fontWeight: 600 }}>
+                    {c.total.toFixed(4)} {data.paymentToken}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Milestone Overview */}
+      <div style={card}>
+        {sectionTitle('Milestone Overview')}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+          {project.milestones.map((m, idx) => (
+            <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>M{idx + 1}: {m.title}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>{fmt(Number(m.amount))}</span>
+                <span style={statusPillStyle(m.status)}>{m.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function CreatorStudioPage() {
@@ -75,6 +243,10 @@ export default function CreatorStudioPage() {
   const [postingUpdate, setPostingUpdate] = useState(false)
   const [updateFeedback, setUpdateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
+  const [editCampaignModal, setEditCampaignModal] = useState<CreatorCampaign | null>(null)
+  const [openAnalyticsCampaignId, setOpenAnalyticsCampaignId] = useState<string | null>(null)
+  const [analyticsMap, setAnalyticsMap] = useState<Record<string, ContributionExportData>>({})
+  const [analyticsLoading, setAnalyticsLoading] = useState<string | null>(null)
 
   const { writeWithSimulate } = useSimulatedWrite()
 
@@ -84,6 +256,14 @@ export default function CreatorStudioPage() {
     apiFetch('/creator/projects')
       .then(r => r.ok ? r.json() : [])
       .then(data => { setCampaigns(data); setLoading(false) })
+  }
+
+  const silentRefreshCampaigns = () => {
+    if (!isAuthenticated) return
+    apiFetch('/creator/projects')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCampaigns(data) })
+      .catch(() => {})
   }
 
   useEffect(() => { loadCampaigns() }, [isAuthenticated])
@@ -119,6 +299,68 @@ export default function CreatorStudioPage() {
       setTxError(errMsg)
       toast.error(errMsg)
     }
+  }
+
+  const handleResubmit = async (campaignId: string) => {
+    try {
+      const res = await apiFetch(`/projects/${campaignId}/resubmit`, { method: 'POST' })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.message || 'Resubmit failed')
+      }
+      toast.success('Campaign resubmitted for review!')
+      loadCampaigns()
+    } catch (err: any) {
+      toast.error(err.message || 'Resubmit failed')
+    }
+  }
+
+  const fetchAnalyticsData = async (campaignId: string): Promise<ContributionExportData | null> => {
+    if (analyticsMap[campaignId]) return analyticsMap[campaignId]
+    setAnalyticsLoading(campaignId)
+    try {
+      const res = await apiFetch(`/projects/${campaignId}/contributions/export`)
+      if (!res.ok) throw new Error('Failed to load contribution data')
+      const data: ContributionExportData = await res.json()
+      setAnalyticsMap(prev => ({ ...prev, [campaignId]: data }))
+      return data
+    } catch {
+      toast.error('Could not load contribution data')
+      return null
+    } finally {
+      setAnalyticsLoading(null)
+    }
+  }
+
+  const toggleAnalytics = (campaignId: string) => {
+    if (openAnalyticsCampaignId === campaignId) { setOpenAnalyticsCampaignId(null); return }
+    setOpenAnalyticsCampaignId(campaignId)
+    fetchAnalyticsData(campaignId)
+    silentRefreshCampaigns()
+  }
+
+  const handleDownloadReport = async (campaign: CreatorCampaign) => {
+    const data = analyticsMap[campaign.id] ?? await fetchAnalyticsData(campaign.id)
+    if (!data) return
+    const token = data.paymentToken
+    const slug = campaign.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    const header = ['Wallet Address', 'Amount', 'Token', 'Transaction Hash', 'Date/Time', 'Refunded']
+    const rows = data.contributions.map(c => [
+      c.contributor.walletAddress,
+      c.amount,
+      token,
+      c.transactionHash,
+      new Date(c.timestamp).toISOString(),
+      c.refunded ? 'Yes' : 'No',
+    ])
+    const csv = [header, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = Object.assign(document.createElement('a'), { href: url, download: `${slug}-contributions.csv` })
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const toggleUpdates = (campaignId: string) => {
@@ -260,15 +502,15 @@ export default function CreatorStudioPage() {
                   <div className="creator-project-info">
                     <div className="creator-project-badges">
                       <span className="creator-category-badge">{project.category}</span>
-                      <span className={`creator-status-badge ${isActive(project) ? 'active' : 'pending'}`}>
-                        {project.status}
+                      <span className={`creator-status-badge ${isActive(project) ? 'active' : project.status === 'CHANGES_REQUESTED' ? 'changes-requested' : 'pending'}`}>
+                        {project.status === 'CHANGES_REQUESTED' ? 'Changes Requested' : project.status}
                       </span>
                     </div>
                     <h2 className="creator-project-title">{project.title}</h2>
                     <p className="creator-project-description">{project.description}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="creator-view-project-btn">
+                    <button className="creator-view-project-btn" onClick={() => handleDownloadReport(project)}>
                       <HiArrowDownTray style={{ marginRight: 8 }} /> Download Report
                     </button>
                     {['PENDING', 'ACTIVE'].includes(project.status) && project.onChainId != null && (
@@ -301,6 +543,47 @@ export default function CreatorStudioPage() {
                     )}
                   </div>
                 </div>
+
+                {project.status === 'CHANGES_REQUESTED' && (
+                  <div style={{
+                    margin: '0 0 16px',
+                    padding: '14px 16px',
+                    background: 'rgba(245,158,11,0.07)',
+                    border: '1px solid rgba(245,158,11,0.3)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <HiExclamationTriangle style={{ flexShrink: 0, color: '#d97706', marginTop: '2px' }} />
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '14px', color: '#92400e', marginBottom: '6px' }}>
+                          Admin Review: Changes Requested
+                        </div>
+                        <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: '1.6' }}>
+                          {project.reviewMessage || 'An admin has reviewed your campaign and requested changes. Please edit and resubmit.'}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', paddingLeft: '26px' }}>
+                      <button
+                        className="creator-view-project-btn"
+                        onClick={() => setEditCampaignModal(project)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <HiPencilSquare size={14} /> Edit Campaign
+                      </button>
+                      <button
+                        className="creator-view-project-btn"
+                        onClick={() => handleResubmit(project.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-primary)', border: 'none', color: 'white' }}
+                      >
+                        <HiArrowPath size={14} /> Resubmit for Review
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="creator-project-stats">
                   <div className="creator-project-stat">
@@ -353,6 +636,29 @@ export default function CreatorStudioPage() {
                     </div>
                   )
                 })()}
+
+                {/* Analytics expandable section */}
+                <div className="creator-milestones-section" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: openAnalyticsCampaignId === project.id ? '16px' : '0' }}>
+                    <h3 className="creator-milestones-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <HiChartBar style={{ color: 'var(--color-primary)' }} /> Analytics
+                    </h3>
+                    <button
+                      className="btn"
+                      onClick={() => toggleAnalytics(project.id)}
+                      style={{ padding: '6px 14px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '6px', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontWeight: '500' }}
+                    >
+                      {openAnalyticsCampaignId === project.id ? 'Hide Analytics' : 'View Analytics'}
+                    </button>
+                  </div>
+                  {openAnalyticsCampaignId === project.id && (
+                    analyticsLoading === project.id
+                      ? <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '16px 0' }}>Loading contribution data…</p>
+                      : analyticsMap[project.id]
+                        ? <AnalyticsPanel project={project} data={analyticsMap[project.id]} />
+                        : null
+                  )}
+                </div>
 
                 {/* Milestones */}
                 <div className="creator-milestones-section">
@@ -439,7 +745,7 @@ export default function CreatorStudioPage() {
                               {/* Locked — waiting on previous milestone to complete */}
                               {m.status === 'NOT_STARTED' && !submittedIds.has(m.id) && (
                                 <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <HiLockClosed /> Unlocks when previous milestone is completed
+                                   Unlocks when previous milestone is completed &nbsp;
                                 </span>
                               )}
 
@@ -611,6 +917,14 @@ export default function CreatorStudioPage() {
       </div>
 
       <CreateCampaignModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={loadCampaigns} />
+      {editCampaignModal && (
+        <EditCampaignModal
+          isOpen
+          campaign={editCampaignModal}
+          onClose={() => setEditCampaignModal(null)}
+          onSuccess={() => { setEditCampaignModal(null); loadCampaigns() }}
+        />
+      )}
       <ProofModal isOpen={showProofModal} onClose={() => setShowProofModal(false)} title={selectedProof?.title || ''} proofContent={selectedProof?.content || ''} />
       {proofModal && (
         <SubmitProofModal isOpen onClose={() => setProofModal(null)} milestoneTitle={proofModal.title} isResubmission={proofModal.isResubmission} isKickoff={proofModal.isKickoff} onSubmit={handleSubmitProof} />

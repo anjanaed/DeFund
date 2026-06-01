@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { HiXMark, HiArrowTopRightOnSquare } from 'react-icons/hi2'
+import { HiXMark, HiArrowTopRightOnSquare, HiDocument } from 'react-icons/hi2'
+import { ipfsUrl as ipfsGatewayUrl, isImageMime } from '../../lib/ipfs'
 
 interface ProofModalProps {
   isOpen: boolean
@@ -10,11 +11,28 @@ interface ProofModalProps {
 
 const IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || 'https://ipfs.io/ipfs/'
 
+interface ProofFile { name: string; cid: string; mimetype?: string }
+interface ProofManifest { note: string; files: ProofFile[] }
+
 function isIpfsCid(s: string): boolean {
   const trimmed = s.trim()
   // CIDv0 starts with Qm (base58, 46 chars) or CIDv1 starts with baf/bafk/bafybei etc.
   return /^Qm[1-9A-HJ-NP-Za-km-z]{44,}$/.test(trimmed) ||
          /^baf[a-zA-Z0-9]{50,}$/.test(trimmed)
+}
+
+// Proofs submitted with file uploads are pinned as a JSON manifest. Parse it so we
+// can render images inline and documents as links instead of showing raw JSON.
+function parseManifest(text: string): ProofManifest | null {
+  try {
+    const obj = JSON.parse(text)
+    if (obj && Array.isArray(obj.files)) {
+      return { note: typeof obj.note === 'string' ? obj.note : '', files: obj.files }
+    }
+  } catch {
+    // not JSON — fall through to plain text rendering
+  }
+  return null
 }
 
 export default function ProofModal({ isOpen, onClose, title, proofContent }: ProofModalProps) {
@@ -103,17 +121,55 @@ export default function ProofModal({ isOpen, onClose, title, proofContent }: Pro
                     Could not fetch content from the gateway. Open the link above to view it directly.
                   </p>
                 )}
-                {fetched && (
-                  <pre style={{
-                    fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                    color: 'var(--color-text-primary)',
-                    background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)',
-                    borderRadius: 8, padding: '14px 16px', margin: 0,
-                    maxHeight: 360, overflowY: 'auto',
-                  }}>
-                    {fetched}
-                  </pre>
-                )}
+                {fetched && (() => {
+                  const manifest = parseManifest(fetched)
+                  if (manifest) {
+                    return (
+                      <div>
+                        {manifest.note && (
+                          <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--color-text-primary)', marginBottom: 12 }}>
+                            {manifest.note}
+                          </p>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {manifest.files.map(f => (
+                            isImageMime(f.mimetype) ? (
+                              <a key={f.cid} href={ipfsGatewayUrl(f.cid)} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={ipfsGatewayUrl(f.cid)}
+                                  alt={f.name}
+                                  style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--color-border)', display: 'block' }}
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                key={f.cid}
+                                href={ipfsGatewayUrl(f.cid)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)', textDecoration: 'none', wordBreak: 'break-all' }}
+                              >
+                                <HiDocument style={{ flexShrink: 0 }} /> {f.name}
+                                <HiArrowTopRightOnSquare size={13} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--color-primary)' }} />
+                              </a>
+                            )
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  }
+                  return (
+                    <pre style={{
+                      fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      color: 'var(--color-text-primary)',
+                      background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)',
+                      borderRadius: 8, padding: '14px 16px', margin: 0,
+                      maxHeight: 360, overflowY: 'auto',
+                    }}>
+                      {fetched}
+                    </pre>
+                  )
+                })()}
               </>
             ) : (
               <>

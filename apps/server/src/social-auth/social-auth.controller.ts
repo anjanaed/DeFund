@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Logger, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { SocialAuthService } from './social-auth.service';
@@ -8,6 +8,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 @Controller('auth')
 export class SocialAuthController {
   private readonly frontendOrigin: string;
+  private readonly logger = new Logger(SocialAuthController.name);
 
   constructor(
     private readonly svc: SocialAuthService,
@@ -36,7 +37,7 @@ export class SocialAuthController {
   @Get('github/initiate')
   @UseGuards(JwtAuthGuard)
   githubInitiate(@CurrentUser() user: any) {
-    return { url: this.svc.githubUrl(user.userId) };
+    return { url: this.svc.githubUrl(user.walletAddress) };
   }
 
   @Get('github/callback')
@@ -48,8 +49,9 @@ export class SocialAuthController {
     try {
       const username = await this.svc.githubCallback(code, state);
       res.send(this.popupHtml('github', username));
-    } catch {
-      res.send(this.popupHtml('github', null, 'GitHub verification failed'));
+    } catch (err) {
+      this.logger.error('GitHub callback error', err instanceof Error ? err.message : err);
+      res.send(this.popupHtml('github', null, err instanceof Error ? err.message : 'GitHub verification failed'));
     }
   }
 
@@ -58,7 +60,7 @@ export class SocialAuthController {
   @Get('discord/initiate')
   @UseGuards(JwtAuthGuard)
   discordInitiate(@CurrentUser() user: any) {
-    return { url: this.svc.discordUrl(user.userId) };
+    return { url: this.svc.discordUrl(user.walletAddress) };
   }
 
   @Get('discord/callback')
@@ -70,8 +72,9 @@ export class SocialAuthController {
     try {
       const username = await this.svc.discordCallback(code, state);
       res.send(this.popupHtml('discord', username));
-    } catch {
-      res.send(this.popupHtml('discord', null, 'Discord verification failed'));
+    } catch (err) {
+      this.logger.error('Discord callback error', err instanceof Error ? err.message : err);
+      res.send(this.popupHtml('discord', null, err instanceof Error ? err.message : 'Discord verification failed'));
     }
   }
 
@@ -80,7 +83,7 @@ export class SocialAuthController {
   @Get('twitter/initiate')
   @UseGuards(JwtAuthGuard)
   twitterInitiate(@CurrentUser() user: any) {
-    return { url: this.svc.twitterUrl(user.userId) };
+    return { url: this.svc.twitterUrl(user.walletAddress) };
   }
 
   @Get('twitter/callback')
@@ -92,8 +95,9 @@ export class SocialAuthController {
     try {
       const username = await this.svc.twitterCallback(code, state);
       res.send(this.popupHtml('twitter', username));
-    } catch {
-      res.send(this.popupHtml('twitter', null, 'Twitter verification failed'));
+    } catch (err) {
+      this.logger.error('Twitter callback error', err instanceof Error ? err.message : err);
+      res.send(this.popupHtml('twitter', null, err instanceof Error ? err.message : 'Twitter verification failed'));
     }
   }
 }

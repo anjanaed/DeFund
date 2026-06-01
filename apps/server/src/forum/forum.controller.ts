@@ -46,20 +46,22 @@ export class ForumController {
   @Patch(':messageId')
   @UseGuards(JwtAuthGuard)
   updateMessage(
+    @Param('id') id: string,
     @Param('messageId') messageId: string,
     @CurrentUser() user: any,
     @Body() dto: UpdateMessageDto,
   ) {
-    return this.forum.updateMessage(messageId, user, dto);
+    return this.forum.updateMessage(id, messageId, user, dto);
   }
 
   @Delete(':messageId')
   @UseGuards(JwtAuthGuard)
   deleteMessage(
+    @Param('id') id: string,
     @Param('messageId') messageId: string,
     @CurrentUser() user: any,
   ) {
-    return this.forum.deleteMessage(messageId, user);
+    return this.forum.deleteMessage(id, messageId, user);
   }
 
   @Post(':messageId/reactions')

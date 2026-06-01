@@ -267,44 +267,61 @@ describe('ForumService', () => {
 
     it('allows the message owner to edit their message', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-1', isDeleted: false }));
-      const updated = makeMessage({ content: 'Edited' });
-      mockPrisma.message.update.mockResolvedValue(updated);
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
+      mockPrisma.contribution.findFirst.mockResolvedValue(null);
+      mockPrisma.message.update.mockResolvedValue(makeMessage({ content: 'Edited' }));
 
-      const result = await service.updateMessage('msg-1', editorUser, { content: 'Edited' });
+      const result = await service.updateMessage('campaign-1', 'msg-1', editorUser, { content: 'Edited' });
 
-      expect(result).toEqual(updated);
+      expect(result).toMatchObject({ content: 'Edited', user: expect.objectContaining({ isCreator: false, isContributor: false }) });
+    });
+
+    it('annotates isCreator when the message author is the campaign creator', async () => {
+      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-1', isDeleted: false }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'user-1' });
+      mockPrisma.contribution.findFirst.mockResolvedValue(null);
+      mockPrisma.message.update.mockResolvedValue(makeMessage({ userId: 'user-1', content: 'Edited' }));
+
+      const result = await service.updateMessage('campaign-1', 'msg-1', editorUser, { content: 'Edited' });
+
+      expect(result.user.isCreator).toBe(true);
     });
 
     it('allows an admin to edit any message', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-99', isDeleted: false }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
+      mockPrisma.contribution.findFirst.mockResolvedValue(null);
       mockPrisma.message.update.mockResolvedValue(makeMessage({ content: 'Admin edit' }));
 
       await expect(
-        service.updateMessage('msg-1', adminUser, { content: 'Admin edit' }),
+        service.updateMessage('campaign-1', 'msg-1', adminUser, { content: 'Admin edit' }),
       ).resolves.toBeDefined();
     });
 
     it('throws ForbiddenException when non-owner non-admin tries to edit', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'owner', isDeleted: false }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
 
       await expect(
-        service.updateMessage('msg-1', { userId: 'stranger', role: UserRole.USER }, { content: 'Hack' }),
+        service.updateMessage('campaign-1', 'msg-1', { userId: 'stranger', role: UserRole.USER }, { content: 'Hack' }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws BadRequestException when trying to edit a deleted message', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-1', isDeleted: true }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
 
       await expect(
-        service.updateMessage('msg-1', editorUser, { content: 'Edit' }),
+        service.updateMessage('campaign-1', 'msg-1', editorUser, { content: 'Edit' }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when message does not exist', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(null);
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
 
       await expect(
-        service.updateMessage('bad-id', editorUser, { content: 'x' }),
+        service.updateMessage('campaign-1', 'bad-id', editorUser, { content: 'x' }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -313,11 +330,13 @@ describe('ForumService', () => {
     const ownerUser = { userId: 'user-1', role: UserRole.USER };
     const adminUser = { userId: 'admin-1', role: UserRole.ADMIN };
 
-    it('soft-deletes the message (sets isDeleted=true, clears content)', async () => {
-      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-1' }));
+    it('allows an admin to soft-delete any message', async () => {
+      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-99' }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
+      mockPrisma.contribution.findFirst.mockResolvedValue(null);
       mockPrisma.message.update.mockResolvedValue(makeMessage({ isDeleted: true, content: '' }));
 
-      await service.deleteMessage('msg-1', ownerUser);
+      await service.deleteMessage('campaign-1', 'msg-1', adminUser);
 
       expect(mockPrisma.message.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -326,25 +345,29 @@ describe('ForumService', () => {
       );
     });
 
-    it('allows an admin to delete any message', async () => {
-      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-99' }));
-      mockPrisma.message.update.mockResolvedValue(makeMessage({ isDeleted: true }));
-
-      await expect(service.deleteMessage('msg-1', adminUser)).resolves.toBeDefined();
-    });
-
-    it('throws ForbiddenException when non-owner non-admin tries to delete', async () => {
-      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'owner' }));
+    it('throws ForbiddenException when a regular user tries to delete their own message', async () => {
+      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'user-1' }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
 
       await expect(
-        service.deleteMessage('msg-1', { userId: 'intruder', role: UserRole.USER }),
+        service.deleteMessage('campaign-1', 'msg-1', ownerUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when a non-admin tries to delete any message', async () => {
+      mockPrisma.message.findUnique.mockResolvedValue(makeMessage({ userId: 'owner' }));
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
+
+      await expect(
+        service.deleteMessage('campaign-1', 'msg-1', { userId: 'intruder', role: UserRole.USER }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws NotFoundException when message does not exist', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(null);
+      mockPrisma.campaign.findUnique.mockResolvedValue({ creatorId: 'creator-99' });
 
-      await expect(service.deleteMessage('bad-id', ownerUser)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteMessage('campaign-1', 'bad-id', ownerUser)).rejects.toThrow(NotFoundException);
     });
   });
 

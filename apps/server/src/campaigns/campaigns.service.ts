@@ -2,13 +2,16 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { IpfsService } from '../ipfs/ipfs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { QueryCampaignsDto } from './dto/query-campaigns.dto';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
-import { CampaignStatus } from '../generated/prisma';
+import { CampaignStatus, NotificationType, Prisma } from '../generated/prisma';
 
 const creatorSelect = {
   id: true,
@@ -24,7 +27,13 @@ const campaignInclude = {
 
 @Injectable()
 export class CampaignsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(CampaignsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ipfs: IpfsService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async findAll(query: QueryCampaignsDto) {
     const { category, status, sort, search, page = 1, limit = 12 } = query;
@@ -104,7 +113,7 @@ export class CampaignsService {
     return this.prisma.milestone.findMany({
       where: { campaignId: id },
       include: { _count: { select: { votes: true } } },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { order: 'asc' },
     });
   }
 
@@ -125,7 +134,44 @@ export class CampaignsService {
   }
 
   async createCampaign(userId: string, dto: CreateCampaignDto) {
-    const { milestones, deadline, onChainId, transactionHash, paymentToken, ...rest } = dto;
+    const {
+      milestones,
+      deadline,
+      onChainId,
+      transactionHash,
+      paymentToken,
+      ipfsHash,
+      images,
+      documents,
+      ...rest
+    } = dto;
+
+    // Pin a metadata JSON to IPFS so the on-chain ipfsHash points at a real,
+    // content-addressed record of the campaign (title, description, media). When
+    // Pinata is not configured we keep any client-provided hash so local dev and
+    // the existing approve flow still work; media columns persist either way.
+    let metadataCid = ipfsHash ?? null;
+    if (this.ipfs.isConfigured()) {
+      try {
+        metadataCid = await this.ipfs.pinJSON(
+          {
+            name: rest.title,
+            description: rest.description,
+            category: rest.category,
+            images: images ?? [],
+            documents: documents ?? [],
+            website: rest.website ?? null,
+            repository: rest.repositoryUrl ?? null,
+          },
+          `campaign:${rest.title}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to pin campaign metadata: ${(err as Error).message}`,
+        );
+      }
+    }
+
     return this.prisma.campaign.create({
       data: {
         ...rest,
@@ -135,9 +181,13 @@ export class CampaignsService {
         onChainId: onChainId ?? null,
         transactionHash: transactionHash ?? null,
         paymentToken: paymentToken ?? 'ETH',
+        ipfsHash: metadataCid,
+        images: images ?? [],
+        documents: (documents ?? []) as unknown as Prisma.InputJsonValue,
         milestones: {
-          create: milestones.map(m => ({
+          create: milestones.map((m, idx) => ({
             ...m,
+            order: idx,
             deadline: m.deadline ? new Date(m.deadline) : undefined,
           })),
         },
@@ -150,8 +200,8 @@ export class CampaignsService {
   async updateCampaign(id: string, userId: string, dto: UpdateCampaignDto) {
     const campaign = await this.ensureExists(id);
     if (campaign.creatorId !== userId) throw new ForbiddenException();
-    if (campaign.status !== CampaignStatus.PENDING) {
-      throw new ForbiddenException('Can only edit PENDING campaigns');
+    if (campaign.status !== CampaignStatus.PENDING && campaign.status !== CampaignStatus.CHANGES_REQUESTED) {
+      throw new ForbiddenException('Can only edit campaigns that are PENDING or awaiting changes');
     }
     const { deadline, ...rest } = dto;
     if (deadline !== undefined) {
@@ -169,6 +219,25 @@ export class CampaignsService {
     });
   }
 
+  async resubmitCampaign(id: string, userId: string): Promise<void> {
+    const campaign = await this.ensureExists(id);
+    if (campaign.creatorId !== userId) throw new ForbiddenException();
+    if (campaign.status !== CampaignStatus.CHANGES_REQUESTED) {
+      throw new ForbiddenException('Campaign is not awaiting changes');
+    }
+    await this.prisma.campaign.update({
+      where: { id },
+      data: { status: CampaignStatus.PENDING, reviewMessage: null },
+    });
+    await this.notifications.notifyAdmins(
+      NotificationType.CAMPAIGN_APPROVAL_PROPOSED,
+      'Campaign Resubmitted for Review',
+      `"${campaign.title}" has been updated by the creator and is ready for re-review.`,
+      { campaignId: id, campaignTitle: campaign.title },
+      `RESUBMITTED:${id}:${Date.now()}`,
+    );
+  }
+
   async findCreatorProjects(userId: string) {
     return this.prisma.campaign.findMany({
       where: { creatorId: userId },
@@ -176,7 +245,7 @@ export class CampaignsService {
         _count: { select: { milestones: true, contributions: true } },
         milestones: {
           select: { id: true, title: true, status: true, amount: true, onChainId: true, proofUrl: true, submissionCount: true },
-          orderBy: { createdAt: 'asc' as const },
+          orderBy: { order: 'asc' as const },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -205,6 +274,26 @@ export class CampaignsService {
       totalContributors,
       successRate: finishedCampaigns > 0 ? Math.round((completedCampaigns / finishedCampaigns) * 100) : 0,
     };
+  }
+
+  async exportContributions(campaignId: string, userId: string) {
+    const campaign = await this.ensureExists(campaignId);
+    if (campaign.creatorId !== userId) throw new ForbiddenException();
+
+    const contributions = await this.prisma.contribution.findMany({
+      where: { campaignId },
+      select: {
+        id: true,
+        amount: true,
+        transactionHash: true,
+        timestamp: true,
+        refunded: true,
+        contributor: { select: { walletAddress: true, name: true } },
+      },
+      orderBy: { timestamp: 'asc' },
+    });
+
+    return { paymentToken: campaign.paymentToken, contributions };
   }
 
   private async ensureExists(id: string) {

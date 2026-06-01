@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
-import { HiArrowLeft, HiClock, HiDocumentText, HiCurrencyDollar, HiCheckCircle, HiXCircle, HiExclamationTriangle, HiUserCircle } from 'react-icons/hi2'
+import { HiArrowLeft, HiClock, HiDocumentText, HiCurrencyDollar, HiExclamationTriangle, HiUserCircle, HiHandThumbUp, HiHandThumbDown, HiScale } from 'react-icons/hi2'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
 import LoadingScreen from '../../components/common/LoadingScreen'
@@ -176,6 +176,49 @@ export default function AdminMilestoneDetailsPage() {
             )}
           </div>
 
+          {milestone.votes && milestone.votes.length > 0 && (() => {
+            const approveWeight = milestone.votes.filter((v: any) => v.choice).reduce((s: number, v: any) => s + Number(v.weight ?? 0), 0)
+            const rejectWeight  = milestone.votes.filter((v: any) => !v.choice).reduce((s: number, v: any) => s + Number(v.weight ?? 0), 0)
+            const totalWeight   = approveWeight + rejectWeight
+            const approvePct    = totalWeight > 0 ? Math.round((approveWeight / totalWeight) * 100) : 0
+            const rejectPct     = totalWeight > 0 ? Math.round((rejectWeight  / totalWeight) * 100) : 0
+            return (
+              <div className="admin-table-card" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <HiScale style={{ color: 'var(--color-primary)' }} /> Vote Tally
+                </h3>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '10px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#15803d', fontWeight: 600 }}>
+                    <HiHandThumbUp size={14} /> Approve — {approvePct}%
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-error)', fontWeight: 600 }}>
+                    Reject — {rejectPct}% <HiHandThumbDown size={14} />
+                  </span>
+                </div>
+
+                <div style={{ height: '10px', borderRadius: '5px', background: 'rgba(239,68,68,0.15)', overflow: 'hidden', marginBottom: '16px' }}>
+                  <div style={{ height: '100%', width: `${approvePct}%`, background: '#22c55e', borderRadius: '5px', transition: 'width 0.4s' }} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '13px' }}>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '18px', color: '#15803d' }}>{approvePct}%</div>
+                    <div style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }}>Approve</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--color-text-primary)' }}>{milestone.votes.length}</div>
+                    <div style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }}>Total Votes</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '18px', color: 'var(--color-error)' }}>{rejectPct}%</div>
+                    <div style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }}>Reject</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {milestone.votes && milestone.votes.length > 0 && (
             <div className="admin-table-card">
               <div className="admin-table-header">
@@ -185,6 +228,7 @@ export default function AdminMilestoneDetailsPage() {
                 <thead>
                   <tr>
                     <th>Voter</th>
+                    <th>Weight</th>
                     <th>Choice</th>
                   </tr>
                 </thead>
@@ -192,7 +236,10 @@ export default function AdminMilestoneDetailsPage() {
                   {milestone.votes.map((v: any) => (
                     <tr key={v.id}>
                       <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
-                        {v.voter?.walletAddress?.slice(0, 8)}...{v.voter?.walletAddress?.slice(-4)}
+                        {v.voter?.name || `${v.voter?.walletAddress?.slice(0, 8)}…${v.voter?.walletAddress?.slice(-4)}`}
+                      </td>
+                      <td style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+                        {Number(v.weight ?? 0).toLocaleString()}
                       </td>
                       <td>
                         <span className={`admin-badge ${v.choice ? 'success' : 'error'}`}>

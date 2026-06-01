@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { HiPaperAirplane, HiPencil, HiTrash, HiArrowUturnLeft, HiCheck, HiXMark, HiHandThumbUp, HiHandThumbDown } from 'react-icons/hi2'
+import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import Spinner from '../common/Spinner'
@@ -95,7 +96,7 @@ export default function ProjectForum({ projectId }: Props) {
       setMessages((prev) => [...prev, ...data.messages])
       setNextCursor(data.nextCursor)
     } catch (e: any) {
-      setError(e.message || 'Failed to load more')
+      toast.error(e.message || 'Failed to load more messages')
     } finally {
       setLoadingMore(false)
     }
@@ -130,7 +131,6 @@ export default function ProjectForum({ projectId }: Props) {
   const handlePost = async () => {
     if (!composer.trim() || !isAuthenticated) return
     setPosting(true)
-    setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum`, {
         method: 'POST',
@@ -144,7 +144,7 @@ export default function ProjectForum({ projectId }: Props) {
       upsertTopLevel({ ...msg, replies: [], _count: msg._count ?? { replies: 0 } })
       setComposer('')
     } catch (e: any) {
-      setError(e.message || 'Failed to post')
+      toast.error(e.message || 'Failed to post message')
     } finally {
       setPosting(false)
     }
@@ -153,7 +153,6 @@ export default function ProjectForum({ projectId }: Props) {
   const handleReplySubmit = async (parentId: string) => {
     if (!replyText.trim() || !isAuthenticated) return
     setBusyMessageId(parentId)
-    setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum`, {
         method: 'POST',
@@ -168,7 +167,7 @@ export default function ProjectForum({ projectId }: Props) {
       setReplyText('')
       setReplyTo(null)
     } catch (e: any) {
-      setError(e.message || 'Failed to reply')
+      toast.error(e.message || 'Failed to post reply')
     } finally {
       setBusyMessageId(null)
     }
@@ -177,7 +176,6 @@ export default function ProjectForum({ projectId }: Props) {
   const handleEditSubmit = async (messageId: string) => {
     if (!editText.trim() || !isAuthenticated) return
     setBusyMessageId(messageId)
-    setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum/${messageId}`, {
         method: 'PATCH',
@@ -192,7 +190,7 @@ export default function ProjectForum({ projectId }: Props) {
       setEditingId(null)
       setEditText('')
     } catch (e: any) {
-      setError(e.message || 'Failed to edit')
+      toast.error(e.message || 'Failed to edit message')
     } finally {
       setBusyMessageId(null)
     }
@@ -201,7 +199,6 @@ export default function ProjectForum({ projectId }: Props) {
   const handleDelete = async (messageId: string) => {
     if (!isAuthenticated) return
     setBusyMessageId(messageId)
-    setError('')
     try {
       const res = await apiFetch(`/projects/${projectId}/forum/${messageId}`, {
         method: 'DELETE',
@@ -213,7 +210,7 @@ export default function ProjectForum({ projectId }: Props) {
       const msg: Message = await res.json()
       replaceMessage(msg)
     } catch (e: any) {
-      setError(e.message || 'Failed to delete')
+      toast.error(e.message || 'Failed to delete message')
     } finally {
       setBusyMessageId(null)
     }
@@ -239,15 +236,14 @@ export default function ProjectForum({ projectId }: Props) {
       })
       if (!res.ok) throw new Error('Reaction failed')
     } catch (e: any) {
-      // Roll back
       replaceMessage(target)
-      setError(e.message || 'Reaction failed')
+      toast.error(e.message || 'Reaction failed')
     }
   }
 
   const renderMessage = (m: Message, isReply = false) => {
     const canEdit = !m.isDeleted && (user?.id === m.user.id || isAdmin)
-    const canDelete = !m.isDeleted && (user?.id === m.user.id || isAdmin)
+    const canDelete = !m.isDeleted && isAdmin
     const wasEdited = !m.isDeleted && new Date(m.updatedAt).getTime() - new Date(m.createdAt).getTime() > 1000
     const likeCount = m.reactions.filter((r) => r.type === 'LIKE').length
     const dislikeCount = m.reactions.filter((r) => r.type === 'DISLIKE').length

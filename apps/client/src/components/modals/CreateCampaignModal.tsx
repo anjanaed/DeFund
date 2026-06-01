@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { HiXMark, HiPlus, HiCheckCircle, HiExclamationTriangle } from 'react-icons/hi2'
+import { HiXMark, HiPlus, HiCheckCircle, HiExclamationTriangle, HiDocument } from 'react-icons/hi2'
 import { FaXTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
 import { keccak256, toBytes } from 'viem'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
+import FileUpload from '../common/FileUpload'
+import { uploadFileToIpfs, type UploadedMedia } from '../../lib/ipfs'
+
+// A file chosen locally, not yet pinned. id gives stable React keys + removal.
+type LocalFile = { id: string; file: File }
 
 const OSS_LICENSES = [
   'MIT', 'Apache-2.0', 'GPL-3.0', 'AGPL-3.0', 'GPL-2.0',
@@ -48,10 +53,12 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     { title: '', description: '', amount: '', deadline: '' },
   ])
 
-  const [txStatus, setTxStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
+  // Files chosen locally; only pinned to IPFS when the campaign is submitted.
+  const [images, setImages] = useState<LocalFile[]>([])
+  const [documents, setDocuments] = useState<LocalFile[]>([])
+
+  const [txStatus, setTxStatus] = useState<'idle' | 'uploading' | 'saving' | 'done' | 'error'>('idle')
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
-  const [socialError, setSocialError] = useState<string | null>(null)
 
   // Auto-fill the last milestone's deadline with the campaign deadline
   useEffect(() => {
@@ -69,7 +76,6 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
 
   const handleConnect = async (platform: 'twitter' | 'discord' | 'github') => {
     if (socials[platform].connected || !isAuthenticated) return
-    setSocialError(null)
     setConnectingPlatform(platform)
     const popup = window.open('', `${platform}-oauth`, 'width=600,height=700,left=400,top=100')
     try {
@@ -78,18 +84,17 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
         popup?.close()
         setConnectingPlatform(null)
         if (res.status === 401) {
-          setSocialError('Session expired — please disconnect your wallet and reconnect, then try again.')
+          toast.error('Session expired — please disconnect your wallet and reconnect, then try again.')
         } else {
           const err = await res.json().catch(() => ({}))
-          setSocialError(`Could not start ${platform} auth: ${err.message || res.status}`)
+          toast.error(`Could not start ${platform} auth: ${err.message || res.status}`)
         }
         return
       }
       const { url } = await res.json()
       if (popup) popup.location.href = url
-      const expectedOrigin = import.meta.env.VITE_API_URL
-        ? new URL(import.meta.env.VITE_API_URL).origin
-        : window.location.origin
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+      const expectedOrigin = new URL(apiBase).origin
       const handler = (e: MessageEvent) => {
         if (e.origin !== expectedOrigin) return
         if (e.data?.provider !== platform) return
@@ -100,14 +105,14 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
           setSocials(prev => ({ ...prev, [platform]: { connected: true, username: e.data.username } }))
           toast.success(`Connected as ${e.data.username}`)
         } else {
-          setSocialError(`${platform} verification failed: ${e.data.error || 'unknown error'}`)
+          toast.error(`${platform} verification failed: ${e.data.error || 'unknown error'}`)
         }
       }
       window.addEventListener('message', handler)
     } catch (err: any) {
       popup?.close()
       setConnectingPlatform(null)
-      setSocialError(`${platform} auth error: ${err.message}`)
+      toast.error(`${platform} auth error: ${err.message}`)
     }
   }
 
@@ -130,6 +135,22 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
   const removeMilestone = (index: number) => {
     if (milestones.length > 1) setMilestones(milestones.filter((_, i) => i !== index))
   }
+
+  const handleImagesSelected = (files: File[]) =>
+    setImages(prev => [...prev, ...files.map(file => ({ id: crypto.randomUUID(), file }))])
+  const handleDocumentsSelected = (files: File[]) =>
+    setDocuments(prev => [...prev, ...files.map(file => ({ id: crypto.randomUUID(), file }))])
+  const removeImage = (id: string) => setImages(prev => prev.filter(m => m.id !== id))
+  const removeDocument = (id: string) => setDocuments(prev => prev.filter(m => m.id !== id))
+
+  // Local object URLs for image previews; revoked when the set changes / unmounts.
+  const imagePreviews = useMemo(
+    () => images.map(img => ({ id: img.id, name: img.file.name, url: URL.createObjectURL(img.file) })),
+    [images],
+  )
+  useEffect(() => {
+    return () => imagePreviews.forEach(p => URL.revokeObjectURL(p.url))
+  }, [imagePreviews])
 
   const totalMilestoneAmount = milestones.reduce(
     (sum, m) => sum + (parseFloat(m.amount) || 0),
@@ -195,7 +216,27 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
     }
 
     try {
-      const ipfsHash = keccak256(toBytes(formData.title + formData.description))
+      // Fallback only: the server pins a real metadata CID to IPFS when Pinata is
+      // configured and overrides this. It keeps the approve flow working in local
+      // dev where pinning may be disabled.
+      const fallbackHash = keccak256(toBytes(formData.title + formData.description))
+
+      // Pin media to IPFS only now — after the form passed validation above — so
+      // abandoned or invalid drafts never push files to IPFS.
+      setTxStatus('uploading')
+      const uploadedImages: UploadedMedia[] = []
+      const uploadedDocuments: UploadedMedia[] = []
+      try {
+        for (const img of images) uploadedImages.push(await uploadFileToIpfs(img.file))
+        for (const doc of documents) uploadedDocuments.push(await uploadFileToIpfs(doc.file))
+      } catch (uploadErr: any) {
+        setTxStatus('error')
+        const msg = uploadErr?.message || 'Failed to upload files to IPFS'
+        setErrorMsg(msg)
+        toast.error(msg)
+        return
+      }
+
       setTxStatus('saving')
 
       const res = await apiFetch('/projects', {
@@ -210,7 +251,13 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
           repositoryUrl: formData.repositoryUrl,
           license: formData.license,
           paymentToken: isUsdc ? 'USDC' : 'ETH',
-          ipfsHash,
+          ipfsHash: fallbackHash,
+          images: uploadedImages.map(m => m.cid),
+          documents: uploadedDocuments.map(m => ({
+            name: m.name,
+            cid: m.cid,
+            mimetype: m.mimetype,
+          })),
           milestones: milestones.map(m => ({
             title: m.title,
             description: m.description,
@@ -235,21 +282,23 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
       setFormData({ title: '', description: '', category: 'DeFi', repositoryUrl: '', license: '', website: '', deadline: '', paymentToken: '0' })
       setMilestones([{ title: '', description: '', amount: '', deadline: '' }])
       setSocials({ twitter: { connected: false, username: '' }, discord: { connected: false, username: '' }, github: { connected: false, username: '' } })
+      setImages([])
+      setDocuments([])
+
     } catch (err: any) {
       console.error(err)
       setTxStatus('error')
-      const msg = err?.message || 'Submission failed'
-      setErrorMsg(msg)
-      toast.error(msg)
+      toast.error(err?.message || 'Submission failed')
     }
   }
 
   if (!isOpen) return null
 
-  const isSubmitting = txStatus === 'saving'
+  const isSubmitting = txStatus === 'uploading' || txStatus === 'saving'
 
   const statusLabel: Record<typeof txStatus, string> = {
     idle: 'Submit for Review',
+    uploading: 'Uploading files to IPFS...',
     saving: 'Submitting...',
     done: 'Submitted for Review!',
     error: 'Submit for Review',
@@ -292,6 +341,79 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
                   name="description" className="form-textarea"
                   placeholder="Describe your project..." rows={4}
                   value={formData.description} onChange={handleInputChange} required
+                />
+              </div>
+
+              {/* Media & documents — pinned to IPFS, only the CID is stored */}
+              <div className="form-group">
+                <label className="form-label">
+                  Images{' '}
+                  <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span>
+                </label>
+                {imagePreviews.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                    {imagePreviews.map(img => (
+                      <div key={img.id} style={{ position: 'relative' }}>
+                        <img
+                          src={img.url}
+                          alt={img.name}
+                          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-border)' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(img.id)}
+                          aria-label="Remove image"
+                          style={{ position: 'absolute', top: -8, right: -8, background: 'var(--color-error)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <HiXMark size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <FileUpload
+                  label="Upload images"
+                  accept="image/*"
+                  multiple
+                  disabled={isSubmitting}
+                  onSelect={handleImagesSelected}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Documents{' '}
+                  <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>(optional)</span>
+                </label>
+                {documents.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                    {documents.map(doc => (
+                      <div
+                        key={doc.id}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)' }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>
+                          <HiDocument style={{ flexShrink: 0 }} /> {doc.file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeDocument(doc.id)}
+                          className="remove-milestone-btn"
+                          aria-label="Remove document"
+                        >
+                          <HiXMark />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <FileUpload
+                  label="Upload documents"
+                  accept=".pdf,.doc,.docx,.txt,.md"
+                  multiple
+                  disabled={isSubmitting}
+                  onSelect={handleDocumentsSelected}
+                  hint="Whitepaper, pitch deck, or specs. PDF, DOC, DOCX, TXT, or MD up to 10 MB each."
                 />
               </div>
 
@@ -365,11 +487,6 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
                     )
                   })}
                 </div>
-                {socialError && (
-                  <p style={{ fontSize: '12px', color: 'var(--color-error)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <HiExclamationTriangle /> {socialError}
-                  </p>
-                )}
               </div>
 
               <div className="form-group">
@@ -509,27 +626,6 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
             </div>
           </form>
         </div>
-
-        {/* Error banner */}
-        {(txStatus === 'error' || errorMsg) && (
-          <div
-            style={{
-              margin: '0 24px',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              color: 'var(--color-error)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-            }}
-          >
-            <HiExclamationTriangle />
-            {errorMsg || 'Transaction failed. Please try again.'}
-          </div>
-        )}
 
         {isSubmitting && (
           <div

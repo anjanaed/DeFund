@@ -4,13 +4,15 @@ import { usePublicClient, useAccount } from 'wagmi'
 import { parseEther, parseUnits, keccak256, toBytes, decodeEventLog } from 'viem'
 import { useSimulatedWrite } from '../../hooks/useSimulatedWrite'
 import { toast } from 'sonner'
-import { HiArrowLeft, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiCurrencyDollar, HiExclamationTriangle, HiUserCircle, HiClock } from 'react-icons/hi2'
+import { HiArrowLeft, HiCheckCircle, HiXCircle, HiGlobeAlt, HiDocumentText, HiCurrencyDollar, HiExclamationTriangle, HiUserCircle, HiClock, HiPhoto, HiArrowTopRightOnSquare } from 'react-icons/hi2'
 import { FaTwitter, FaDiscord, FaGithub } from 'react-icons/fa6'
 import RepoIcon from '../../components/common/RepoIcon'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/contracts'
 import { apiFetch } from '../../lib/api'
+import { ipfsUrl, isImageMime } from '../../lib/ipfs'
 import LoadingScreen from '../../components/common/LoadingScreen'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import RequestChangesModal from '../../components/modals/RequestChangesModal'
 import { parseContractError } from '../../lib/errors'
 import '../../Admin.css'
 
@@ -28,6 +30,7 @@ export default function AdminProjectReviewPage() {
   const [approvalProposal, setApprovalProposal] = useState<any>(null)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [showCancelProposalConfirm, setShowCancelProposalConfirm] = useState(false)
+  const [showRequestChanges, setShowRequestChanges] = useState(false)
 
   const loadProposals = async () => {
     const [flag, approval] = await Promise.all([
@@ -76,6 +79,7 @@ export default function AdminProjectReviewPage() {
     if (!campaign?.ipfsHash) { toast.error('Campaign has no ipfsHash.'); return }
     if (!campaign?.deadline) { toast.error('Campaign has no deadline set.'); return }
     if (!campaign.creator?.walletAddress) { toast.error('Campaign creator wallet address is missing.'); return }
+    if (!publicClient) { toast.error('Network client not ready. Please try again.'); return }
     setPending(true)
     try {
       const isUsdc = campaign.paymentToken === 'USDC'
@@ -187,6 +191,8 @@ export default function AdminProjectReviewPage() {
   }
 
   const isPending = campaign.status === 'PENDING'
+  const isChangesRequested = campaign.status === 'CHANGES_REQUESTED'
+  const statusBadgeClass = isPending || isChangesRequested ? 'warning' : campaign.status === 'ACTIVE' ? 'success' : 'error'
   const pendingApprovalProposal = approvalProposal && !approvalProposal.executed
   const isApprovalProposer = pendingApprovalProposal && connectedAddress?.toLowerCase() === approvalProposal.proposer?.toLowerCase()
 
@@ -211,8 +217,8 @@ export default function AdminProjectReviewPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
             <h1 className="admin-page-title" style={{ marginBottom: 0 }}>{campaign.title}</h1>
-            <span className={`admin-badge ${isPending ? 'warning' : campaign.status === 'ACTIVE' ? 'success' : 'error'}`}>
-              {campaign.status}
+            <span className={`admin-badge ${statusBadgeClass}`}>
+              {isChangesRequested ? 'Changes Requested' : campaign.status}
             </span>
           </div>
           <p className="admin-page-subtitle">
@@ -263,6 +269,7 @@ export default function AdminProjectReviewPage() {
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <button className="btn" onClick={handleReject} disabled={pending} style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Reject</button>
+              <button className="btn" onClick={() => setShowRequestChanges(true)} disabled={pending} style={{ background: 'white', border: '1px solid #f59e0b', color: '#d97706', padding: '8px 16px', borderRadius: '8px', fontWeight: '600', opacity: pending ? 0.5 : 1 }}>Request Changes</button>
 
               {/* Step 1 — Propose Approval (no proposal yet) */}
               {!pendingApprovalProposal && (
@@ -345,12 +352,74 @@ export default function AdminProjectReviewPage() {
               ))}
             </div>
           </div>
+
+          {/* Media & Documents — only when the creator uploaded something */}
+          {((campaign.images?.length > 0) || (campaign.documents?.length > 0)) && (
+            <div className="admin-table-card" style={{ padding: '24px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <HiPhoto /> Media &amp; Documents
+              </h3>
+
+              {campaign.images?.length > 0 && (
+                <div style={{ marginBottom: campaign.documents?.length > 0 ? '24px' : 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>
+                    Images ({campaign.images.length})
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
+                    {campaign.images.map((cid: string, i: number) => (
+                      <a key={i} href={ipfsUrl(cid)} target="_blank" rel="noreferrer"
+                        style={{ display: 'block', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--color-border)', aspectRatio: '1', background: 'var(--color-bg-subtle)', position: 'relative' }}
+                        title="Open full size"
+                      >
+                        <img
+                          src={ipfsUrl(cid)}
+                          alt={`Campaign image ${i + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {campaign.documents?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>
+                    Documents ({campaign.documents.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {campaign.documents.map((doc: any, i: number) => (
+                      <a key={i} href={ipfsUrl(doc.cid)} target="_blank" rel="noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: '8px', background: 'var(--color-bg-subtle)', textDecoration: 'none', color: 'var(--color-text-primary)' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          {isImageMime(doc.mimetype) ? (
+                            <img src={ipfsUrl(doc.cid)} alt={doc.name} style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: '4px', flexShrink: 0 }}>
+                              <HiDocumentText size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                            </div>
+                          )}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '14px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || 'Untitled'}</div>
+                            {doc.mimetype && <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>{doc.mimetype}</div>}
+                          </div>
+                        </div>
+                        <HiArrowTopRightOnSquare size={15} style={{ flexShrink: 0, color: 'var(--color-text-secondary)' }} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div className="admin-table-card" style={{ padding: '24px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)' }}>Project Links</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '20px' }}>
               {[
                 { icon: <HiGlobeAlt />, label: 'Website', url: campaign.website },
                 { icon: <RepoIcon url={campaign.repositoryUrl} size={15} />, label: 'Repository', url: campaign.repositoryUrl },
@@ -374,7 +443,7 @@ export default function AdminProjectReviewPage() {
             </div>
 
             {campaign.license && (
-              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '20px', paddingBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <HiDocumentText /> License
                 </div>
@@ -435,6 +504,16 @@ export default function AdminProjectReviewPage() {
         </div>
       </div>
 
+      <RequestChangesModal
+        isOpen={showRequestChanges}
+        onClose={() => setShowRequestChanges(false)}
+        campaignId={id!}
+        campaignTitle={campaign.title}
+        onSuccess={() => {
+          setCampaign((c: any) => ({ ...c, status: 'CHANGES_REQUESTED' }))
+          setShowRequestChanges(false)
+        }}
+      />
       <ConfirmModal
         isOpen={showCancelConfirm}
         onClose={() => setShowCancelConfirm(false)}
