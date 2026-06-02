@@ -6,10 +6,9 @@ import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../../config/con
 
 interface Props {
   milestoneOnChainId: number
+  campaignOnChainId?: number | null
   paymentToken?: string
 }
-
-const MIN_QUORUM_PERCENTAGE = 30n
 
 function formatCountdown(endTimeSec: bigint): string {
   const now = BigInt(Math.floor(Date.now() / 1000))
@@ -23,7 +22,7 @@ function formatCountdown(endTimeSec: bigint): string {
   return `${m}m left`
 }
 
-export default function MilestoneVotingStatus({ milestoneOnChainId, paymentToken = 'ETH' }: Props) {
+export default function MilestoneVotingStatus({ milestoneOnChainId, campaignOnChainId, paymentToken = 'ETH' }: Props) {
   const { address } = useAccount()
   const [, setTick] = useState(0)
 
@@ -47,6 +46,14 @@ export default function MilestoneVotingStatus({ milestoneOnChainId, paymentToken
     query: { enabled: !!address },
   })
 
+  const { data: contributorAmount } = useReadContract({
+    address: CAMPAIGN_FACTORY_ADDRESS,
+    abi: CAMPAIGN_FACTORY_ABI,
+    functionName: 'getContributorAmount',
+    args: address && campaignOnChainId != null ? [BigInt(campaignOnChainId), address] : undefined,
+    query: { enabled: !!address && campaignOnChainId != null },
+  })
+
   if (!milestoneData) return null
 
   const m = milestoneData as unknown as readonly [
@@ -59,12 +66,9 @@ export default function MilestoneVotingStatus({ milestoneOnChainId, paymentToken
   const raisedAtStart = m[10]
 
   const decimals = paymentToken === 'USDC' ? 6 : 18
-  const totalVotes    = votesFor + votesAgainst
-  const quorumRequired = (raisedAtStart * MIN_QUORUM_PERCENTAGE) / 100n
-  const quorumReached  = quorumRequired > 0n && totalVotes >= quorumRequired
-  const quorumPct      = quorumRequired === 0n ? 0 : Math.min(100, Number((totalVotes * 100n) / quorumRequired))
-  const forPct         = totalVotes === 0n ? 0 : Math.round(Number((votesFor * 100n) / totalVotes))
-  const againstPct     = 100 - forPct
+  const totalVotes = votesFor + votesAgainst
+  const forPct     = totalVotes === 0n ? 0 : Math.round(Number((votesFor * 100n) / totalVotes))
+  const againstPct = 100 - forPct
 
   const fmt = (v: bigint) =>
     Number(formatUnits(v, decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })
@@ -122,34 +126,35 @@ export default function MilestoneVotingStatus({ milestoneOnChainId, paymentToken
         </div>
       )}
 
-      {/* Quorum — text only, no bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginTop: 12, paddingTop: 10,
-        borderTop: '1px solid var(--color-border)',
-        fontSize: 12,
-      }}>
-        <span style={{ color: 'var(--color-text-secondary)' }}>
-          Quorum <span style={{ color: 'var(--color-text-tertiary)' }}>(30% required)</span>
-        </span>
-        <span style={{
-          fontWeight: 700,
-          color: quorumReached ? '#16a34a' : 'var(--color-text-primary)',
-          display: 'flex', alignItems: 'center', gap: 4,
-        }}>
-          {quorumReached && <HiCheckCircle size={13} color="#16a34a" />}
-          {quorumPct}% {quorumReached ? 'met' : 'reached'}
-        </span>
-      </div>
-
       {/* Voted status */}
       {address && hasVoted !== undefined && (
         <div style={{
-          marginTop: 8, fontSize: 12, fontWeight: 600,
+          marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-border)',
+          fontSize: 12, fontWeight: 600,
           color: hasVoted ? '#16a34a' : 'var(--color-text-tertiary)',
           display: 'flex', alignItems: 'center', gap: 4,
         }}>
           {hasVoted ? <><HiCheckCircle size={13} /> You have voted</> : '— You have not voted yet'}
+        </div>
+      )}
+
+      {/* Voting power */}
+      {address && contributorAmount != null && (contributorAmount as bigint) > 0n && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginTop: 8, paddingTop: 8,
+          borderTop: '1px solid var(--color-border)',
+          fontSize: 12,
+        }}>
+          <span style={{ color: 'var(--color-text-secondary)' }}>Your voting power</span>
+          <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            {fmt(contributorAmount as bigint)} {paymentToken}
+            {raisedAtStart > 0n && (
+              <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>
+                ({Math.round(Number(((contributorAmount as bigint) * 100n) / raisedAtStart))}%)
+              </span>
+            )}
+          </span>
         </div>
       )}
     </div>

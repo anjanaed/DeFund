@@ -12,6 +12,7 @@ import { AdminService } from './admin.service';
 import { FlagCampaignDto } from './dto/flag-campaign.dto';
 import { ProposeRoleChangeDto } from './dto/propose-role-change.dto';
 import { RequestChangesDto } from './dto/request-changes.dto';
+import { ProposeRefundDto } from './dto/propose-refund.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -121,24 +122,37 @@ export class AdminController {
     return this.admin.getFlagProposalForCampaign(id);
   }
 
-  @Post('projects/:id/block')
-  blockCampaign(@Param('id') id: string) {
-    return this.admin.blockCampaign(id);
+  @Post('projects/:id/unflag')
+  unflagCampaign(@Param('id') id: string) {
+    return this.admin.unflagCampaign(id);
   }
 
   @Post('projects/:id/propose-refund')
-  proposeRefund(@Param('id') id: string) {
-    return this.admin.proposeRefund(id);
+  proposeRefund(@Param('id') id: string, @Body() dto: ProposeRefundDto) {
+    return this.admin.proposeRefund(id, dto.reason);
   }
 
   @Post('projects/:id/approve-refund')
-  approveRefund(@Param('id') id: string) {
-    return this.admin.approveRefund(id);
+  approveRefund(
+    @Param('id') id: string,
+    @CurrentUser() user: { walletAddress: string },
+  ) {
+    return this.admin.approveRefundAudited(id, user.walletAddress);
   }
 
   @Get('refund-proposals')
   getRefundProposals() {
     return this.admin.getRefundProposals();
+  }
+
+  @Get('flag-proposals')
+  getFlagProposals() {
+    return this.admin.getFlagProposals();
+  }
+
+  @Get('release-proposals')
+  getReleaseFundsProposals() {
+    return this.admin.getReleaseFundsProposals();
   }
 
   @Get('projects/:id/refund-proposal')

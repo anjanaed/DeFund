@@ -189,6 +189,7 @@ export default function NotificationBell() {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          fontFamily: 'inherit',
         }}>
           <div style={{
             display: 'flex',
@@ -241,8 +242,8 @@ export default function NotificationBell() {
                       alignItems: 'flex-start',
                       gap: '10px',
                       padding: '12px 16px',
-                      borderLeft: n.isRead ? '4px solid transparent' : '4px solid var(--color-primary)',
                       borderTop: 'none',
+                      borderLeft: 'none',
                       borderRight: 'none',
                       borderBottom: '1px solid var(--color-border)',
                       background: n.isRead ? 'white' : 'var(--color-bg-purple-subtle)',

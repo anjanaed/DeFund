@@ -16,7 +16,9 @@ export function useSimulatedWrite() {
       ...config,
       account: account!,
     } as any)
-    return writeContractAsync(request as any)
+    const hash = await writeContractAsync(request as any)
+    await publicClient!.waitForTransactionReceipt({ hash })
+    return hash
   }
 
   return { writeWithSimulate }

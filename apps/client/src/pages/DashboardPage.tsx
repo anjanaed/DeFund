@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
+import { useBalance, useAccount } from 'wagmi'
+import { formatUnits } from 'viem'
 import AppNavbar from '../components/layout/AppNavbar'
-import { HiChartBar, HiLockClosed, HiCheckCircle, HiXCircle, HiEye, HiRocketLaunch, HiBolt, HiScale } from 'react-icons/hi2'
+import { HiChartBar, HiLockClosed, HiCheckCircle, HiXCircle, HiEye, HiRocketLaunch, HiBolt, HiScale, HiExclamationTriangle, HiInformationCircle, HiArrowPath } from 'react-icons/hi2'
 import ProofModal from '../components/common/ProofModal'
 import ConfirmModal from '../components/common/ConfirmModal'
 import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
 import TxBanner from '../components/common/TxBanner'
 import LoadingScreen from '../components/common/LoadingScreen'
 import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
-import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI } from '../config/contracts'
+import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI, USDC_ADDRESS } from '../config/contracts'
 import { useAuth } from '../context/AuthContext'
 import { apiFetch } from '../lib/api'
 import { parseContractError } from '../lib/errors'
@@ -25,13 +27,15 @@ interface VotingMilestone {
   campaign: { id: string; title: string; paymentToken?: string; raisedAmount?: string }
 }
 interface Transaction {
-  id: string; type: string; amount: number; timestamp: string
+  id: string; type: 'contribution' | 'refund'; amount: number; timestamp: string
   transactionHash: string | null; refunded: boolean
   campaign: { id: string; title: string }
 }
 interface ReclaimItem {
   id: string; title: string; status: string; raisedAmount: string
   totalContributed: number; onChainId: number | null
+  refundReason?: string | null
+  flagProposals?: Array<{ reason: string }>
 }
 
 const fmt = (n: number) => `$${Number(n).toLocaleString()}`
@@ -57,6 +61,9 @@ export default function DashboardPage() {
   const [claimConfirmItem, setClaimConfirmItem] = useState<ReclaimItem | null>(null)
 
   const { writeWithSimulate } = useSimulatedWrite()
+  const { address } = useAccount()
+  const { data: ethBal } = useBalance({ address })
+  const { data: usdcBal } = useBalance({ address, token: USDC_ADDRESS })
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -79,11 +86,14 @@ export default function DashboardPage() {
 
   // Group contributions by campaign for portfolio tab
   const portfolio = Object.values(
-    contributions.reduce<Record<string, { id: string; title: string; status: string; raisedAmount: number; goalAmount: number; totalContributed: number }>>(
+    contributions.reduce<Record<string, { id: string; title: string; status: string; raisedAmount: number; goalAmount: number; totalContributed: number; totalCount: number; refundedCount: number; allRefunded: boolean }>>(
       (acc, c) => {
         const key = c.campaign.id
-        if (!acc[key]) acc[key] = { ...c.campaign, raisedAmount: Number(c.campaign.raisedAmount), goalAmount: Number(c.campaign.goalAmount), totalContributed: 0 }
+        if (!acc[key]) acc[key] = { ...c.campaign, raisedAmount: Number(c.campaign.raisedAmount), goalAmount: Number(c.campaign.goalAmount), totalContributed: 0, totalCount: 0, refundedCount: 0, allRefunded: false }
         acc[key].totalContributed += Number(c.amount)
+        acc[key].totalCount += 1
+        if (c.refunded) acc[key].refundedCount += 1
+        acc[key].allRefunded = acc[key].refundedCount === acc[key].totalCount
         return acc
       }, {}
     )
@@ -125,6 +135,7 @@ export default function DashboardPage() {
         args: [BigInt(item.onChainId!)],
       })
       setClaimedIds(prev => new Set(prev).add(item.id))
+      setReclaimable(prev => prev.filter(r => r.id !== item.id))
       toast.success('Refund claimed!', { description: '95% of your contribution has been returned.' })
     } catch (err) {
       const errMsg = parseContractError(err)
@@ -174,6 +185,25 @@ export default function DashboardPage() {
                 </div>
               )
             })}
+            {address && (
+              <div className="dashboard-stat-card">
+                <div className="dashboard-stat-header"><span className="dashboard-stat-label">Wallet Balance</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                  {[
+                    { token: 'ETH', val: ethBal ? Number(formatUnits(ethBal.value, 18)).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—' },
+                    { token: 'USDC', val: usdcBal ? Number(formatUnits(usdcBal.value, 6)).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—' },
+                  ].map(({ token, val }, i) => (
+                    <div key={token}>
+                      {i > 0 && <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 'var(--space-2)' }} />}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-primary)' }}>{val}</span>
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{token}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Tabs */}
@@ -204,13 +234,22 @@ export default function DashboardPage() {
                   <div className="dashboard-project-header">
                     <div className="dashboard-project-badges">
                       <span className={`dashboard-status-badge ${project.status.toLowerCase()}`}>{project.status}</span>
+                      {project.allRefunded && (
+                        <span className="dashboard-status-badge refunded">Refunded</span>
+                      )}
                     </div>
-                    <div className="dashboard-contribution-amount">
-                      <div className="dashboard-contribution-value">{fmt(project.totalContributed)}</div>
-                      <div className="dashboard-contribution-label">Your contribution</div>
+                    <div className="dashboard-contribution-amount" style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <span className="dashboard-contribution-value" style={{ margin: 0 }}>{fmt(project.totalContributed)}</span>
+                      <span className="dashboard-contribution-label" style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>contributed</span>
                     </div>
                   </div>
                   <h3 className="dashboard-project-title">{project.title}</h3>
+                  {project.status === 'FLAGGED' && (project as any).flagProposals?.[0]?.reason && (
+                    <div className="reclaim-reason-block">
+                      <div className="reclaim-reason-label">Community Flag Reason</div>
+                      <div className="reclaim-reason-text">{(project as any).flagProposals[0].reason}</div>
+                    </div>
+                  )}
                   <div className="dashboard-project-progress">
                     <div className="dashboard-progress-header">
                       <span className="dashboard-progress-amount">{fmt(project.raisedAmount)} raised</span>
@@ -246,13 +285,7 @@ export default function DashboardPage() {
                 const voted = votedIds.has(item.id)
 
                 return (
-                <div key={item.id} style={{
-                  background: 'var(--color-bg-card)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 12,
-                  padding: '20px 24px',
-                  marginBottom: 16,
-                }}>
+                <div key={item.id} className="voting-card">
                   {/* Top row — campaign + power badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)' }}>
@@ -407,34 +440,67 @@ export default function DashboardPage() {
           {activeTab === 'reclaim' && (
             <div className="dashboard-reclaim">
               {reclaimable.length === 0 ? (
-                <div className="empty-state"><HiCheckCircle className="empty-icon" /><h3>No Funds to Reclaim</h3><p>All your contributions are in active projects.</p></div>
-              ) : reclaimable.map(item => (
-                <div key={item.id} className="reclaim-card">
-                  <div className="reclaim-header">
-                    <div>
-                      <span className={`dashboard-status-badge ${item.status.toLowerCase()}`}>{item.status}</span>
-                      <h3 className="reclaim-title">{item.title}</h3>
+                <div className="empty-state">
+                  <HiCheckCircle className="empty-icon" style={{ fontSize: '2.5rem', color: 'var(--color-primary)' }} />
+                  <h3>No Funds to Reclaim</h3>
+                  <p>All your contributions are in active campaigns.</p>
+                </div>
+              ) : reclaimable.map(item => {
+                const flagReason = item.flagProposals?.[0]?.reason
+                const hasReason = !!(item.refundReason || flagReason)
+                const refundAmount = item.totalContributed * 0.95
+                const isClaimed = claimedIds.has(item.id)
+                const isClaiming = claimingId === item.id
+                const isFlagged = item.status.toLowerCase() === 'flagged'
+
+                return (
+                  <div key={item.id} className="reclaim-card">
+                    {/* Header Row */}
+                    <div className="reclaim-header">
+                      <span className={`dashboard-status-badge ${item.status.toLowerCase()}`}>
+                        {item.status}
+                      </span>
+                      <span className="reclaim-amount-display">
+                        Refund Amount: <strong style={{ color: 'var(--color-success)', fontSize: '15px' }}>{fmt(refundAmount)}</strong>
+                      </span>
                     </div>
-                    <div className="reclaim-amount-box">
-                      <div className="reclaim-amount">{fmt(item.totalContributed)}</div>
-                      <div className="reclaim-label">Available to reclaim</div>
+
+                    <h3 className="reclaim-title">{item.title}</h3>
+
+                    {/* Reason Box */}
+                    {hasReason && (
+                      <div className={`reclaim-reason-block ${isFlagged ? 'flagged' : 'cancelled'}`}>
+                        <div className="reclaim-reason-label">
+                          {isFlagged ? 'Community Flag Reason' : 'Refund Reason'}
+                        </div>
+                        <div className="reclaim-reason-text">
+                          {flagReason || item.refundReason}
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="reclaim-contribution-line">
+                      Your contribution of <strong>{fmt(item.totalContributed)}</strong> is eligible for a <strong>95% refund</strong> (5% retention fee applies).
+                    </p>
+
+                    <div className="reclaim-actions">
+                      {isClaimed ? (
+                        <span className="reclaim-claimed">
+                          <HiCheckCircle size={16} /> Refund claimed
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-primary"
+                          disabled={isClaiming}
+                          onClick={() => handleClaimRequest(item)}
+                        >
+                          {isClaiming ? 'Confirming...' : 'Claim Refund'}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  {claimedIds.has(item.id) ? (
-                    <span style={{ color: 'var(--color-success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <HiCheckCircle /> Refund claimed
-                    </span>
-                  ) : (
-                    <button
-                      className="btn btn-primary reclaim-btn"
-                      disabled={claimingId === item.id}
-                      onClick={() => handleClaimRequest(item)}
-                    >
-                      {claimingId === item.id ? 'Confirming...' : `Reclaim ${fmt(item.totalContributed)}`}
-                    </button>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

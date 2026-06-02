@@ -430,10 +430,11 @@
 }
 
 .project-detail-tagline {
-  font-size: var(--text-xl);
+  font-size: var(--text-base);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-6);
   line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .project-detail-links {
@@ -601,6 +602,7 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .project-milestone-amount {
@@ -717,6 +719,7 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 /* Sidebar */

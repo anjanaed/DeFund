@@ -403,7 +403,8 @@ describe('AdminService', () => {
     it('returns guidance message for on-chain campaign', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(makeCampaign({ onChainId: 5 }));
 
-      const result = await service.proposeRefund('campaign-1');
+      mockPrisma.campaign.update.mockResolvedValue({});
+      const result = await service.proposeRefund('campaign-1', 'test reason');
 
       expect(result.message).toContain('proposeRefund()');
     });
@@ -411,13 +412,13 @@ describe('AdminService', () => {
     it('throws BadRequestException when campaign is not on-chain', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(makeCampaign({ onChainId: null }));
 
-      await expect(service.proposeRefund('campaign-1')).rejects.toThrow(BadRequestException);
+      await expect(service.proposeRefund('campaign-1', 'reason')).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when campaign does not exist', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(null);
 
-      await expect(service.proposeRefund('bad-id')).rejects.toThrow(NotFoundException);
+      await expect(service.proposeRefund('bad-id', 'reason')).rejects.toThrow(NotFoundException);
     });
   });
 

@@ -164,7 +164,7 @@ export class AdminService {
       where: { id },
       include: {
         creator: true,
-        milestones: { include: { _count: { select: { votes: true } } }, orderBy: { order: 'asc' } },
+        milestones: { include: { _count: { select: { votes: true } } }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] },
         contributions: {
           include: {
             contributor: { select: { walletAddress: true, name: true } },
@@ -269,15 +269,47 @@ export class AdminService {
     return proposal ?? null;
   }
 
-  async blockCampaign(id: string) {
-    return this.proposeFlagCampaign(id, 'blocked');
+  async unflagCampaign(id: string) {
+    const campaign = await this.ensureExists(id);
+    if (campaign.status !== CampaignStatus.FLAGGED) {
+      throw new BadRequestException('Campaign is not flagged');
+    }
+    await this.prisma.campaign.update({ where: { id }, data: { status: CampaignStatus.ACTIVE } });
+    return { message: 'Campaign unflagged and restored to ACTIVE.' };
   }
 
-  /** First admin proposes a refund — signed from their wallet on the frontend */
-  async proposeRefund(id: string) {
+  /** First admin proposes a refund — stores reason in DB, then admin signs on-chain */
+  async proposeRefund(id: string, reason: string) {
     const campaign = await this.ensureExists(id);
     if (campaign.onChainId === null) throw new BadRequestException('Campaign is not on-chain');
+    const refundableStatuses = [CampaignStatus.ACTIVE, CampaignStatus.FLAGGED, CampaignStatus.FAILED];
+    if (!refundableStatuses.includes(campaign.status)) {
+      throw new BadRequestException('Campaign cannot be refunded in its current state');
+    }
+    await this.prisma.campaign.update({ where: { id }, data: { refundReason: reason } });
     return { message: 'Sign proposeRefund() from your admin wallet. The indexer will sync the DB once the transaction confirms.' };
+  }
+
+  async getFlagProposals() {
+    return this.prisma.flagProposal.findMany({
+      include: { campaign: { select: { id: true, title: true } } },
+      orderBy: { proposedAt: 'desc' },
+    });
+  }
+
+  async getReleaseFundsProposals() {
+    return this.prisma.releaseFundsProposal.findMany({
+      include: {
+        milestone: {
+          select: {
+            id: true,
+            title: true,
+            campaign: { select: { id: true, title: true } },
+          },
+        },
+      },
+      orderBy: { proposedAt: 'desc' },
+    });
   }
 
   /** Second admin approves the refund — signed from their wallet on the frontend */
@@ -566,10 +598,11 @@ export class AdminService {
       throw new ForbiddenException('The same admin cannot confirm their own proposal — a different admin must confirm');
     }
 
-    // Fetch milestones in their defined order — must match the order passed to createCampaign() on-chain
+    // Fetch milestones in their defined order — must match the order passed to createCampaign() on-chain.
+    // Secondary createdAt sort ensures determinism when order values are equal (legacy campaigns).
     const milestones = await this.prisma.milestone.findMany({
       where: { campaignId },
-      orderBy: { order: 'asc' },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       select: { id: true },
     });
 
@@ -719,6 +752,13 @@ export class AdminService {
     const result = await this.confirmReleaseFunds(id, callerWalletAddress);
     const milestone = await this.prisma.milestone.findUnique({ where: { id }, select: { title: true } });
     await this.logAudit(callerWalletAddress, 'CONFIRM_RELEASE_FUNDS', 'milestone', id, milestone?.title);
+    return result;
+  }
+
+  async approveRefundAudited(id: string, callerWalletAddress: string) {
+    const result = await this.approveRefund(id);
+    const campaign = await this.prisma.campaign.findUnique({ where: { id }, select: { title: true } });
+    await this.logAudit(callerWalletAddress, 'APPROVE_REFUND', 'campaign', id, campaign?.title);
     return result;
   }
 

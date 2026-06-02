@@ -77,6 +77,7 @@ const AUDIT_ACTION_LABEL: Record<string, { label: string; color: string }> = {
   REJECT_CAMPAIGN:        { label: 'Rejected campaign',        color: 'var(--color-error)' },
   REQUEST_CHANGES:        { label: 'Requested changes',        color: '#d97706' },
   CONFIRM_FLAG:           { label: 'Confirmed flag',           color: '#b45309' },
+  APPROVE_REFUND:         { label: 'Approved refund',          color: '#0369a1' },
   CONFIRM_RELEASE_FUNDS:  { label: 'Released milestone funds', color: '#0369a1' },
 }
 

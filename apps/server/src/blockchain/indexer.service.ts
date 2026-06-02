@@ -132,8 +132,11 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       case 'CampaignFlagged':
         await this.onStatusChange(log.args[0] as bigint, CampaignStatus.FLAGGED);
         break;
+      case 'CampaignUnflagged':
+        await this.onStatusChange(log.args[0] as bigint, CampaignStatus.ACTIVE);
+        break;
       case 'CampaignCancelled':
-        await this.onStatusChange(log.args[0] as bigint, CampaignStatus.FAILED);
+        await this.onCampaignCancelled(log);
         break;
       case 'CampaignCompleted':
         await this.onStatusChange(log.args[0] as bigint, CampaignStatus.COMPLETED);
@@ -483,6 +486,21 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
         data: { status: MilestoneStatus.ONGOING },
       });
     }
+  }
+
+  private async onCampaignCancelled(log: ethers.EventLog) {
+    const onChainId = Number(log.args[0] as bigint);
+    // expireCampaign() and 3rd-rejection auto-cancel both set fundsReclaimed = true
+    // on-chain without emitting RefundApproved, so we must read it from the contract
+    // here to keep the DB in sync — otherwise contributors never see the Reclaim tab.
+    const onChainCampaign = await this.blockchain.getContract().campaigns(BigInt(onChainId));
+    await this.prisma.campaign.updateMany({
+      where: { onChainId },
+      data: {
+        status: CampaignStatus.FAILED,
+        fundsReclaimed: (onChainCampaign as any).fundsReclaimed ?? false,
+      },
+    });
   }
 
   private async onRefundProposed(log: ethers.EventLog) {

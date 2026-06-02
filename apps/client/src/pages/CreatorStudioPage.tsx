@@ -55,6 +55,7 @@ interface CreatorCampaign {
 }
 
 const fmt = (n: number) => `$${Number(n).toLocaleString()}`
+const formatStatus = (s: string) => s.split('_').map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 
 const STATUS_ICON: Record<string, any> = {
   NOT_STARTED: HiLockClosed,
@@ -211,7 +212,7 @@ function AnalyticsPanel({ project, data }: { project: CreatorCampaign; data: Con
               <span style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>M{idx + 1}: {m.title}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>{fmt(Number(m.amount))}</span>
-                <span style={statusPillStyle(m.status)}>{m.status}</span>
+                <span style={statusPillStyle(m.status)}>{formatStatus(m.status)}</span>
               </div>
             </div>
           ))}
@@ -511,7 +512,7 @@ export default function CreatorStudioPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button className="creator-view-project-btn" onClick={() => handleDownloadReport(project)}>
-                      <HiArrowDownTray style={{ marginRight: 8 }} /> Download Report
+                      <HiArrowDownTray /> Download Report
                     </button>
                     {['PENDING', 'ACTIVE'].includes(project.status) && project.onChainId != null && (
                       cancelConfirmId === project.id ? (
@@ -535,7 +536,7 @@ export default function CreatorStudioPage() {
                         <button
                           className="creator-view-project-btn"
                           onClick={() => handleCancelCampaign(project)}
-                          style={{ background: 'white', border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
+                          style={{ border: '1px solid var(--color-error)', color: 'var(--color-error)' }}
                         >
                           Cancel Campaign
                         </button>
@@ -691,7 +692,7 @@ export default function CreatorStudioPage() {
                             <div className="creator-milestone-info">
                               <div className="creator-milestone-number-status">
                                 <span className="creator-milestone-number">Milestone {idx + 1}</span>
-                                <span className={`creator-milestone-status ${m.status.toLowerCase()}`}>{m.status}</span>
+                                <span className={`creator-milestone-status ${m.status.toLowerCase()}`}>{formatStatus(m.status)}</span>
                               </div>
                               <h4 className="creator-milestone-title">{m.title}</h4>
                               <div className="creator-milestone-amount">

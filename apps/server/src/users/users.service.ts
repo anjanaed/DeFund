@@ -52,6 +52,13 @@ export class UsersService {
             status: true,
             raisedAmount: true,
             goalAmount: true,
+            refundReason: true,
+            flagProposals: {
+              where: { executed: true },
+              select: { reason: true },
+              orderBy: { proposedAt: 'desc' },
+              take: 1,
+            },
           },
         },
       },
@@ -99,15 +106,40 @@ export class UsersService {
       orderBy: { timestamp: 'desc' },
     });
 
-    return contributions.map((c) => ({
-      id: c.id,
-      type: 'contribution' as const,
-      amount: Number(c.amount),
-      timestamp: c.timestamp,
-      transactionHash: c.transactionHash,
-      campaign: c.campaign,
-      refunded: c.refunded,
-    }));
+    const entries: {
+      id: string;
+      type: 'contribution' | 'refund';
+      amount: number;
+      timestamp: Date;
+      transactionHash: string | null;
+      campaign: { id: string; title: string };
+      refunded: boolean;
+    }[] = [];
+
+    for (const c of contributions) {
+      entries.push({
+        id: c.id,
+        type: 'contribution',
+        amount: Number(c.amount),
+        timestamp: c.timestamp,
+        transactionHash: c.transactionHash,
+        campaign: c.campaign,
+        refunded: c.refunded,
+      });
+      if (c.refunded) {
+        entries.push({
+          id: `${c.id}_refund`,
+          type: 'refund',
+          amount: Number(c.amount) * 0.95,
+          timestamp: c.timestamp,
+          transactionHash: null,
+          campaign: c.campaign,
+          refunded: true,
+        });
+      }
+    }
+
+    return entries;
   }
 
   async getReclaimable(userId: string) {
@@ -116,7 +148,7 @@ export class UsersService {
         contributorId: userId,
         refunded: false,
         campaign: {
-          status: { in: [CampaignStatus.FLAGGED, CampaignStatus.FAILED] },
+          status: { in: [CampaignStatus.FLAGGED, CampaignStatus.FAILED, CampaignStatus.ACTIVE] },
           fundsReclaimed: true,
         },
       },
@@ -128,6 +160,13 @@ export class UsersService {
             status: true,
             raisedAmount: true,
             onChainId: true,
+            refundReason: true,
+            flagProposals: {
+              where: { executed: true },
+              select: { reason: true },
+              orderBy: { proposedAt: 'desc' },
+              take: 1,
+            },
           },
         },
       },

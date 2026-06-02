@@ -24,7 +24,6 @@ export default function ConfirmModal({
   const borderColor = variant === 'warning' ? '#F59E0B' : '#EF4444'
   const confirmBg = variant === 'warning' ? '#F59E0B' : '#EF4444'
   const confirmHoverBg = variant === 'warning' ? '#D97706' : '#DC2626'
-  const labelText = variant === 'warning' ? 'Heads up' : 'Irreversible action'
 
   return (
     <div
@@ -40,23 +39,11 @@ export default function ConfirmModal({
           background: 'var(--color-bg)',
           borderRadius: 'var(--radius-lg)',
           border: '1px solid var(--color-border)',
-          borderTop: `3px solid ${borderColor}`,
           overflow: 'hidden',
           boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
         }}
       >
         <div style={{ padding: '28px 28px 24px' }}>
-          <p style={{
-            fontSize: '10px',
-            fontWeight: 600,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: borderColor,
-            marginBottom: '10px',
-          }}>
-            {labelText}
-          </p>
-
           <h3 style={{
             fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
             fontSize: '20px',

@@ -39,7 +39,6 @@ export default function HomePage() {
         { value: fmt(stats.totalRaised), label: 'Total Raised' },
         { value: `${stats.activeCampaigns}`, label: 'Active Campaigns' },
         { value: `${stats.totalContributors}+`, label: 'Community Members' },
-        { value: `${stats.successRate}%`, label: 'Success Rate' },
       ]
     : []
 

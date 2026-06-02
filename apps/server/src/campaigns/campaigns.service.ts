@@ -55,7 +55,7 @@ export class CampaignsService {
       // Doing this in the DB avoids loading all campaigns into memory.
       const trendingWhere: any = {
         ...where,
-        status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] },
+        ...(status ? {} : { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } }),
       };
       const [items, total] = await Promise.all([
         this.prisma.campaign.findMany({
@@ -102,6 +102,12 @@ export class CampaignsService {
       include: {
         creator: { select: creatorSelect },
         _count: { select: { milestones: true, contributions: true } },
+        flagProposals: {
+          where: { executed: true },
+          select: { reason: true },
+          orderBy: { proposedAt: 'desc' },
+          take: 1,
+        },
       },
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
@@ -113,7 +119,11 @@ export class CampaignsService {
     return this.prisma.milestone.findMany({
       where: { campaignId: id },
       include: { _count: { select: { votes: true } } },
-      orderBy: { order: 'asc' },
+      orderBy: [
+        { onChainId: { sort: 'asc', nulls: 'last' } },
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ],
     });
   }
 

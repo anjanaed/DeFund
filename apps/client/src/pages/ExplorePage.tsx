@@ -9,12 +9,10 @@ const CATEGORIES = ['All', 'DeFi', 'Gaming', 'NFT', 'DAO', 'Education', 'Infrast
 const SORT_OPTIONS = [
   { value: 'trending', label: 'Trending' },
   { value: 'newest', label: 'Newest' },
-  { value: 'most_funded', label: 'Most Funded' },
 ]
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'ACTIVE', label: 'Active' },
-  { value: 'FUNDED', label: 'Funded' },
   { value: 'COMPLETED', label: 'Completed' },
 ]
 

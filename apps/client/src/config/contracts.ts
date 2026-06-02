@@ -166,6 +166,15 @@ export const CAMPAIGN_FACTORY_ABI = [
     outputs: [],
   },
 
+  // unflagCampaign(campaignId) — admin only, restores Flagged campaign to Active
+  {
+    name: 'unflagCampaign',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: '_campaignId', type: 'uint256' }],
+    outputs: [],
+  },
+
   // proposeRefund(campaignId) — admin only, first step of two-admin refund
   {
     name: 'proposeRefund',
@@ -269,6 +278,18 @@ export const CAMPAIGN_FACTORY_ABI = [
       { name: 'raisedAmountAtVotingStart', type: 'uint256' },
       { name: 'submissionCount', type: 'uint8' },
     ],
+  },
+
+  // getContributorAmount(campaignId, contributor) — used by MilestoneVotingStatus to show voting power
+  {
+    name: 'getContributorAmount',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: '_campaignId', type: 'uint256' },
+      { name: '_contributor', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
   },
 
   // hasVoted(milestoneId, voter) — public getter used by MilestoneVotingStatus

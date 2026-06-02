@@ -186,6 +186,7 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         address indexed admin,
         string reason
     );
+    event CampaignUnflagged(uint256 indexed campaignId, address indexed admin);
     event CampaignCancelled(uint256 indexed campaignId, address indexed by);
     event CampaignCompleted(uint256 indexed campaignId);
     event CampaignStatusChanged(
@@ -499,6 +500,20 @@ contract CampaignFactory is AccessControl, ReentrancyGuard, Pausable {
         emit FlagConfirmed(proposalId, _campaignId, msg.sender);
         emit CampaignFlagged(_campaignId, msg.sender, proposal.reason);
         emit CampaignStatusChanged(_campaignId, CampaignStatus.Flagged);
+    }
+
+    /**
+     * @notice Admin removes the flag from a campaign, restoring it to Active
+     * @param _campaignId Campaign ID to unflag
+     */
+    function unflagCampaign(
+        uint256 _campaignId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) validCampaign(_campaignId) {
+        Campaign storage campaign = campaigns[_campaignId];
+        require(campaign.status == CampaignStatus.Flagged, "Campaign is not flagged");
+        campaign.status = CampaignStatus.Active;
+        emit CampaignUnflagged(_campaignId, msg.sender);
+        emit CampaignStatusChanged(_campaignId, CampaignStatus.Active);
     }
 
     /**

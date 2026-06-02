@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import {
-  HiArrowUturnLeft, HiExclamationTriangle,
+  HiExclamationTriangle,
   HiCheckCircle, HiXCircle, HiUserCircle, HiClock,
 } from 'react-icons/hi2'
 import { apiFetch } from '../../lib/api'
@@ -22,6 +22,37 @@ interface RoleProposal {
   targetUser: { id: string; name: string | null; walletAddress: string; role: string }
 }
 
+interface FlagProposal {
+  id: string
+  campaignId: string
+  proposer: string
+  reason: string
+  confirmer: string | null
+  executed: boolean
+  proposedAt: string
+  campaign: { id: string; title: string }
+}
+
+interface RefundProposal {
+  id: string
+  campaignId: string
+  proposer: string
+  confirmer: string | null
+  executed: boolean
+  proposedAt: string
+  campaign: { id: string; title: string }
+}
+
+interface ReleaseProposal {
+  id: string
+  milestoneId: string
+  proposer: string
+  confirmer: string | null
+  executed: boolean
+  proposedAt: string
+  milestone: { id: string; title: string; campaign: { id: string; title: string } }
+}
+
 const shortAddr = (addr: string) => `${addr.slice(0, 8)}…${addr.slice(-4)}`
 
 export default function AdminGovernancePage() {
@@ -29,8 +60,10 @@ export default function AdminGovernancePage() {
   const { address: connectedAddress } = useAccount()
 
   const [proposals, setProposals] = useState<RoleProposal[]>([])
-  const [pendingRefunds, setPendingRefunds] = useState<number>(0)
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([])
+  const [flagProposals, setFlagProposals] = useState<FlagProposal[]>([])
+  const [refundProposals, setRefundProposals] = useState<RefundProposal[]>([])
+  const [releaseProposals, setReleaseProposals] = useState<ReleaseProposal[]>([])
   const [loading, setLoading] = useState(true)
   const [actionPending, setActionPending] = useState<string | null>(null)
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
@@ -38,18 +71,23 @@ export default function AdminGovernancePage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [proposalsRes, refundsRes, approvalsRes] = await Promise.all([
+      const [proposalsRes, refundsRes, approvalsRes, flagRes, releaseRes] = await Promise.all([
         apiFetch('/admin/governance/role-proposals'),
         apiFetch('/admin/refund-proposals'),
         apiFetch('/admin/governance/pending-approvals'),
+        apiFetch('/admin/flag-proposals'),
+        apiFetch('/admin/release-proposals'),
       ])
       const proposalsData = await proposalsRes.json()
       const refundsData = await refundsRes.json()
       const approvalsData = await approvalsRes.json()
+      const flagData = await flagRes.json()
+      const releaseData = await releaseRes.json()
       setProposals(Array.isArray(proposalsData) ? proposalsData : [])
-      const pending = Array.isArray(refundsData) ? refundsData.filter((p: any) => !p.executed).length : 0
-      setPendingRefunds(pending)
+      setRefundProposals(Array.isArray(refundsData) ? refundsData : [])
       setPendingApprovals(Array.isArray(approvalsData) ? approvalsData : [])
+      setFlagProposals(Array.isArray(flagData) ? flagData : [])
+      setReleaseProposals(Array.isArray(releaseData) ? releaseData : [])
     } catch {
       // best-effort
     } finally {
@@ -91,24 +129,15 @@ export default function AdminGovernancePage() {
   }
 
   const pending = proposals.filter((p) => !p.executed)
-  const past = proposals.filter((p) => p.executed)
+  const pendingFlags = flagProposals.filter((p) => !p.executed)
+  const pendingRefunds = refundProposals.filter((p) => !p.executed)
+  const pendingRelease = releaseProposals.filter((p) => !p.executed)
 
   return (
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">Governance</h1>
         <p className="admin-page-subtitle">Pending admin actions requiring a second approval</p>
-      </div>
-
-      {/* Quick links to other proposal types */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        <div className="admin-stat-card" onClick={() => navigate('/admin/refund-proposals')} style={{ cursor: 'pointer' }}>
-          <div className="admin-stat-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}><HiArrowUturnLeft /></div>
-          <div>
-            <div className="admin-stat-label">Refund Proposals</div>
-            <div className="admin-stat-value">{pendingRefunds} pending</div>
-          </div>
-        </div>
       </div>
 
       {/* Pending campaign approval proposals */}
@@ -136,6 +165,80 @@ export default function AdminGovernancePage() {
           </table>
         </div>
       )}
+
+      {/* Flag Proposals */}
+      <div className="admin-table-card" style={{ marginBottom: '24px' }}>
+        <div className="admin-table-header">
+          <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Pending Flag Proposals ({pendingFlags.length})</h3>
+        </div>
+        <table className="admin-table">
+          <thead><tr><th>Campaign</th><th>Reason</th><th>Proposed By</th><th>Date</th><th></th></tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} style={{ padding: 0 }}><Spinner label="Loading…" /></td></tr>
+            ) : pendingFlags.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No pending flag proposals.</td></tr>
+            ) : pendingFlags.map(p => (
+              <tr key={p.id}>
+                <td style={{ fontWeight: '600' }}>{p.campaign.title}</td>
+                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)', maxWidth: '200px' }}>{p.reason || '—'}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{shortAddr(p.proposer)}</td>
+                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{new Date(p.proposedAt).toLocaleDateString()}</td>
+                <td><button className="btn" onClick={() => navigate(`/admin/risk/${p.campaignId}`)} style={{ padding: '5px 12px', fontSize: '12px', border: '1px solid var(--color-error)', borderRadius: '6px', background: 'white', color: 'var(--color-error)', fontWeight: '600', cursor: 'pointer' }}>Go to Campaign</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Refund Proposals */}
+      <div className="admin-table-card" style={{ marginBottom: '24px' }}>
+        <div className="admin-table-header">
+          <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Pending Refund Proposals ({pendingRefunds.length})</h3>
+        </div>
+        <table className="admin-table">
+          <thead><tr><th>Campaign</th><th>Proposed By</th><th>Date</th><th></th></tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={4} style={{ padding: 0 }}><Spinner label="Loading…" /></td></tr>
+            ) : pendingRefunds.length === 0 ? (
+              <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No pending refund proposals.</td></tr>
+            ) : pendingRefunds.map(p => (
+              <tr key={p.id}>
+                <td style={{ fontWeight: '600' }}>{p.campaign.title}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{shortAddr(p.proposer)}</td>
+                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{new Date(p.proposedAt).toLocaleDateString()}</td>
+                <td><button className="btn" onClick={() => navigate(`/admin/risk/${p.campaignId}`)} style={{ padding: '5px 12px', fontSize: '12px', border: '1px solid var(--color-primary)', borderRadius: '6px', background: 'var(--color-primary)', color: 'white', fontWeight: '600', cursor: 'pointer' }}>Review</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Release Fund Proposals */}
+      <div className="admin-table-card" style={{ marginBottom: '24px' }}>
+        <div className="admin-table-header">
+          <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Pending Release Fund Proposals ({pendingRelease.length})</h3>
+        </div>
+        <table className="admin-table">
+          <thead><tr><th>Milestone</th><th>Campaign</th><th>Proposed By</th><th>Date</th><th></th></tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} style={{ padding: 0 }}><Spinner label="Loading…" /></td></tr>
+            ) : pendingRelease.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No pending release proposals.</td></tr>
+            ) : pendingRelease.map(p => (
+              <tr key={p.id}>
+                <td style={{ fontWeight: '600' }}>{p.milestone.title}</td>
+                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{p.milestone.campaign.title}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{shortAddr(p.proposer)}</td>
+                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{new Date(p.proposedAt).toLocaleDateString()}</td>
+                <td><button className="btn" onClick={() => navigate(`/admin/milestones/${p.milestoneId}`)} style={{ padding: '5px 12px', fontSize: '12px', border: '1px solid var(--color-primary)', borderRadius: '6px', background: 'var(--color-primary)', color: 'white', fontWeight: '600', cursor: 'pointer' }}>Review</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* Role proposals — pending */}
       <div className="admin-table-card" style={{ marginBottom: '32px' }}>
@@ -228,45 +331,6 @@ export default function AdminGovernancePage() {
                 </tr>
               )
             })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Role proposals — history */}
-      <div className="admin-table-card">
-        <div className="admin-table-header">
-          <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Past Role Changes ({past.length})</h3>
-        </div>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Target User</th>
-              <th>Change</th>
-              <th>Proposed By</th>
-              <th>Confirmed By</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {past.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No past role changes.</td></tr>
-            ) : past.map((p) => (
-              <tr key={p.id}>
-                <td style={{ fontWeight: '600' }}>{p.targetUser.name || shortAddr(p.targetUser.walletAddress)}</td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className={`admin-badge neutral`}>{p.targetUser.role}</span>
-                    <span style={{ color: 'var(--color-text-tertiary)' }}>→</span>
-                    <span className={`admin-badge ${p.targetRole === 'ADMIN' ? 'success' : 'neutral'}`}>{p.targetRole}</span>
-                  </div>
-                </td>
-                <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{shortAddr(p.proposer)}</td>
-                <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{p.confirmer ? shortAddr(p.confirmer) : '—'}</td>
-                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                  {new Date(p.proposedAt).toLocaleDateString()}
-                </td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </div>

@@ -13,7 +13,8 @@ import {
   HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle, HiGlobeAlt, HiUser,
   HiDocument, HiArrowTopRightOnSquare,
 } from 'react-icons/hi2'
-import { useAccount, usePublicClient } from 'wagmi'
+import { useAccount, usePublicClient, useReadContract } from 'wagmi'
+import { formatUnits } from 'viem'
 import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
 import { parseEther, parseUnits } from 'viem'
 import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI, USDC_ADDRESS, ERC20_APPROVE_ABI } from '../config/contracts'
@@ -39,6 +40,7 @@ interface Update { id: string; title: string; content: string; createdAt: string
 
 const fmt = (n: number) => `$${Number(n).toLocaleString()}`
 const shortenAddress = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`
+const formatStatus = (s: string) => s.split('_').map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 
 const MILESTONE_STATUS_COLOR: Record<string, string> = {
   NOT_STARTED: '',
@@ -70,6 +72,14 @@ export default function ProjectDetailPage() {
   const [txError, setTxError] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+
+  const { data: myContributionRaw } = useReadContract({
+    address: CAMPAIGN_FACTORY_ADDRESS,
+    abi: CAMPAIGN_FACTORY_ABI,
+    functionName: 'getContributorAmount',
+    args: address && campaign?.onChainId != null ? [BigInt(campaign.onChainId), address] : undefined,
+    query: { enabled: !!address && campaign?.onChainId != null },
+  })
 
   useEffect(() => {
     if (!id) return
@@ -223,14 +233,19 @@ export default function ProjectDetailPage() {
               <div className="project-detail-header">
                 <div className="project-detail-badges">
                   <span className="project-detail-category-badge">{campaign.category}</span>
-                  {isActive && <span className="project-detail-active-badge">{campaign.status}</span>}
+                  {isActive && <span className="project-detail-active-badge">{formatStatus(campaign.status)}</span>}
                   {!isActive && (
                     <span className="project-detail-category-badge"
                       style={{ color: campaign.status === 'FLAGGED' ? 'var(--color-error)' : undefined }}>
-                      {campaign.status}
+                      {formatStatus(campaign.status)}
                     </span>
                   )}
                 </div>
+                {campaign.status === 'FLAGGED' && (campaign as any).flagProposals?.[0]?.reason && (
+                  <p style={{ fontSize: '13px', color: 'var(--color-error)', margin: '6px 0 0', lineHeight: 1.5 }}>
+                    Flagged: {(campaign as any).flagProposals[0].reason}
+                  </p>
+                )}
                 <h1 className="project-detail-title">{campaign.title}</h1>
                 <p className="project-detail-tagline">{campaign.description}</p>
                 <div className="project-creator">
@@ -243,13 +258,13 @@ export default function ProjectDetailPage() {
                 (campaign.documents && campaign.documents.length > 0)) && (
                 <div style={{ marginBottom: 24 }}>
                   {campaign.images && campaign.images.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                       {campaign.images.map(cid => (
                         <a key={cid} href={ipfsUrl(cid)} target="_blank" rel="noopener noreferrer">
                           <img
                             src={ipfsUrl(cid)}
                             alt=""
-                            style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-border)' }}
+                            style={{ width: 220, height: 160, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--color-border)' }}
                           />
                         </a>
                       ))}
@@ -305,7 +320,7 @@ export default function ProjectDetailPage() {
                             <div className="project-milestone-title-row">
                               <h3 className="project-milestone-title">{m.title}</h3>
                               <span className={`project-milestone-status-badge ${MILESTONE_STATUS_COLOR[m.status] || 'pending'}`}>
-                                {m.status}
+                                {formatStatus(m.status)}
                               </span>
                             </div>
                             <p className="project-milestone-description">{m.description}</p>
@@ -329,6 +344,7 @@ export default function ProjectDetailPage() {
                       {m.status === 'VOTING' && m.onChainId != null && (
                         <MilestoneVotingStatus
                           milestoneOnChainId={m.onChainId}
+                          campaignOnChainId={campaign.onChainId}
                           paymentToken={campaign.paymentToken}
                         />
                       )}
@@ -445,6 +461,20 @@ export default function ProjectDetailPage() {
 
                 {isActive && !isConnected && (
                   <p className="connect-wallet-note">Connect your wallet to contribute.</p>
+                )}
+
+                {/* Voting power */}
+                {isConnected && myContributionRaw != null && (myContributionRaw as bigint) > 0n && (
+                  <div style={{
+                    marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    fontSize: 13,
+                  }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Your voting power</span>
+                    <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {Number(formatUnits(myContributionRaw as bigint, campaign.paymentToken === 'USDC' ? 6 : 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {campaign.paymentToken}
+                    </span>
+                  </div>
                 )}
               </div>
 
