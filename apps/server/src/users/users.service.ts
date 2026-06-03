@@ -52,6 +52,7 @@ export class UsersService {
             status: true,
             raisedAmount: true,
             goalAmount: true,
+            paymentToken: true,
             refundReason: true,
             flagProposals: {
               where: { executed: true },
@@ -101,7 +102,7 @@ export class UsersService {
     const contributions = await this.prisma.contribution.findMany({
       where: { contributorId: userId },
       include: {
-        campaign: { select: { id: true, title: true } },
+        campaign: { select: { id: true, title: true, paymentToken: true } },
       },
       orderBy: { timestamp: 'desc' },
     });
@@ -112,7 +113,7 @@ export class UsersService {
       amount: number;
       timestamp: Date;
       transactionHash: string | null;
-      campaign: { id: string; title: string };
+      campaign: { id: string; title: string; paymentToken: string };
       refunded: boolean;
     }[] = [];
 
@@ -160,6 +161,7 @@ export class UsersService {
             status: true,
             raisedAmount: true,
             onChainId: true,
+            paymentToken: true,
             refundReason: true,
             flagProposals: {
               where: { executed: true },

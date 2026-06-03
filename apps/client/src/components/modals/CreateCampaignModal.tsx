@@ -58,6 +58,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
   const [documents, setDocuments] = useState<LocalFile[]>([])
 
   const [txStatus, setTxStatus] = useState<'idle' | 'uploading' | 'saving' | 'done' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
 
   // Auto-fill the last milestone's deadline with the campaign deadline
@@ -279,6 +280,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
       onSuccess?.()
       onClose()
       setTxStatus('idle')
+      setErrorMsg('')
       setFormData({ title: '', description: '', category: 'DeFi', repositoryUrl: '', license: '', website: '', deadline: '', paymentToken: '0' })
       setMilestones([{ title: '', description: '', amount: '', deadline: '' }])
       setSocials({ twitter: { connected: false, username: '' }, discord: { connected: false, username: '' }, github: { connected: false, username: '' } })
@@ -642,6 +644,12 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
           >
             {statusLabel[txStatus]}
           </div>
+        )}
+
+        {errorMsg && (
+          <p style={{ margin: '0 24px 8px', color: 'var(--color-error)', fontSize: '13px' }}>
+            {errorMsg}
+          </p>
         )}
 
         <div className="modal-footer">

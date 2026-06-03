@@ -24,13 +24,22 @@ interface Campaign {
   status: string
   raisedAmount: string
   goalAmount: string
+  paymentToken: string
   deadline: string | null
   creator: { id: string; name: string | null; walletAddress: string }
   _count: { milestones: number; contributions: number }
 }
 
-const fmt = (n: number) =>
-  n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`
+const fmtAmount = (n: number, token: string) => {
+  if (token === 'ETH') {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M ETH`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K ETH`
+    return `${n} ETH`
+  }
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n.toLocaleString()}`
+}
 
 const daysLeft = (deadline: string | null): string | null => {
   if (!deadline) return null
@@ -173,8 +182,8 @@ export default function ExplorePage() {
                     {/* U1 — funding progress */}
                     <div className="explore-project-progress">
                       <div className="explore-progress-header">
-                        <span className="explore-progress-amount">{fmt(raised)} raised</span>
-                        <span className="explore-progress-goal">of {fmt(goal)} ({Math.round(pct)}%)</span>
+                        <span className="explore-progress-amount">{fmtAmount(raised, project.paymentToken)} raised</span>
+                        <span className="explore-progress-goal">of {fmtAmount(goal, project.paymentToken)} ({Math.round(pct)}%)</span>
                       </div>
                       <div className="explore-progress-bar">
                         <div className="explore-progress-fill" style={{ width: `${pct}%` }} />

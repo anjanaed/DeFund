@@ -19,7 +19,7 @@ import { parseContractError } from '../lib/errors'
 interface DashboardStats { totalContributed: number; lockedFunds: number; releasedFunds: number }
 interface Contribution {
   id: string; amount: string; timestamp: string; transactionHash: string; refunded: boolean
-  campaign: { id: string; title: string; status: string; raisedAmount: string; goalAmount: string }
+  campaign: { id: string; title: string; status: string; raisedAmount: string; goalAmount: string; paymentToken: string }
 }
 interface VotingMilestone {
   id: string; title: string; description: string; status: string
@@ -29,16 +29,26 @@ interface VotingMilestone {
 interface Transaction {
   id: string; type: 'contribution' | 'refund'; amount: number; timestamp: string
   transactionHash: string | null; refunded: boolean
-  campaign: { id: string; title: string }
+  campaign: { id: string; title: string; paymentToken: string }
 }
 interface ReclaimItem {
-  id: string; title: string; status: string; raisedAmount: string
+  id: string; title: string; status: string; raisedAmount: string; paymentToken: string
   totalContributed: number; onChainId: number | null
   refundReason?: string | null
   flagProposals?: Array<{ reason: string }>
 }
 
 const fmt = (n: number) => `$${Number(n).toLocaleString()}`
+const fmtAmount = (n: number, token: string) => {
+  if (token === 'ETH') {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M ETH`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K ETH`
+    return `${n} ETH`
+  }
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${Number(n).toLocaleString()}`
+}
 
 export default function DashboardPage() {
   const { isAuthenticated } = useAuth()
@@ -86,7 +96,7 @@ export default function DashboardPage() {
 
   // Group contributions by campaign for portfolio tab
   const portfolio = Object.values(
-    contributions.reduce<Record<string, { id: string; title: string; status: string; raisedAmount: number; goalAmount: number; totalContributed: number; totalCount: number; refundedCount: number; allRefunded: boolean }>>(
+    contributions.reduce<Record<string, { id: string; title: string; status: string; raisedAmount: number; goalAmount: number; paymentToken: string; totalContributed: number; totalCount: number; refundedCount: number; allRefunded: boolean }>>(
       (acc, c) => {
         const key = c.campaign.id
         if (!acc[key]) acc[key] = { ...c.campaign, raisedAmount: Number(c.campaign.raisedAmount), goalAmount: Number(c.campaign.goalAmount), totalContributed: 0, totalCount: 0, refundedCount: 0, allRefunded: false }
@@ -239,7 +249,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <div className="dashboard-contribution-amount" style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                      <span className="dashboard-contribution-value" style={{ margin: 0 }}>{fmt(project.totalContributed)}</span>
+                      <span className="dashboard-contribution-value" style={{ margin: 0 }}>{fmtAmount(project.totalContributed, project.paymentToken)}</span>
                       <span className="dashboard-contribution-label" style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>contributed</span>
                     </div>
                   </div>
@@ -252,8 +262,8 @@ export default function DashboardPage() {
                   )}
                   <div className="dashboard-project-progress">
                     <div className="dashboard-progress-header">
-                      <span className="dashboard-progress-amount">{fmt(project.raisedAmount)} raised</span>
-                      <span className="dashboard-progress-goal">of {fmt(project.goalAmount)}</span>
+                      <span className="dashboard-progress-amount">{fmtAmount(project.raisedAmount, project.paymentToken)} raised</span>
+                      <span className="dashboard-progress-goal">of {fmtAmount(project.goalAmount, project.paymentToken)}</span>
                     </div>
                     <div className="dashboard-progress-bar">
                       <div className="dashboard-progress-fill"
@@ -422,7 +432,7 @@ export default function DashboardPage() {
                     <div key={tx.id} className="table-row">
                       <div className="table-col"><span className={`tx-type ${tx.type.toLowerCase()}`}>{tx.type}</span></div>
                       <div className="table-col">{tx.campaign.title}</div>
-                      <div className="table-col tx-amount">{fmt(tx.amount)}</div>
+                      <div className="table-col tx-amount">{fmtAmount(tx.amount, tx.campaign.paymentToken)}</div>
                       <div className="table-col">{new Date(tx.timestamp).toLocaleDateString()}</div>
                       <div className="table-col tx-hash">
                         {tx.transactionHash
@@ -461,7 +471,7 @@ export default function DashboardPage() {
                         {item.status}
                       </span>
                       <span className="reclaim-amount-display">
-                        Refund Amount: <strong style={{ color: 'var(--color-success)', fontSize: '15px' }}>{fmt(refundAmount)}</strong>
+                        Refund Amount: <strong style={{ color: 'var(--color-success)', fontSize: '15px' }}>{fmtAmount(refundAmount, item.paymentToken)}</strong>
                       </span>
                     </div>
 
@@ -480,7 +490,7 @@ export default function DashboardPage() {
                     )}
 
                     <p className="reclaim-contribution-line">
-                      Your contribution of <strong>{fmt(item.totalContributed)}</strong> is eligible for a <strong>95% refund</strong> (5% retention fee applies).
+                      Your contribution of <strong>{fmtAmount(item.totalContributed, item.paymentToken)}</strong> is eligible for a <strong>95% refund</strong> (5% retention fee applies).
                     </p>
 
                     <div className="reclaim-actions">

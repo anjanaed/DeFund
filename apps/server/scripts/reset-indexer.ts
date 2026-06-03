@@ -11,9 +11,14 @@
  *   npx ts-node --project tsconfig.json scripts/reset-indexer.ts 0
  */
 
+import 'dotenv/config';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma';
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DIRECT_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter } as any);
 
 async function main() {
   const arg = process.argv[2];

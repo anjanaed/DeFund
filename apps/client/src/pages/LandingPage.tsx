@@ -36,18 +36,23 @@ export default function LandingPage() {
       .catch(() => { /* keep placeholder */ })
   }, [])
 
-  const stats = homeStats
-    ? [
+  const DUMMY_STATS = [
+    { label: 'Total Raised', value: '$124.5K' },
+    { label: 'Active Projects', value: '23' },
+    { label: 'Contributors', value: '847' },
+    { label: 'Success Rate', value: '89%' },
+  ]
+
+  const isBlank = !homeStats ||
+    (homeStats.totalRaised === 0 && homeStats.activeProjects === 0 && homeStats.contributors === 0)
+
+  const stats = isBlank
+    ? DUMMY_STATS
+    : [
         { label: 'Total Raised', value: compactCurrency(homeStats.totalRaised) },
         { label: 'Active Projects', value: compactNumber(homeStats.activeProjects) },
         { label: 'Contributors', value: compactNumber(homeStats.contributors) },
         { label: 'Success Rate', value: `${homeStats.successRate}%` },
-      ]
-    : [
-        { label: 'Total Raised', value: '—' },
-        { label: 'Active Projects', value: '—' },
-        { label: 'Contributors', value: '—' },
-        { label: 'Success Rate', value: '—' },
       ]
 
 

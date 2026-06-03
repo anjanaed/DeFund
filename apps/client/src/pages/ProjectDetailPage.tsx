@@ -38,7 +38,16 @@ interface Milestone {
 }
 interface Update { id: string; title: string; content: string; createdAt: string }
 
-const fmt = (n: number) => `$${Number(n).toLocaleString()}`
+const fmtAmount = (n: number, token: string) => {
+  if (token === 'ETH') {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M ETH`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K ETH`
+    return `${n} ETH`
+  }
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${Number(n).toLocaleString()}`
+}
 const shortenAddress = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`
 const formatStatus = (s: string) => s.split('_').map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 
@@ -324,7 +333,7 @@ export default function ProjectDetailPage() {
                               </span>
                             </div>
                             <p className="project-milestone-description">{m.description}</p>
-                            <div className="project-milestone-amount">{fmt(Number(m.amount))}</div>
+                            <div className="project-milestone-amount">{fmtAmount(Number(m.amount), campaign.paymentToken)}</div>
                             {m.deadline && (
                               <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
                                 <HiClock size={12} /> Due {new Date(m.deadline).toLocaleDateString()}
@@ -383,8 +392,8 @@ export default function ProjectDetailPage() {
               <div className="project-contribution-card">
                 <div className="contribution-stats">
                   <div className="contribution-stat-main">
-                    <div className="contribution-amount">{fmt(raised)}</div>
-                    <div className="contribution-label">raised of {fmt(goal)} goal</div>
+                    <div className="contribution-amount">{fmtAmount(raised, campaign.paymentToken)}</div>
+                    <div className="contribution-label">raised of {fmtAmount(goal, campaign.paymentToken)} goal</div>
                   </div>
                   <div className="contribution-progress-bar">
                     <div className="contribution-progress-fill" style={{ width: `${progress}%` }} />

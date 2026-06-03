@@ -282,7 +282,7 @@ export class AdminService {
   async proposeRefund(id: string, reason: string) {
     const campaign = await this.ensureExists(id);
     if (campaign.onChainId === null) throw new BadRequestException('Campaign is not on-chain');
-    const refundableStatuses = [CampaignStatus.ACTIVE, CampaignStatus.FLAGGED, CampaignStatus.FAILED];
+    const refundableStatuses: CampaignStatus[] = [CampaignStatus.ACTIVE, CampaignStatus.FLAGGED, CampaignStatus.FAILED];
     if (!refundableStatuses.includes(campaign.status)) {
       throw new BadRequestException('Campaign cannot be refunded in its current state');
     }
