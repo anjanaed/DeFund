@@ -1,142 +1,115 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HiMagnifyingGlass } from 'react-icons/hi2'
+import { HiMagnifyingGlass, HiClock } from 'react-icons/hi2'
+import Spinner from '../../components/common/Spinner'
+import { apiFetch } from '../../lib/api'
 import '../../Admin.css'
+
+interface Campaign {
+  id: string
+  title: string
+  status: string
+  createdAt: string
+  creator: { walletAddress: string; name?: string }
+}
 
 export default function AdminVerificationPage() {
   const navigate = useNavigate()
-  const [statusFilter, setStatusFilter] = useState('All')
+  const [projects, setProjects] = useState<Campaign[]>([])
+  const [pendingApprovalIds, setPendingApprovalIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const allProjects = [
-    {
-      id: 1,
-      name: 'DeFi Protocol X',
-      address: '0x742d35Cc...95f0bEb1',
-      submitted: '2026-01-14',
-      signature: 'Verified',
-      status: 'Pending'
-    },
-    {
-      id: 2,
-      name: 'NFT Marketplace Builder',
-      address: '0x8ba1f109...d64DBA72',
-      submitted: '2026-01-13',
-      signature: 'Verified',
-      status: 'Pending'
-    },
-    {
-      id: 3,
-      name: 'Web3 Social Network',
-      address: '0x12345678...34567890',
-      submitted: '2026-01-13',
-      signature: 'Invalid',
-      status: 'Rejected'
-    },
-    {
-      id: 4,
-      name: 'DAO Governance Tool',
-      address: '0xdAC17F95...3D831ec7',
-      submitted: '2026-01-12',
-      signature: 'Verified',
-      status: 'Approved'
-    },
-    {
-      id: 5,
-      name: 'Crypto Payment Gateway',
-      address: '0x6B175474...95271d0F',
-      submitted: '2026-01-11',
-      signature: 'Verified',
-      status: 'Pending'
-    },
-    {
-      id: 6,
-      name: 'Web3 Gaming Platform',
-      address: '0x9a8b...1c2d',
-      submitted: '2026-01-10',
-      signature: 'Verified',
-      status: 'Approved'
-    }
-  ]
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/admin/verification').then((r) => r.json()),
+      apiFetch('/admin/governance/pending-approvals').then((r) => r.json()).catch(() => []),
+    ]).then(([data, approvals]) => {
+      setProjects(Array.isArray(data?.items) ? data.items : [])
+      const ids = new Set<string>(Array.isArray(approvals) ? approvals.map((a: any) => a.campaignId) : [])
+      setPendingApprovalIds(ids)
+    }).catch(() => setProjects([]))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const filteredProjects = allProjects.filter(project => {
-    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          project.address.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'All' || project.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filtered = projects.filter(
+    (p) =>
+      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.creator.walletAddress.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   return (
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">Verification Queue</h1>
-        <p className="admin-page-subtitle">Manage and monitor platform activity</p>
+        <p className="admin-page-subtitle">Pending campaign applications awaiting admin review</p>
       </div>
 
       <div className="admin-table-card">
         <div className="admin-table-header" style={{ justifyContent: 'flex-end', gap: '16px' }}>
           <div className="admin-search">
             <HiMagnifyingGlass color="var(--color-text-tertiary)" />
-            <input 
-              type="text" 
-              placeholder="Search projects..." 
+            <input
+              type="text"
+              placeholder="Search projects..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select 
-            value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '14px', cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="All">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
         </div>
 
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Project Name</th>
-              <th>Wallet Address</th>
-              <th>Submitted</th>
-              <th>Signature</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProjects.map((project) => (
-              <tr 
-                key={project.id} 
-                onClick={() => navigate(`/admin/verification/${project.id}`)}
-                style={{ cursor: 'pointer' }}
-              >
-                <td style={{ fontWeight: '600' }}>{project.name}</td>
-                <td style={{ fontFamily: 'monospace' }}>{project.address}</td>
-                <td>{project.submitted}</td>
-                <td>
-                  <span className={`admin-badge ${project.signature === 'Verified' ? 'success' : 'error'}`}>
-                    {project.signature}
-                  </span>
-                </td>
-                <td>
-                  <span className={`admin-badge ${
-                    project.status === 'Approved' ? 'success' : 
-                    project.status === 'Pending' ? 'warning' : 'error'
-                  }`}>{project.status}</span>
-                </td>
-                <td>
-                  <button className="btn" style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-                    Review
-                  </button>
-                </td>
+        {loading ? (
+          <Spinner label="Loading verification queue…" />
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+            No pending campaigns.
+          </div>
+        ) : (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Project Name</th>
+                <th>Wallet Address</th>
+                <th>Submitted</th>
+                <th>Approval</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((project) => (
+                <tr
+                  key={project.id}
+                  onClick={() => navigate(`/admin/verification/${project.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td style={{ fontWeight: '600' }}>{project.title}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                    {project.creator.walletAddress.slice(0, 10)}...{project.creator.walletAddress.slice(-6)}
+                  </td>
+                  <td>{new Date(project.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    {pendingApprovalIds.has(project.id) ? (
+                      <span className="admin-badge warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <HiClock size={12} /> Proposed
+                      </span>
+                    ) : (
+                      <span className="admin-badge neutral">Not proposed</span>
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      className="btn"
+                      style={{ padding: '6px 12px', fontSize: '13px', border: '1px solid var(--color-border)', borderRadius: '6px' }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/verification/${project.id}`) }}
+                    >
+                      {pendingApprovalIds.has(project.id) ? 'Review & Deploy' : 'Review'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

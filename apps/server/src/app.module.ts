@@ -1,40 +1,51 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { BlockchainModule } from './blockchain/blockchain.module';
+import { AuthModule } from './auth/auth.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { MilestonesModule } from './milestones/milestones.module';
+import { ForumModule } from './forum/forum.module';
+import { StatsModule } from './stats/stats.module';
+import { UsersModule } from './users/users.module';
+import { AdminModule } from './admin/admin.module';
+import { SocialAuthModule } from './social-auth/social-auth.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { HealthModule } from './health/health.module';
+import { IpfsModule } from './ipfs/ipfs.module';
+import configuration from './config/configuration';
 
 @Module({
   imports: [
-    // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      load: [configuration],
     }),
-
-    // Database
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_DATABASE || 'defund',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: process.env.NODE_ENV !== 'production',
-      logging: process.env.NODE_ENV === 'development',
-    }),
-
-    // Scheduled tasks for blockchain event listening
-    ScheduleModule.forRoot(),
-
-    // Feature modules will be added here
-    // CampaignsModule,
-    // UsersModule,
-    // BlockchainModule,
+    // M2 — global rate limiting (10 requests per 60 s per IP by default)
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
+    PrismaModule,
+    BlockchainModule,
+    AuthModule,
+    CampaignsModule,
+    MilestonesModule,
+    ForumModule,
+    StatsModule,
+    UsersModule,
+    AdminModule,
+    SocialAuthModule,
+    NotificationsModule,
+    HealthModule,
+    IpfsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Activates the global throttler guard so @Throttle() decorators are enforced
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

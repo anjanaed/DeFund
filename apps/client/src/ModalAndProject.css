@@ -274,6 +274,18 @@
    PROJECT DETAIL PAGE
    ============================================ */
 
+.page-loading {
+  text-align: center;
+  padding: 6rem 0;
+  color: var(--color-text-secondary);
+}
+
+.empty-state-text {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  padding: var(--space-4) 0;
+}
+
 .project-detail-page {
   padding: var(--space-12) 0 var(--space-16);
 }
@@ -288,6 +300,77 @@
   font-size: var(--text-sm);
   margin-bottom: var(--space-8);
   transition: color var(--transition);
+}
+
+.project-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  gap: var(--space-4);
+}
+
+.project-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.project-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.project-ghost-btn svg {
+  font-size: 16px;
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.project-ghost-btn:hover {
+  background: var(--color-bg-purple-subtle);
+  color: var(--color-primary);
+}
+
+.project-ghost-btn:hover svg {
+  opacity: 1;
+  transform: translateY(-0.5px);
+}
+
+.project-ghost-btn:active {
+  transform: scale(0.97);
+}
+
+.project-ghost-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-bg-purple-light), 0 0 0 3px var(--color-border-purple);
+}
+
+.project-ghost-btn.is-success {
+  background: rgba(16, 185, 129, 0.10);
+  color: var(--color-success);
+}
+
+.project-ghost-btn.is-success:hover {
+  background: rgba(16, 185, 129, 0.16);
+  color: var(--color-success);
+}
+
+.project-ghost-btn.is-success svg {
+  opacity: 1;
 }
 
 .project-back-link:hover {
@@ -338,7 +421,7 @@
 }
 
 .project-detail-title {
-  font-size: var(--text-5xl);
+  font-size: var(--text-4xl);
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--color-text-primary);
@@ -347,10 +430,11 @@
 }
 
 .project-detail-tagline {
-  font-size: var(--text-xl);
+  font-size: var(--text-base);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-6);
   line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .project-detail-links {
@@ -412,15 +496,17 @@
 }
 
 .project-milestone-card {
-  background: var(--color-bg);
+  background: #FFFFFF;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
-  transition: border-color var(--transition);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 .project-milestone-card:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-purple);
+  box-shadow: 0 6px 18px rgba(91, 33, 182, 0.09);
 }
 
 .project-milestone-card.approved {
@@ -443,17 +529,37 @@
 }
 
 .project-milestone-number {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-bg-purple-light);
+  border: 2px solid var(--color-border-purple);
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   flex-shrink: 0;
+  transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.project-milestone-card.approved .project-milestone-number {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.project-milestone-card.active .project-milestone-number {
+  background: var(--color-bg-purple-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.project-milestone-card.pending .project-milestone-number {
+  background: var(--color-bg-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .project-milestone-title-row {
@@ -496,10 +602,11 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .project-milestone-amount {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--color-primary);
   letter-spacing: -0.02em;
@@ -612,6 +719,7 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 /* Sidebar */
@@ -624,11 +732,12 @@
 .project-contribution-card,
 .project-creator-card,
 .project-info-card {
-  background: var(--color-bg);
+  background: #FFFFFF;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   margin-bottom: var(--space-6);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.04);
 }
 
 /* Contribution Card */
@@ -643,7 +752,7 @@
 }
 
 .contribution-amount {
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-primary);
@@ -656,7 +765,7 @@
 }
 
 .contribution-progress-bar {
-  height: 4px;
+  height: 6px;
   background: var(--color-bg-muted);
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -673,29 +782,48 @@
 .contribution-stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-4);
+  gap: var(--space-5);
+  padding: var(--space-2) 0;
 }
 
 .contribution-stat-item {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .contribution-stat-item .stat-icon {
-  font-size: 24px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  box-sizing: border-box;
+  background: var(--color-bg-purple-light);
+  border-radius: var(--radius-md);
   color: var(--color-primary);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.contribution-stat-item > div:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.2;
 }
 
 .stat-value {
   font-size: var(--text-xl);
   font-weight: 700;
   color: var(--color-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .stat-label {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
+  margin-top: 2px;
 }
 
 .contribution-form {
@@ -759,16 +887,22 @@
 }
 
 .creator-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: var(--text-base);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--color-bg-purple-subtle), 0 2px 6px rgba(91, 33, 182, 0.15);
+}
+
+.creator-avatar svg {
+  font-size: 22px;
 }
 
 .creator-name {
@@ -845,8 +979,161 @@
   }
 
   .project-detail-title {
-    font-size: var(--text-4xl);
+    font-size: var(--text-3xl);
   }
+}
+
+/* Project Tabs */
+.project-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  margin-bottom: var(--space-8);
+  width: fit-content;
+}
+
+.project-tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.project-tab:hover:not(.active) {
+  color: var(--color-text-primary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.project-tab.active {
+  background: #ffffff;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Project Creator line */
+.project-creator {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-4);
+}
+
+.project-creator span {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* Contribute section */
+.project-contribute {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.project-contribute-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Forum Messages */
+.project-forum {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.forum-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.forum-message {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.forum-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.forum-message-author {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.forum-message-content {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.forum-compose {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.forum-compose .form-input {
+  flex: 1;
+}
+
+/* Updates list */
+.project-updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.project-update-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-2);
+}
+
+/* Success state */
+.contribution-success {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-success);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.connect-wallet-note {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 /* Forum Styles */

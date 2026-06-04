@@ -1,16 +1,60 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HiShieldCheck, HiUserGroup, HiDocumentCheck, HiChartBar, HiLockClosed, HiBolt, HiArrowRight } from 'react-icons/hi2'
 import Navbar from '../components/layout/Navbar'
 import Footer from '../components/layout/Footer'
 import logo from '../assets/logo.png'
+import { landingSteps as steps } from '../data/mockData'
+import { apiFetch } from '../lib/api'
+
+interface HomeStats {
+  totalRaised: number
+  activeProjects: number
+  contributors: number
+  successRate: number
+}
+
+const compactCurrency = (n: number) => {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
+  return `$${n.toLocaleString()}`
+}
+
+const compactNumber = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return `${n}`
+}
 
 export default function LandingPage() {
-  const stats = [
-    { label: 'Total Raised', value: '$24M+' },
-    { label: 'Projects', value: '1200+' },
-    { label: 'Contributors', value: '45K+' },
-    { label: 'Success Rate', value: '98%' }
+  const [homeStats, setHomeStats] = useState<HomeStats | null>(null)
+
+  useEffect(() => {
+    apiFetch('/stats/home')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setHomeStats(data) })
+      .catch(() => { /* keep placeholder */ })
+  }, [])
+
+  const DUMMY_STATS = [
+    { label: 'Total Raised', value: '$124.5K' },
+    { label: 'Active Projects', value: '23' },
+    { label: 'Contributors', value: '847' },
+    { label: 'Success Rate', value: '89%' },
   ]
+
+  const isBlank = !homeStats ||
+    (homeStats.totalRaised === 0 && homeStats.activeProjects === 0 && homeStats.contributors === 0)
+
+  const stats = isBlank
+    ? DUMMY_STATS
+    : [
+        { label: 'Total Raised', value: compactCurrency(homeStats.totalRaised) },
+        { label: 'Active Projects', value: compactNumber(homeStats.activeProjects) },
+        { label: 'Contributors', value: compactNumber(homeStats.contributors) },
+        { label: 'Success Rate', value: `${homeStats.successRate}%` },
+      ]
+
 
   const features = [
     {
@@ -26,7 +70,7 @@ export default function LandingPage() {
     {
       icon: HiDocumentCheck,
       title: 'Verified Projects',
-      description: 'Admins verified creators with transparent identities and verified GitHub repositories.'
+      description: 'Admins verify creators with transparent identities and verified public repositories.'
     },
     {
       icon: HiChartBar,
@@ -45,28 +89,7 @@ export default function LandingPage() {
     }
   ]
 
-  const steps = [
-    {
-      id: '01',
-      title: 'Project Verification',
-      description: 'Creators submit projects with defined milestones. Admins verify authenticity through wallet signing and GitHub validation.'
-    },
-    {
-      id: '02',
-      title: 'Contribution Phase',
-      description: 'Contributors fund projects on-chain. Funds are locked in smart contracts until milestones are approved.'
-    },
-    {
-      id: '03',
-      title: 'Community Voting',
-      description: 'Project creators submit evidence of milestone completion. Contributors vote to approve fund release.'
-    },
-    {
-      id: '04',
-      title: 'Fund Release',
-      description: 'Once approved by community voting, funds automatically release to project creators via smart contracts.'
-    }
-  ]
+
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', overflowX: 'hidden' }}>

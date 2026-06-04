@@ -1,101 +1,94 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import AppNavbar from '../components/layout/AppNavbar'
-import { HiMagnifyingGlass, HiUsers, HiChartBar } from 'react-icons/hi2'
+import { HiMagnifyingGlass, HiUsers, HiChartBar, HiClock, HiRocketLaunch } from 'react-icons/hi2'
+import { apiFetch } from '../lib/api'
+import LoadingScreen from '../components/common/LoadingScreen'
+
+const CATEGORIES = ['All', 'DeFi', 'Gaming', 'NFT', 'DAO', 'Education', 'Infrastructure', 'Open Source']
+const SORT_OPTIONS = [
+  { value: 'trending', label: 'Trending' },
+  { value: 'newest', label: 'Newest' },
+]
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'COMPLETED', label: 'Completed' },
+]
+
+interface Campaign {
+  id: string
+  title: string
+  description: string
+  category: string
+  status: string
+  raisedAmount: string
+  goalAmount: string
+  paymentToken: string
+  deadline: string | null
+  creator: { id: string; name: string | null; walletAddress: string }
+  _count: { milestones: number; contributions: number }
+}
+
+const fmtAmount = (n: number, token: string) => {
+  if (token === 'ETH') {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M ETH`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K ETH`
+    return `${n} ETH`
+  }
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n.toLocaleString()}`
+}
+
+const daysLeft = (deadline: string | null): string | null => {
+  if (!deadline) return null
+  const diff = new Date(deadline).getTime() - Date.now()
+  if (diff <= 0) return 'Ended'
+  const days = Math.ceil(diff / 86_400_000)
+  return days === 1 ? '1 day left' : `${days} days left`
+}
+
+const shortenAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`
 
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState('all')
-  const [sortBy, setSortBy] = useState('trending')
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('trending')
+  const [status, setStatus] = useState('')
+  const [category, setCategory] = useState('All')
+  const [projects, setProjects] = useState<Campaign[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  const categories = ['All', 'DeFi', 'DAO', 'NFT', 'Open Source', 'Infrastructure', 'Gaming']
-  const tabs = [
-    { id: 'all', label: 'All Projects', count: 6 },
-    { id: 'trending', label: 'Trending', count: null },
-    { id: 'new', label: 'New', count: null }
-  ]
+  const fetchProjects = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (sort) params.set('sort', sort)
+    if (status) params.set('status', status)
+    if (category && category !== 'All') params.set('category', category)
+    params.set('limit', '24')
 
-  const projects = [
-    {
-      id: 1,
-      category: 'Infrastructure',
-      verified: true,
-      active: true,
-      title: 'Decentralized Storage Network',
-      description: 'Building a secure and efficient decentralized storage solution for Web3',
-      raised: 12000,
-      goal: 150000,
-      contributors: 28,
-      milestones: 1
-    },
-    {
-      id: 2,
-      category: 'Gaming',
-      verified: true,
-      active: true,
-      title: 'Blockchain Gaming Engine',
-      description: 'Open-source game engine optimized for blockchain gaming with built-in NFT and token',
-      raised: 45000,
-      goal: 120000,
-      contributors: 103,
-      milestones: 1
-    },
-    {
-      id: 3,
-      category: 'NFT',
-      verified: true,
-      active: true,
-      title: 'NFT Marketplace Platform',
-      description: 'A next-generation NFT marketplace with advanced features for creators and',
-      raised: 35000,
-      goal: 80000,
-      contributors: 67,
-      milestones: 3
-    },
-    {
-      id: 4,
-      category: 'Open Source',
-      verified: true,
-      active: true,
-      title: 'Open Source Analytics Tools',
-      description: 'Privacy-focused analytics platform for Web3 applications.',
-      raised: 28000,
-      goal: 30000,
-      contributors: 45,
-      milestones: 2
-    },
-    {
-      id: 5,
-      category: 'DeFi',
-      verified: true,
-      active: true,
-      title: 'DeFi Lending Protocol',
-      description: 'A decentralized lending platform that allows users to lend and borrow cryptocurrencies with',
-      raised: 75000,
-      goal: 100000,
-      contributors: 156,
-      milestones: 3
-    },
-    {
-      id: 6,
-      category: 'DAO',
-      verified: true,
-      active: false,
-      title: 'Community DAO Governance',
-      description: 'Building a transparent and efficient DAO governance system for community-driven',
-      raised: 52000,
-      goal: 50000,
-      contributors: 89,
-      milestones: 2
+    const res = await apiFetch(`/projects?${params}`)
+    if (res.ok) {
+      const data = await res.json()
+      setProjects(data.items)
+      setTotal(data.total)
     }
-  ]
+    setLoading(false)
+  }, [search, sort, status, category])
+
+  useEffect(() => {
+    const timer = setTimeout(fetchProjects, search ? 300 : 0)
+    return () => clearTimeout(timer)
+  }, [fetchProjects])
 
   return (
     <div className="app-container">
       <AppNavbar />
-      
+
       <div className="explore-page">
         <div className="container">
-          {/* Header */}
           <div className="explore-header">
             <h1 className="explore-title">Explore Projects</h1>
             <p className="explore-subtitle">
@@ -107,102 +100,116 @@ export default function ExplorePage() {
           <div className="explore-filters">
             <div className="search-box">
               <HiMagnifyingGlass className="search-icon" />
-              <input 
-                type="text" 
-                placeholder="Search projects..." 
+              <input
+                type="text"
+                placeholder="Search projects..."
                 className="search-input"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
               />
             </div>
-            
             <div className="filter-dropdowns">
-              <select className="filter-select" value="all">
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="completed">Completed</option>
+              <select className="filter-select" value={status} onChange={e => setStatus(e.target.value)}>
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-              
-              <select className="filter-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                <option value="trending">Trending</option>
-                <option value="newest">Newest</option>
-                <option value="funded">Most Funded</option>
+              <select className="filter-select" value={sort} onChange={e => setSort(e.target.value)}>
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
 
           {/* Category Pills */}
           <div className="category-pills">
-            {categories.map((category) => (
+            {CATEGORIES.map(cat => (
               <button
-                key={category}
-                className={`category-pill ${category === 'All' ? 'active' : ''}`}
+                key={cat}
+                className={`category-pill ${category === cat ? 'active' : ''}`}
+                onClick={() => setCategory(cat)}
               >
-                {category}
+                {cat}
               </button>
             ))}
           </div>
 
-          {/* Tabs */}
-          <div className="explore-tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={`explore-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label} {tab.count && `(${tab.count})`}
-              </button>
-            ))}
-          </div>
+          {/* Results count */}
+          {!loading && (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginBottom: '1.5rem' }}>
+              {total} project{total !== 1 ? 's' : ''} found
+            </p>
+          )}
 
           {/* Projects Grid */}
-          <div className="explore-projects-grid">
-            {projects.map((project) => (
-              <Link 
-                key={project.id} 
-                to={`/project/${project.id}`} 
-                className="explore-project-card clickable-card"
-              >
-                <div className="explore-project-header">
-                  <span className="explore-category-badge">{project.category}</span>
-                  <div className="explore-badges">
-                    {project.active && (
-                      <span className="explore-active-badge">Active</span>
-                    )}
-                    {!project.active && (
-                      <span className="explore-completed-badge">Completed</span>
-                    )}
-                  </div>
-                </div>
-                
-                <h3 className="explore-project-title">{project.title}</h3>
-                <p className="explore-project-description">{project.description}</p>
-                
-                <div className="explore-project-progress">
-                  <div className="explore-progress-header">
-                    <span className="explore-progress-amount">${project.raised.toLocaleString()} raised</span>
-                    <span className="explore-progress-goal">of ${project.goal.toLocaleString()}</span>
-                  </div>
-                  <div className="explore-progress-bar">
-                    <div 
-                      className="explore-progress-fill" 
-                      style={{ width: `${Math.min((project.raised / project.goal) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="explore-project-meta">
-                  <div className="explore-meta-item">
-                    <HiUsers />
-                    <span>{project.contributors} contributors</span>
-                  </div>
-                  <div className="explore-meta-item">
-                    <HiChartBar />
-                    <span>{project.milestones} milestones</span>
-                  </div>
-                </div>
+          {loading ? (
+            <LoadingScreen message="Loading projects" />
+          ) : projects.length === 0 ? (
+            /* U7 — helpful empty state with CTA */
+            <div style={{ textAlign: 'center', padding: '4rem 0' }}>
+              <HiRocketLaunch style={{ fontSize: '3rem', color: 'var(--color-primary)', marginBottom: '1rem' }} />
+              <h3 style={{ color: 'var(--color-text)', marginBottom: '0.5rem' }}>No projects found</h3>
+              <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
+                Try adjusting your search or filters, or be the first to launch a campaign!
+              </p>
+              <Link to="/creator-studio" className="btn btn-primary" style={{ display: 'inline-block' }}>
+                Create a Campaign
               </Link>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="explore-projects-grid">
+              {projects.map((project) => {
+                const raised = Number(project.raisedAmount)
+                const goal = Number(project.goalAmount)
+                const pct = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0
+                const isActive = project.status === 'ACTIVE' || project.status === 'FUNDED'
+                const deadline = daysLeft(project.deadline)
+                const creatorLabel = project.creator?.name || shortenAddr(project.creator?.walletAddress || '')
+                return (
+                  <Link
+                    key={project.id}
+                    to={`/project/${project.id}`}
+                    className="explore-project-card clickable-card"
+                  >
+                    <div className="explore-project-header">
+                      <span className="explore-category-badge">{project.category}</span>
+                      <div className="explore-badges">
+                        <span className={isActive ? 'explore-active-badge' : 'explore-completed-badge'}>
+                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <h3 className="explore-project-title">{project.title}</h3>
+                    <p className="explore-project-description">{project.description}</p>
+
+                    {/* U1 — funding progress */}
+                    <div className="explore-project-progress">
+                      <div className="explore-progress-header">
+                        <span className="explore-progress-amount">{fmtAmount(raised, project.paymentToken)} raised</span>
+                        <span className="explore-progress-goal">of {fmtAmount(goal, project.paymentToken)} ({Math.round(pct)}%)</span>
+                      </div>
+                      <div className="explore-progress-bar">
+                        <div className="explore-progress-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+
+                    {/* U1 — meta row: contributors, milestones, deadline */}
+                    <div className="explore-project-meta">
+                      <div className="explore-meta-item"><HiUsers /><span>{project._count.contributions} contributors</span></div>
+                      <div className="explore-meta-item"><HiChartBar /><span>{project._count.milestones} milestones</span></div>
+                      {deadline && (
+                        <div className="explore-meta-item" style={{ color: deadline === 'Ended' ? 'var(--color-error)' : 'var(--color-warning, #f59e0b)' }}>
+                          <HiClock /><span>{deadline}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* U1 — creator identity */}
+                    <div style={{ marginTop: '0.5rem', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      by {creatorLabel}
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

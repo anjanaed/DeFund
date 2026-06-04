@@ -1,0 +1,341 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum CampaignStatus {
+  PENDING
+  ACTIVE
+  FUNDED
+  COMPLETED
+  FAILED
+  FLAGGED
+  CHANGES_REQUESTED
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  ONGOING
+  VOTING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique
+  name          String?
+  email         String?  @unique
+  avatar        String?
+  bio           String?
+  role          UserRole @default(USER)
+
+  twitterHandle String?
+  discordHandle String?
+  githubHandle  String?
+
+  isVerified Boolean  @default(false)
+  nonce      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  createdCampaigns   Campaign[]          @relation("CreatedCampaigns")
+  contributions      Contribution[]
+  votes              Vote[]
+  messages           Message[]
+  reactions          Reaction[]
+  notifications      Notification[]
+  adminRoleProposals AdminRoleProposal[]
+}
+
+model Campaign {
+  id          String @id @default(uuid())
+  title       String
+  description String
+  category    String
+
+  goalAmount      Decimal @db.Decimal(18, 2)
+  raisedAmount    Decimal @default(0) @db.Decimal(18, 2)
+  releasedAmount  Decimal @default(0) @db.Decimal(18, 2)
+  paymentToken    String  @default("ETH")
+
+  status        CampaignStatus @default(PENDING)
+  deadline      DateTime?
+  website       String?
+  repositoryUrl String?
+  license       String?
+
+  reviewMessage    String?
+
+  contractAddress  String?
+  transactionHash  String?
+  onChainId        Int?     @unique
+  isAdminApproved  Boolean  @default(false)
+  fundsReclaimed   Boolean  @default(false)
+  refundReason     String?
+  ipfsHash         String?
+
+  // Media cached from IPFS for fast rendering. The authoritative copy is the
+  // metadata JSON referenced by `ipfsHash`; these mirror its contents so list
+  // and detail pages do not need a gateway round-trip per campaign.
+  // images holds IPFS CIDs; documents is [{ name, cid, mimetype }].
+  images     String[] @default([])
+  documents  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creatorId String
+  creator   User   @relation("CreatedCampaigns", fields: [creatorId], references: [id])
+
+  milestones       Milestone[]
+  contributions    Contribution[]
+  updates          Update[]
+  forum            Forum?
+  refundProposals  RefundProposal[]
+  flagProposals    FlagProposal[]
+  approvalProposal CampaignApprovalProposal?
+}
+
+model RefundProposal {
+  id         String   @id @default(uuid())
+  onChainId  Int      @unique
+  proposer   String
+  confirmer  String?  // [L2] renamed from `approver` to match FlagProposal/ReleaseFundsProposal naming
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model FlagProposal {
+  id         String   @id @default(uuid())
+  onChainId  Int      @unique
+  proposer   String
+  reason     String
+  confirmer  String?
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model ReleaseFundsProposal {
+  id         String   @id @default(uuid())
+  onChainId  Int      @unique
+  proposer   String
+  confirmer  String?
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id])
+}
+
+
+
+model Milestone {
+  id          String          @id @default(uuid())
+  title       String
+  description String
+  amount      Decimal         @db.Decimal(18, 2)
+  status      MilestoneStatus @default(ONGOING)
+
+  order           Int       @default(0)
+
+  deadline        DateTime?
+  proofUrl        String?
+  onChainId       Int?      @unique
+  votingEndTime   DateTime?
+  submissionCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  votes      Vote[]
+  releaseProposals ReleaseFundsProposal[]
+}
+
+model Contribution {
+  id              String   @id @default(uuid())
+  amount          Decimal  @db.Decimal(18, 2)
+  transactionHash String   @unique
+  timestamp       DateTime @default(now())
+
+  refunded      Boolean  @default(false)
+
+  contributorId String
+  contributor   User     @relation(fields: [contributorId], references: [id])
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  choice    Boolean // True = Approve, False = Reject
+  weight    Decimal  @default(0) @db.Decimal(36, 0)
+  timestamp DateTime @default(now())
+
+
+  voterId     String
+  voter       User      @relation(fields: [voterId], references: [id])
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id])
+
+  @@unique([voterId, milestoneId])
+}
+
+
+model Update {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model Forum {
+  id         String    @id @default(uuid())
+  campaignId String    @unique
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  messages   Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  forumId String
+  forum   Forum  @relation(fields: [forumId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+
+  parentId String?
+  parent   Message?  @relation("MessageReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies  Message[] @relation("MessageReplies")
+
+  reactions Reaction[]
+
+  @@index([forumId, parentId, createdAt])
+}
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+  FIRE
+}
+
+model Reaction {
+  id        String       @id @default(uuid())
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId, type])
+}
+
+model IndexerState {
+  id        String   @id @default("singleton")
+  lastBlock Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+// U8 — Admin audit log: tracks who did what and when
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  adminWallet String   // wallet address of the admin who performed the action
+  action      String   // e.g. APPROVE_CAMPAIGN, REJECT_CAMPAIGN, PROPOSE_FLAG, CONFIRM_FLAG, etc.
+  entityType  String   // "campaign" | "milestone"
+  entityId    String   // DB id of the affected entity
+  entityTitle String?  // human-readable title for display
+  metadata    Json?    // additional context (onChainId, reason, etc.)
+  createdAt   DateTime @default(now())
+
+  @@index([adminWallet, createdAt])
+  @@index([entityId, createdAt])
+}
+
+enum NotificationType {
+  MILESTONE_PROOF_UPLOADED
+  MILESTONE_VOTING_STARTED
+  MILESTONE_APPROVED
+  MILESTONE_REJECTED
+  CAMPAIGN_FULLY_FUNDED
+  REFUND_PROPOSED
+  REFUND_APPROVED
+  FLAG_PROPOSED
+  RELEASE_FUNDS_PROPOSED
+  ADMIN_ROLE_PROPOSED
+  CAMPAIGN_APPROVAL_PROPOSED
+  CHANGES_REQUESTED
+}
+
+model CampaignApprovalProposal {
+  id         String   @id @default(uuid())
+  proposer   String   // wallet address of first admin
+  executed   Boolean  @default(false)
+  proposedAt DateTime @default(now())
+
+  campaignId String   @unique  // one active proposal per campaign
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model AdminRoleProposal {
+  id           String    @id @default(uuid())
+  targetUserId String
+  targetRole   UserRole
+  proposer     String    // wallet address of proposing admin
+  confirmer    String?   // wallet address of confirming admin; null until executed
+  executed     Boolean   @default(false)
+  proposedAt   DateTime  @default(now())
+
+  targetUser User @relation(fields: [targetUserId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  eventKey  String?          // deduplication key: {type}:{campaignId}[:{milestoneId}]
+  createdAt DateTime         @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventKey])
+  @@index([userId, isRead, createdAt])
+}

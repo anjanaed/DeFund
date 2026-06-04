@@ -1,421 +1,542 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { useParams, Link } from 'react-router-dom'
+import RepoIcon from '../components/common/RepoIcon'
 import AppNavbar from '../components/layout/AppNavbar'
-import { 
-  HiCheckCircle, 
-  HiUsers, 
-  HiChartBar, 
-  HiClock,
-  HiShieldCheck,
-  HiArrowLeft,
-  HiGlobeAlt,
-  HiCodeBracket,
-  HiEye,
-  HiChatBubbleLeft,
-  HiHeart
-} from 'react-icons/hi2'
-import { FaGithub } from 'react-icons/fa6'
 import ProofModal from '../components/common/ProofModal'
+import MilestoneVotingStatus from '../components/common/MilestoneVotingStatus'
+import TxBanner from '../components/common/TxBanner'
+import LoadingScreen from '../components/common/LoadingScreen'
+import OnboardingModal from '../components/common/OnboardingModal'
+import {
+  HiUsers, HiChartBar, HiCheckCircle, HiClock, HiInformationCircle,
+  HiEye, HiArrowLeft, HiShare, HiQuestionMarkCircle, HiGlobeAlt, HiUser,
+  HiDocument, HiArrowTopRightOnSquare,
+} from 'react-icons/hi2'
+import { useAccount, usePublicClient, useReadContract } from 'wagmi'
+import { formatUnits } from 'viem'
+import { useSimulatedWrite } from '../hooks/useSimulatedWrite'
+import { parseEther, parseUnits } from 'viem'
+import { CAMPAIGN_FACTORY_ADDRESS, CAMPAIGN_FACTORY_ABI, USDC_ADDRESS, ERC20_APPROVE_ABI } from '../config/contracts'
+import { apiFetch } from '../lib/api'
+import { ipfsUrl } from '../lib/ipfs'
+import ProjectForum from '../components/forum/ProjectForum'
+import { parseContractError } from '../lib/errors'
+
+interface CampaignDocument { name: string; cid: string; mimetype?: string }
+interface Campaign {
+  id: string; title: string; description: string; category: string; status: string
+  raisedAmount: string; goalAmount: string; paymentToken: string; deadline: string | null
+  website: string | null; repositoryUrl: string | null; license: string | null; onChainId: number | null
+  images: string[]; documents: CampaignDocument[] | null
+  creator: { id: string; name: string | null; walletAddress: string }
+  _count: { milestones: number; contributions: number }
+}
+interface Milestone {
+  id: string; title: string; description: string; status: string
+  amount: string; onChainId: number | null; proofUrl: string | null; deadline: string | null
+}
+interface Update { id: string; title: string; content: string; createdAt: string }
+
+const fmtAmount = (n: number, token: string) => {
+  if (token === 'ETH') {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M ETH`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K ETH`
+    return `${n} ETH`
+  }
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${Number(n).toLocaleString()}`
+}
+const shortenAddress = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`
+const formatStatus = (s: string) => s.split('_').map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+
+const MILESTONE_STATUS_COLOR: Record<string, string> = {
+  NOT_STARTED: '',
+  ONGOING: 'pending',
+  APPROVED: 'approved', COMPLETED: 'approved',
+  VOTING: 'active',
+  REJECTED: 'pending',
+}
 
 export default function ProjectDetailPage() {
-  const { id } = useParams()
-  const [contributionAmount, setContributionAmount] = useState('')
+  const { id } = useParams<{ id: string }>()
+  const { isConnected, address } = useAccount()
+  const { writeWithSimulate } = useSimulatedWrite()
+  const publicClient = usePublicClient()
+
+  const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [updates, setUpdates] = useState<Update[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('milestones')
+
   const [showProofModal, setShowProofModal] = useState(false)
-  const [selectedProof, setSelectedProof] = useState<{title: string, content: string} | null>(null)
+  const [selectedProof, setSelectedProof] = useState<{ title: string; content: string } | null>(null)
 
+  const [contributionAmount, setContributionAmount] = useState('')
+  const [contributing, setContributing] = useState(false)
+  const [contributingStep, setContributingStep] = useState<'approving' | 'contributing' | null>(null)
+  const [contributionDone, setContributionDone] = useState(false)
+  const [txError, setTxError] = useState<string | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
 
-  const project = {
-    id: 1,
-    category: 'DeFi',
-    verified: true,
-    active: true,
-    title: 'DeFi Lending Protocol',
-    tagline: 'Decentralized lending platform with minimal fees and maximum security',
-    description: `A comprehensive decentralized lending platform that allows users to lend and borrow cryptocurrencies with minimal fees and maximum security. Our protocol leverages cutting-edge smart contract technology to ensure transparency, security, and efficiency.
+  const { data: myContributionRaw } = useReadContract({
+    address: CAMPAIGN_FACTORY_ADDRESS,
+    abi: CAMPAIGN_FACTORY_ABI,
+    functionName: 'getContributorAmount',
+    args: address && campaign?.onChainId != null ? [BigInt(campaign.onChainId), address] : undefined,
+    query: { enabled: !!address && campaign?.onChainId != null },
+  })
 
-Key Features:
-• Collateralized lending with dynamic interest rates
-• Multi-asset support including major cryptocurrencies
-• Automated liquidation protection
-• Governance token for protocol decisions
-• Audited smart contracts by leading security firms
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    Promise.all([
+      apiFetch(`/projects/${id}`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/projects/${id}/milestones`).then(r => r.ok ? r.json() : []),
+      apiFetch(`/projects/${id}/updates`).then(r => r.ok ? r.json() : []),
+    ]).then(([camp, ms, ups]) => {
+      setCampaign(camp)
+      setMilestones(ms)
+      setUpdates(ups)
+      setLoading(false)
+    })
+  }, [id])
 
-Our mission is to democratize access to financial services by providing a trustless, permissionless lending platform that anyone can use. We believe in transparency, which is why all our code is open-source and our smart contracts are fully audited.`,
-    raised: 75000,
-    goal: 100000,
-    contributors: 156,
-    creator: {
-      name: 'Max Verstappen',
-      address: '0x742d...00Eb',
-      avatar: 'AC'
-    },
-    github: 'https://github.com/username/defi-lending',
-    website: 'https://defilending.io',
-    milestones: [
-      {
-        number: 1,
-        status: 'Approved',
-        title: 'Smart Contract Development',
-        description: 'Complete core smart contract architecture and security audits. This includes developing the lending pool contracts, interest rate models, and collateral management system.',
-        amount: 30000,
-        required: 30000,
-        deliverables: [
-          'Core lending pool smart contracts',
-          'Interest rate calculation module',
-          'Collateral management system',
-          'Initial security audit report'
-        ],
-        completed: true,
-        votes: { for: 142, against: 8 },
-        proof: 'Smart contracts have been deployed to the testnet and verified. The security audit was conducted by CertiK and the report is attached. You can verify the contract addresses on Etherscan: 0x123...abc'
-      },
-      {
-        number: 2,
-        status: 'Active',
-        title: 'Frontend Development',
-        description: 'Build user interface and integrate with smart contracts. Create an intuitive dashboard for users to manage their lending and borrowing positions.',
-        amount: 25000,
-        required: 25000,
-        deliverables: [
-          'Responsive web application',
-          'Wallet integration (MetaMask, WalletConnect)',
-          'Real-time position tracking',
-          'Transaction history and analytics'
-        ],
-        completed: false,
-        votes: null
-      },
-      {
-        number: 3,
-        status: 'Pending',
-        title: 'Security Audit & Launch',
-        description: 'Complete third-party security audit and mainnet deployment. Final testing and preparation for public launch.',
-        amount: 45000,
-        required: 45000,
-        deliverables: [
-          'Comprehensive security audit by CertiK',
-          'Bug bounty program',
-          'Mainnet deployment',
-          'Marketing and launch campaign'
-        ],
-        completed: false,
-        votes: null
+  // [L1] Minimum contributions enforced on-chain: 0.001 ETH / 1 USDC
+  const MIN_ETH = 0.001
+  const MIN_USDC = 1
+
+  const handleContribute = async () => {
+    if (!campaign?.onChainId || !contributionAmount) return
+    const amt = parseFloat(contributionAmount)
+    if (isNaN(amt) || amt <= 0) { setTxError('Amount must be greater than zero'); return }
+    if (amt > 1_000_000) { setTxError('Amount exceeds maximum allowed'); return }
+    // Client-side minimum check mirrors on-chain require() to avoid wasted gas
+    const isUsdc = campaign.paymentToken === 'USDC'
+    if (isUsdc && amt < MIN_USDC) { setTxError(`Minimum contribution is ${MIN_USDC} USDC`); return }
+    if (!isUsdc && amt < MIN_ETH) { setTxError(`Minimum contribution is ${MIN_ETH} ETH`); return }
+    setContributing(true)
+    setContributingStep(null)
+    try {
+      if (campaign.paymentToken === 'USDC') {
+        const amount = parseUnits(contributionAmount, 6)
+        // USDC requires an ERC-20 approve() before transferFrom can succeed.
+        // Check existing allowance and only prompt approval when needed.
+        if (publicClient && address) {
+          const allowance = await publicClient.readContract({
+            address: USDC_ADDRESS,
+            abi: ERC20_APPROVE_ABI,
+            functionName: 'allowance',
+            args: [address, CAMPAIGN_FACTORY_ADDRESS],
+          }) as bigint
+          if (allowance < amount) {
+            setContributingStep('approving')
+            const approveTx = await writeWithSimulate({
+              address: USDC_ADDRESS,
+              abi: ERC20_APPROVE_ABI,
+              functionName: 'approve',
+              args: [CAMPAIGN_FACTORY_ADDRESS, amount],
+            })
+            await publicClient.waitForTransactionReceipt({ hash: approveTx })
+          }
+        }
+        setContributingStep('contributing')
+        await writeWithSimulate({
+          address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
+          functionName: 'contributeUSDC',
+          args: [BigInt(campaign.onChainId), amount],
+        })
+      } else {
+        setContributingStep('contributing')
+        await writeWithSimulate({
+          address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI,
+          functionName: 'contributeETH',
+          args: [BigInt(campaign.onChainId)],
+          value: parseEther(contributionAmount),
+        })
       }
-    ],
-    updates: [
-      {
-        date: '2026-01-15',
-        title: 'Milestone 1 Completed!',
-        content: 'We are excited to announce that our smart contracts have been fully developed and audited. The audit report is now available on our GitHub.'
-      },
-      {
-        content: 'Our team has been working hard on the core smart contracts. We expect to complete the security audit by end of this week.'
-      }
-    ],
-    forum: [
-      {
-        id: 1,
-        author: 'DeFiUser123',
-        avatar: 'D',
-        date: '2 hours ago',
-        title: 'Question about milestone 1 deliverables',
-        content: 'Can you clarify if the audit report includes the staking contract? I checked the Github repo but couldnt find the specific file.',
-        replies: 4,
-        likes: 12
-      },
-      {
-        id: 2,
-        author: 'CryptoWhale',
-        avatar: 'C',
-        date: '1 day ago',
-        title: 'Great progress on the frontend!',
-        content: 'The new dashboard looks amazing. Love the dark mode support. Will you be adding mobile support soon?',
-        replies: 2,
-        likes: 8
-      },
-      {
-        id: 3,
-        author: 'SecureDev',
-        avatar: 'S',
-        date: '2 days ago',
-        title: 'Security concern on lending pool',
-        content: 'I noticed a potential reentrancy issue in the lending pool contract. Has this been addressed in the latest audit?',
-        replies: 7,
-        likes: 24
-      }
-    ]
+      setContributionDone(true)
+      setContributionAmount('')
+      toast.success('Contribution confirmed!', { description: 'Your contribution is secured on-chain.' })
+    } catch (err) {
+      const errMsg = parseContractError(err)
+      setTxError(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setContributing(false)
+      setContributingStep(null)
+    }
   }
 
-  const handleContribute = () => {
-    console.log('Contributing:', contributionAmount)
-  }
+  if (loading) return (
+    <div className="app-container">
+      <AppNavbar />
+      <LoadingScreen message="Loading project" />
+    </div>
+  )
 
-  const progress = (project.raised / project.goal) * 100
+  if (!campaign) return (
+    <div className="app-container">
+      <AppNavbar />
+      <div className="page-loading">Campaign not found.</div>
+    </div>
+  )
+
+  const raised = Number(campaign.raisedAmount)
+  const goal = Number(campaign.goalAmount)
+  const progress = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0
+  const isActive = ['ACTIVE', 'FUNDED'].includes(campaign.status)
+
+  const daysLeft = campaign.deadline
+    ? Math.ceil((new Date(campaign.deadline).getTime() - Date.now()) / 86400000)
+    : null
+
+  // F5 — copy campaign URL to clipboard
+  const handleShare = async () => {
+    await navigator.clipboard.writeText(window.location.href)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }
 
   return (
     <div className="app-container">
       <AppNavbar />
-      
+      {txError && <TxBanner message={txError} onClose={() => setTxError(null)} />}
+      {/* U5 — onboarding modal (auto-shows once, can be re-triggered) */}
+      <OnboardingModal forceShow={showOnboarding} onClose={() => setShowOnboarding(false)} />
       <div className="project-detail-page">
         <div className="container">
-          {/* Back Button */}
-          <Link to="/explore" className="project-back-link">
-            <HiArrowLeft /> Back to Projects
-          </Link>
+
+          <div className="project-detail-topbar">
+            <Link to="/explore" className="project-back-link" style={{ margin: 0 }}>
+              <HiArrowLeft /> Back to Explore
+            </Link>
+            <div className="project-detail-actions">
+              <button
+                type="button"
+                className="project-ghost-btn"
+                onClick={() => setShowOnboarding(true)}
+              >
+                <HiQuestionMarkCircle aria-hidden /> <span>How it works</span>
+              </button>
+              <button
+                type="button"
+                className={`project-ghost-btn${shareCopied ? ' is-success' : ''}`}
+                onClick={handleShare}
+              >
+                {shareCopied ? <HiCheckCircle aria-hidden /> : <HiShare aria-hidden />}
+                <span>{shareCopied ? 'Link copied' : 'Share'}</span>
+              </button>
+            </div>
+          </div>
 
           <div className="project-detail-grid">
-            {/* Main Content */}
+
+            {/* ── Main Content ── */}
             <div className="project-main-content">
+
               {/* Header */}
               <div className="project-detail-header">
                 <div className="project-detail-badges">
-                  <span className="project-detail-category-badge">{project.category}</span>
-                  {project.active && (
-                    <span className="project-detail-active-badge">Active</span>
+                  <span className="project-detail-category-badge">{campaign.category}</span>
+                  {isActive && <span className="project-detail-active-badge">{formatStatus(campaign.status)}</span>}
+                  {!isActive && (
+                    <span className="project-detail-category-badge"
+                      style={{ color: campaign.status === 'FLAGGED' ? 'var(--color-error)' : undefined }}>
+                      {formatStatus(campaign.status)}
+                    </span>
                   )}
                 </div>
-                
-                <h1 className="project-detail-title">{project.title}</h1>
-                <p className="project-detail-tagline">{project.tagline}</p>
-
-                {/* Links */}
-                <div className="project-detail-links">
-                  <a href={project.github} target="_blank" rel="noopener noreferrer" className="project-link">
-                    <FaGithub /> GitHub
-                  </a>
-                  <a href={project.website} target="_blank" rel="noopener noreferrer" className="project-link">
-                    <HiGlobeAlt /> Website
-                  </a>
+                {campaign.status === 'FLAGGED' && (campaign as any).flagProposals?.[0]?.reason && (
+                  <p style={{ fontSize: '13px', color: 'var(--color-error)', margin: '6px 0 0', lineHeight: 1.5 }}>
+                    Flagged: {(campaign as any).flagProposals[0].reason}
+                  </p>
+                )}
+                <h1 className="project-detail-title">{campaign.title}</h1>
+                <p className="project-detail-tagline">{campaign.description}</p>
+                <div className="project-creator">
+                  by <span>{campaign.creator.name || shortenAddress(campaign.creator.walletAddress)}</span>
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="project-detail-section">
-                <h2 className="project-section-title">About This Project</h2>
-                <div className="project-description-content">
-                  {project.description.split('\n').map((paragraph, index) => (
-                    <p key={index}>{paragraph}</p>
-                  ))}
+              {/* Media & documents (fetched from IPFS) */}
+              {((campaign.images && campaign.images.length > 0) ||
+                (campaign.documents && campaign.documents.length > 0)) && (
+                <div style={{ marginBottom: 24 }}>
+                  {campaign.images && campaign.images.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                      {campaign.images.map(cid => (
+                        <a key={cid} href={ipfsUrl(cid)} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={ipfsUrl(cid)}
+                            alt=""
+                            style={{ width: 220, height: 160, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--color-border)' }}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {campaign.documents && campaign.documents.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {campaign.documents.map(doc => (
+                        <a
+                          key={doc.cid}
+                          href={ipfsUrl(doc.cid)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text-primary)', textDecoration: 'none', wordBreak: 'break-all' }}
+                        >
+                          <HiDocument style={{ flexShrink: 0 }} /> {doc.name}
+                          <HiArrowTopRightOnSquare size={13} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--color-primary)' }} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {/* Tabs */}
+              <div className="project-tabs">
+                {(['milestones', 'updates', 'forum'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    className={`project-tab ${activeTab === tab ? 'active' : ''}`}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
               </div>
 
-              {/* Milestones */}
-              <div className="project-detail-section">
-                <h2 className="project-section-title">Milestones</h2>
+              {/* Milestones Tab */}
+              {activeTab === 'milestones' && (
                 <div className="project-milestones-list">
-                  {project.milestones.map((milestone) => (
-                    <div key={milestone.number} className={`project-milestone-card ${milestone.status.toLowerCase()}`}>
+                  {milestones.length === 0 && (
+                    <p className="empty-state-text">No milestones yet.</p>
+                  )}
+                  {milestones.map((m, i) => (
+                    <div
+                      key={m.id}
+                      className={`project-milestone-card ${MILESTONE_STATUS_COLOR[m.status] || ''}`}
+                    >
                       <div className="project-milestone-header">
                         <div className="project-milestone-number-wrapper">
-                          <div className="project-milestone-number">
-                            {milestone.completed ? <HiCheckCircle /> : milestone.number}
-                          </div>
+                          <div className="project-milestone-number">{i + 1}</div>
                           <div>
                             <div className="project-milestone-title-row">
-                              <h3 className="project-milestone-title">{milestone.title}</h3>
-                              <span className={`project-milestone-status-badge ${milestone.status.toLowerCase()}`}>
-                                {milestone.status}
+                              <h3 className="project-milestone-title">{m.title}</h3>
+                              <span className={`project-milestone-status-badge ${MILESTONE_STATUS_COLOR[m.status] || 'pending'}`}>
+                                {formatStatus(m.status)}
                               </span>
                             </div>
-                            <p className="project-milestone-description">{milestone.description}</p>
+                            <p className="project-milestone-description">{m.description}</p>
+                            <div className="project-milestone-amount">{fmtAmount(Number(m.amount), campaign.paymentToken)}</div>
+                            {m.deadline && (
+                              <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                <HiClock size={12} /> Due {new Date(m.deadline).toLocaleDateString()}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="project-milestone-amount">
-                          ${milestone.amount.toLocaleString()}
-                        </div>
-                      </div>
-
-                      {/* Proof Button for Completed Milestones */}
-                      {(milestone.completed || milestone.proof) && (
-                        <div style={{ marginBottom: '1rem' }}>
+                        {m.proofUrl && (
                           <button
-                            className="creator-view-project-btn"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}
-                            onClick={() => {
-                              setSelectedProof({
-                                title: `${milestone.title}`,
-                                content: milestone.proof || 'No proof content available.'
-                              })
-                              setShowProofModal(true)
-                            }}
+                            className="project-link"
+                            onClick={() => { setSelectedProof({ title: m.title, content: m.proofUrl! }); setShowProofModal(true) }}
                           >
-                            <HiEye /> View Submitted Proof
+                            <HiEye /> View Proof
                           </button>
-                        </div>
-                      )}
-
-                      {/* Deliverables */}
-                      <div className="project-milestone-deliverables">
-                        <h4 className="deliverables-title">Deliverables:</h4>
-                        <ul className="deliverables-list">
-                          {milestone.deliverables.map((item, index) => (
-                            <li key={index}>
-                              <HiCheckCircle className={milestone.completed ? 'completed' : ''} />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
+                        )}
                       </div>
-
-                      {/* Voting Results */}
-                      {milestone.votes && (
-                        <div className="project-milestone-votes">
-                          <div className="vote-bar">
-                            <div 
-                              className="vote-bar-for" 
-                              style={{ width: `${(milestone.votes.for / (milestone.votes.for + milestone.votes.against)) * 100}%` }}
-                            />
-                          </div>
-                          <div className="vote-stats">
-                            <span className="vote-for">{milestone.votes.for} For</span>
-                            <span className="vote-against">{milestone.votes.against} Against</span>
-                          </div>
-                        </div>
+                      {m.status === 'VOTING' && m.onChainId != null && (
+                        <MilestoneVotingStatus
+                          milestoneOnChainId={m.onChainId}
+                          campaignOnChainId={campaign.onChainId}
+                          paymentToken={campaign.paymentToken}
+                        />
                       )}
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
 
-              {/* Updates */}
-              <div className="project-detail-section">
-                <h2 className="project-section-title">Project Updates</h2>
+              {/* Updates Tab */}
+              {activeTab === 'updates' && (
                 <div className="project-updates-list">
-                  {project.updates.map((update, index) => (
-                    <div key={index} className="project-update-card">
-                      <div className="project-update-date">{update.date}</div>
-                      <h3 className="project-update-title">{update.title}</h3>
-                      <p className="project-update-content">{update.content}</p>
+                  {updates.length === 0 ? (
+                    <p className="empty-state-text">No updates posted yet.</p>
+                  ) : updates.map(u => (
+                    <div key={u.id} className="project-update-card">
+                      <div className="project-update-header">
+                        <h4 className="project-update-title">{u.title}</h4>
+                        <span className="project-update-date">{new Date(u.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <p className="project-update-content">{u.content}</p>
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
 
-              {/* Forum */}
-              <div className="project-detail-section">
-                <div className="forum-header">
-                  <h2 className="project-section-title">Community Forum</h2>
-                  <button className="forum-new-btn">New Discussion</button>
-                </div>
-                <div className="forum-threads-list">
-                  {project.forum.map((thread) => (
-                    <div key={thread.id} className="forum-thread-card">
-                      <div className="forum-thread-header">
-                        <div className="forum-author">
-                          <div className="forum-avatar">{thread.avatar}</div>
-                          <span className="forum-author-name">{thread.author}</span>
-                        </div>
-                        <span className="forum-date">{thread.date}</span>
-                      </div>
-                      <h3 className="forum-thread-title">{thread.title}</h3>
-                      <p className="forum-thread-excerpt">{thread.content}</p>
-                      <div className="forum-thread-footer">
-                        <div className="forum-stat">
-                          <HiChatBubbleLeft /> {thread.replies} Replies
-                        </div>
-                        <div className="forum-stat">
-                          <HiHeart /> {thread.likes} Likes
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Forum Tab */}
+              {activeTab === 'forum' && id && (
+                <ProjectForum projectId={id} />
+              )}
             </div>
 
-            {/* Sidebar */}
+            {/* ── Sidebar ── */}
             <div className="project-sidebar">
-              {/* Contribution Card */}
+
+              {/* Funding Card */}
               <div className="project-contribution-card">
                 <div className="contribution-stats">
                   <div className="contribution-stat-main">
-                    <div className="contribution-amount">${project.raised.toLocaleString()}</div>
-                    <div className="contribution-label">raised of ${project.goal.toLocaleString()}</div>
+                    <div className="contribution-amount">{fmtAmount(raised, campaign.paymentToken)}</div>
+                    <div className="contribution-label">raised of {fmtAmount(goal, campaign.paymentToken)} goal</div>
                   </div>
-                  
                   <div className="contribution-progress-bar">
                     <div className="contribution-progress-fill" style={{ width: `${progress}%` }} />
                   </div>
-
                   <div className="contribution-stats-grid">
                     <div className="contribution-stat-item">
                       <HiUsers className="stat-icon" />
                       <div>
-                        <div className="stat-value">{project.contributors}</div>
-                        <div className="stat-label">Contributors</div>
+                        <div className="stat-value">{campaign._count.contributions}</div>
+                        <div className="stat-label">contributors</div>
                       </div>
                     </div>
                     <div className="contribution-stat-item">
                       <HiChartBar className="stat-icon" />
                       <div>
+                        <div className="stat-value">{campaign._count.milestones}</div>
+                        <div className="stat-label">milestones</div>
+                      </div>
+                    </div>
+                    {daysLeft !== null && (
+                      <div className="contribution-stat-item">
+                        <HiClock className="stat-icon" />
+                        <div>
+                          <div className="stat-value">{daysLeft > 0 ? daysLeft : 0}</div>
+                          <div className="stat-label">{daysLeft > 0 ? 'days left' : 'ended'}</div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="contribution-stat-item">
+                      <HiInformationCircle className="stat-icon" />
+                      <div>
                         <div className="stat-value">{Math.round(progress)}%</div>
-                        <div className="stat-label">Funded</div>
+                        <div className="stat-label">funded</div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="contribution-form">
-                  <label className="contribution-label">Contribution Amount ($)</label>
-                  <input 
-                    type="number" 
-                    className="contribution-input"
-                    placeholder="Enter amount"
-                    value={contributionAmount}
-                    onChange={(e) => setContributionAmount(e.target.value)}
-                  />
-                  <button className="btn btn-primary contribution-btn" onClick={handleContribute}>
-                    Contribute Now
-                  </button>
-                  <p className="contribution-note">
-                    <HiShieldCheck /> Your funds are protected by smart contracts
-                  </p>
-                </div>
+                {isActive && isConnected && !contributionDone && (
+                  <div className="project-contribute">
+                    <div className="project-contribute-row">
+                      <input
+                        type="number"
+                        className="form-input"
+                        placeholder={`Amount (${campaign.paymentToken})`}
+                        value={contributionAmount}
+                        onChange={e => setContributionAmount(e.target.value)}
+                        min="0"
+                        max="1000000"
+                        step="0.01"
+                      />
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleContribute}
+                        disabled={!contributionAmount || contributing}
+                      >
+                        {contributing
+                        ? contributingStep === 'approving' ? 'Approving USDC...' : 'Confirming...'
+                        : 'Fund'}
+                      </button>
+                    </div>
+                    <p className="contribution-note">
+                      <HiCheckCircle /> Secured by smart contract
+                      {' '}· Min: {campaign.paymentToken === 'USDC' ? `${MIN_USDC} USDC` : `${MIN_ETH} ETH`}
+                    </p>
+                  </div>
+                )}
+
+                {contributionDone && (
+                  <div className="contribution-success">
+                    <HiCheckCircle /> Contribution submitted!
+                  </div>
+                )}
+
+                {isActive && !isConnected && (
+                  <p className="connect-wallet-note">Connect your wallet to contribute.</p>
+                )}
+
+                {/* Voting power */}
+                {isConnected && myContributionRaw != null && (myContributionRaw as bigint) > 0n && (
+                  <div style={{
+                    marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    fontSize: 13,
+                  }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Your voting power</span>
+                    <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {Number(formatUnits(myContributionRaw as bigint, campaign.paymentToken === 'USDC' ? 6 : 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {campaign.paymentToken}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Creator Card */}
               <div className="project-creator-card">
-                <h3 className="creator-card-title">Project Creator</h3>
+                <div className="creator-card-title">Creator</div>
                 <div className="creator-info">
-                  <div className="creator-avatar">{project.creator.avatar}</div>
+                  <div className="creator-avatar" aria-label="Creator"><HiUser /></div>
                   <div>
-                    <div className="creator-name">{project.creator.name}</div>
-                    <div className="creator-address">{project.creator.address}</div>
+                    <div className="creator-name">
+                      {campaign.creator.name || shortenAddress(campaign.creator.walletAddress)}
+                    </div>
+                    <div className="creator-address">
+                      {shortenAddress(campaign.creator.walletAddress)}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Info Card */}
-              <div className="project-info-card">
-                <h3 className="info-card-title">Campaign Info</h3>
-                <div className="info-items">
-                  <div className="info-item">
-                    <span className="info-label">Status</span>
-                    <span className="info-value active">Active</span>
+              {/* Links Card */}
+              {(campaign.website || campaign.repositoryUrl) && (
+                <div className="project-info-card">
+                  <div className="info-card-title">Links</div>
+                  <div className="project-detail-links">
+                    {campaign.website && (
+                      <a href={campaign.website} target="_blank" rel="noopener noreferrer" className="project-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <HiGlobeAlt size={15} /> Website
+                      </a>
+                    )}
+                    {campaign.repositoryUrl && (
+                      <a href={campaign.repositoryUrl} target="_blank" rel="noopener noreferrer" className="project-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <RepoIcon url={campaign.repositoryUrl} size={14} /> Repository
+                      </a>
+                    )}
                   </div>
-                  <div className="info-item">
-                    <span className="info-label">Milestones</span>
-                    <span className="info-value">{project.milestones.length}</span>
-                  </div>
-                  <div className="info-item">
-                    <span className="info-label">Completed</span>
-                    <span className="info-value">
-                      {project.milestones.filter(m => m.completed).length} / {project.milestones.length}
-                    </span>
-                  </div>
+                  {campaign.license && (
+                    <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      License: <strong>{campaign.license}</strong>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
-        
-        <ProofModal 
-          isOpen={showProofModal}
-          onClose={() => setShowProofModal(false)}
-          title={selectedProof?.title || ''}
-          proofContent={selectedProof?.content || ''}
-        />
       </div>
+
+      <ProofModal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        title={selectedProof?.title || ''}
+        proofContent={selectedProof?.content || ''}
+      />
     </div>
   )
 }

@@ -1,32 +1,110 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HiShieldCheck, HiWallet } from 'react-icons/hi2'
+import { useAccount, useConnect, useSignMessage } from 'wagmi'
+import { HiShieldCheck, HiWallet, HiExclamationTriangle } from 'react-icons/hi2'
+import { useAuth } from '../../context/AuthContext'
 import '../../Admin.css'
+
+type Status = 'idle' | 'connecting' | 'signing' | 'verifying' | 'error'
 
 export default function AdminLoginPage() {
   const navigate = useNavigate()
+  const { address, isConnected } = useAccount()
+  const { connect, connectors } = useConnect()
+  const { signMessageAsync } = useSignMessage()
+  const { isAuthenticated, isAdmin, login } = useAuth()
+  const [status, setStatus] = useState<Status>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const handleLogin = () => {
+  // If already authenticated as admin, go straight to dashboard
+  useEffect(() => {
+    if (isAuthenticated && isAdmin) navigate('/admin/dashboard', { replace: true })
+  }, [isAuthenticated, isAdmin, navigate])
 
-    navigate('/admin/dashboard')
+  const handleLogin = async () => {
+    setErrorMsg('')
+
+    try {
+      // Step 1: connect wallet if not already connected
+      if (!isConnected) {
+        setStatus('connecting')
+        const injected = connectors.find(c => c.id === 'injected') || connectors[0]
+        if (!injected) throw new Error('No wallet connector found')
+        await connect({ connector: injected })
+        // address becomes available on next render; useEffect below will continue
+        return
+      }
+
+      await signIn()
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Login failed')
+      setStatus('error')
+    }
+  }
+
+  const signIn = async () => {
+    if (!address) return
+    setStatus('signing')
+    try {
+      await login(address, async (message) => {
+        setStatus('signing')
+        const sig = await signMessageAsync({ message })
+        setStatus('verifying')
+        return sig
+      })
+      // isAuthenticated + isAdmin will update → useEffect will redirect
+      // But check role explicitly in case user is not admin
+    } catch (err: any) {
+      if (err?.message?.includes('verification') || err?.message?.includes('401')) {
+        setErrorMsg('Authentication failed. Please try again.')
+      } else {
+        setErrorMsg(err?.message || 'Login failed')
+      }
+      setStatus('error')
+      return
+    }
+  }
+
+  // After wallet connects (address appears), auto-trigger signing
+  useEffect(() => {
+    if (isConnected && address && status === 'connecting') {
+      signIn()
+    }
+  }, [isConnected, address, status])
+
+  // After login succeeds, check if admin
+  useEffect(() => {
+    if (isAuthenticated && !isAdmin) {
+      setErrorMsg('This wallet does not have admin access.')
+      setStatus('error')
+    }
+  }, [isAuthenticated, isAdmin])
+
+  const statusLabel: Record<Status, string> = {
+    idle: isConnected ? 'Sign In' : 'Connect Wallet',
+    connecting: 'Connecting...',
+    signing: 'Sign message in wallet...',
+    verifying: 'Verifying...',
+    error: isConnected ? 'Try Again' : 'Connect Wallet',
   }
 
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
-        <div style={{ 
-          width: 64, 
-          height: 64, 
-          background: 'var(--color-primary)', 
-          borderRadius: 16, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
+        <div style={{
+          width: 64,
+          height: 64,
+          background: 'var(--color-primary)',
+          borderRadius: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           margin: '0 auto 24px',
           color: 'white'
         }}>
           <HiShieldCheck size={32} />
         </div>
-        
+
         <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-text-primary)' }}>
           Admin Portal
         </h1>
@@ -39,36 +117,64 @@ export default function AdminLoginPage() {
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginBottom: '24px' }}>
             Connect your authorized wallet to continue
           </p>
-          
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>
-            Wallet Address
+
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', marginBottom: '8px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Wallet
           </label>
-          <div style={{ 
-            background: 'var(--color-bg-subtle)', 
-            padding: '12px 16px', 
-            borderRadius: '8px', 
-            border: '1px solid var(--color-border)',
-            fontFamily: 'monospace',
-            color: 'var(--color-text-secondary)',
-            marginBottom: '24px'
-          }}>
-            0x...
+          <div className={`admin-wallet-field${isConnected && address ? ' is-connected' : ''}`}>
+            {isConnected && address ? (
+              <>
+                <span className="admin-wallet-dot" />
+                <HiWallet size={15} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                <span className="admin-wallet-addr">
+                  {address.slice(0, 6)}
+                  <span style={{ color: 'var(--color-text-tertiary)', margin: '0 1px' }}>···</span>
+                  {address.slice(-4)}
+                </span>
+                <span className="admin-wallet-chip">Connected</span>
+              </>
+            ) : (
+              <>
+                <HiWallet size={15} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: '14px' }}>No wallet connected</span>
+              </>
+            )}
           </div>
 
-          <button 
+          {errorMsg && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(239,68,68,0.1)',
+              border: '1px solid var(--color-error)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              fontSize: '14px',
+              color: 'var(--color-error)',
+            }}>
+              <HiExclamationTriangle style={{ flexShrink: 0 }} />
+              {errorMsg}
+            </div>
+          )}
+
+          <button
             onClick={handleLogin}
             className="btn btn-primary"
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            disabled={status === 'connecting' || status === 'signing' || status === 'verifying'}
           >
-            <HiWallet /> Connect Wallet
+            <HiWallet />
+            {statusLabel[status]}
           </button>
         </div>
 
-        <div style={{ 
-          background: 'var(--color-bg-subtle)', 
-          padding: '16px', 
-          borderRadius: '12px', 
-          display: 'flex', 
+        <div style={{
+          background: 'var(--color-bg-subtle)',
+          padding: '16px',
+          borderRadius: '12px',
+          display: 'flex',
           gap: '12px',
           textAlign: 'left',
           border: '1px solid var(--color-border)'
@@ -77,7 +183,7 @@ export default function AdminLoginPage() {
           <div>
             <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>Authorized Access Only</div>
             <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-              Only whitelisted wallet addresses can access this dashboard.
+              Only wallets with the ADMIN role can access this dashboard.
             </div>
           </div>
         </div>
