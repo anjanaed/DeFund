@@ -1,10 +1,8 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Put } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
-@UseGuards(JwtAuthGuard)
 @Controller('user')
 export class UsersController {
   constructor(private readonly users: UsersService) {}

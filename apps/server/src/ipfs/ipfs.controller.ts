@@ -4,11 +4,9 @@ import {
   Controller,
   Post,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { IpfsService } from './ipfs.service';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -43,7 +41,6 @@ export class IpfsController {
    * Auth-guarded so only signed-in users can upload.
    */
   @Post('file')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: MAX_FILE_BYTES } }),
   )
@@ -76,7 +73,6 @@ export class IpfsController {
    * its CID. Used when a proof bundles several files plus a note into one record.
    */
   @Post('json')
-  @UseGuards(JwtAuthGuard)
   async uploadJson(@Body() body: { content?: unknown; name?: string }) {
     if (!body || body.content === undefined || body.content === null) {
       throw new BadRequestException('No JSON content provided.');

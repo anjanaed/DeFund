@@ -214,8 +214,6 @@ export class AdminController {
     return this.admin.getUsers(search, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
   }
 
-  // ─── Governance: Multi-Sig Admin Role Proposals ─────────────────────────────
-
   @Post('governance/role-proposals')
   proposeRoleChange(
     @Body() dto: ProposeRoleChangeDto,
@@ -244,8 +242,6 @@ export class AdminController {
   getRoleProposals(@Query('pending') pending?: string) {
     return this.admin.getRoleProposals(pending === 'true');
   }
-
-  // ─── Governance: Multi-Sig Campaign Approval ────────────────────────────────
 
   @Post('projects/:id/propose-approval')
   proposeApproval(

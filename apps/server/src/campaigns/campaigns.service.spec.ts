@@ -3,6 +3,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { CampaignsService } from './campaigns.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IpfsService } from '../ipfs/ipfs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CampaignStatus } from '../generated/prisma';
 
 const makeCampaign = (overrides: Partial<Record<string, any>> = {}) => ({
@@ -50,6 +51,10 @@ const mockIpfs = {
   gatewayUrl: jest.fn((cid: string) => `https://ipfs.io/ipfs/${cid}`),
 };
 
+const mockNotifications = {
+  notifyAdmins: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('CampaignsService', () => {
   let service: CampaignsService;
 
@@ -61,6 +66,7 @@ describe('CampaignsService', () => {
         CampaignsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: IpfsService, useValue: mockIpfs },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
 
@@ -222,7 +228,9 @@ describe('CampaignsService', () => {
 
       expect(result).toEqual(milestones);
       expect(mockPrisma.milestone.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { order: 'asc' } }),
+        expect.objectContaining({
+          orderBy: [{ onChainId: { sort: 'asc', nulls: 'last' } }, { order: 'asc' }, { createdAt: 'asc' }],
+        }),
       );
     });
 

@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { Public } from '../auth/public.decorator';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(

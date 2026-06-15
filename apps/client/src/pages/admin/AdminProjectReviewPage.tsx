@@ -50,8 +50,6 @@ export default function AdminProjectReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // ── Approval proposal handlers ───────────────────────────────────────────
-
   const handleProposeApproval = async () => {
     setPending(true)
     try {
@@ -74,7 +72,6 @@ export default function AdminProjectReviewPage() {
     finally { setPending(false) }
   }
 
-  // The second admin calls createCampaign() on-chain then confirms in the DB
   const handleConfirmDeploy = async () => {
     if (!campaign?.ipfsHash) { toast.error('Campaign has no ipfsHash.'); return }
     if (!campaign?.deadline) { toast.error('Campaign has no deadline set.'); return }
@@ -133,8 +130,6 @@ export default function AdminProjectReviewPage() {
       setPending(false)
     }
   }
-
-  // ── Other action handlers ────────────────────────────────────────────────
 
   const handleCancel = async () => {
     if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID.'); return }
