@@ -1,9 +1,9 @@
-import { Controller, Get, Logger, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Logger, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { SocialAuthService } from './social-auth.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Public } from '../auth/public.decorator';
 
 @Controller('auth')
 export class SocialAuthController {
@@ -35,11 +35,11 @@ export class SocialAuthController {
   // ── GitHub ───────────────────────────────────────────────────────────────
 
   @Get('github/initiate')
-  @UseGuards(JwtAuthGuard)
   githubInitiate(@CurrentUser() user: any) {
     return { url: this.svc.githubUrl(user.walletAddress) };
   }
 
+  @Public()
   @Get('github/callback')
   async githubCallback(
     @Query('code') code: string,
@@ -58,11 +58,11 @@ export class SocialAuthController {
   // ── Discord ──────────────────────────────────────────────────────────────
 
   @Get('discord/initiate')
-  @UseGuards(JwtAuthGuard)
   discordInitiate(@CurrentUser() user: any) {
     return { url: this.svc.discordUrl(user.walletAddress) };
   }
 
+  @Public()
   @Get('discord/callback')
   async discordCallback(
     @Query('code') code: string,
@@ -81,11 +81,11 @@ export class SocialAuthController {
   // ── Twitter / X ──────────────────────────────────────────────────────────
 
   @Get('twitter/initiate')
-  @UseGuards(JwtAuthGuard)
   twitterInitiate(@CurrentUser() user: any) {
     return { url: this.svc.twitterUrl(user.walletAddress) };
   }
 
+  @Public()
   @Get('twitter/callback')
   async twitterCallback(
     @Query('code') code: string,

@@ -4,14 +4,11 @@ import {
   Patch,
   Param,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

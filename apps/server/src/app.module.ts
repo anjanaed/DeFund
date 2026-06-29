@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -25,7 +26,6 @@ import configuration from './config/configuration';
       isGlobal: true,
       load: [configuration],
     }),
-    // M2 — global rate limiting (10 requests per 60 s per IP by default)
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
     PrismaModule,
     BlockchainModule,
@@ -44,8 +44,9 @@ import configuration from './config/configuration';
   controllers: [AppController],
   providers: [
     AppService,
-    // Activates the global throttler guard so @Throttle() decorators are enforced
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Global JWT guard — all routes require a valid JWT unless decorated with @Public()
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule {}

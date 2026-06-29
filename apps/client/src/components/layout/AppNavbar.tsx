@@ -14,16 +14,13 @@ export default function AppNavbar() {
   const { signMessageAsync } = useSignMessage()
   const [signing, setSigning] = useState(false)
   const [signError, setSignError] = useState('')
-  // F4 — wallet disconnect detection
   const [showDisconnectBanner, setShowDisconnectBanner] = useState(false)
   const prevConnected = useRef(isConnected)
 
   useEffect(() => {
-    // When a signed-in user's wallet becomes disconnected, show the banner
     if (prevConnected.current && !isConnected && isAuthenticated) {
       setShowDisconnectBanner(true)
     }
-    // If they reconnect, hide the banner
     if (isConnected) setShowDisconnectBanner(false)
     prevConnected.current = isConnected
   }, [isConnected, isAuthenticated])
@@ -54,7 +51,6 @@ export default function AppNavbar() {
 
   return (
     <>
-    {/* F4 — wallet disconnect banner */}
     {showDisconnectBanner && (
       <div style={{
         background: 'var(--color-warning-bg, #78350f)',

@@ -26,7 +26,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const { disconnect } = useDisconnect()
 
-  // Restore session from HttpOnly cookie on page load
   useEffect(() => {
     fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
@@ -36,8 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (walletAddress: string, signFn: (message: string) => Promise<string>) => {
-    // Step 1: get nonce (apiFetch applies a request timeout so the UI can never
-    // hang indefinitely if the server stalls)
     const nonceRes = await apiFetch('/auth/nonce', {
       method: 'POST',
       body: JSON.stringify({ walletAddress }),
@@ -45,10 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!nonceRes.ok) throw new Error('Failed to get nonce')
     const { nonce } = await nonceRes.json()
 
-    // Step 2: sign the nonce with the wallet
     const signature = await signFn(nonce)
 
-    // Step 3: verify signature — server sets HttpOnly cookie, returns user info
     const verifyRes = await apiFetch('/auth/verify', {
       method: 'POST',
       body: JSON.stringify({ walletAddress, signature }),

@@ -6,21 +6,17 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { QueryCampaignsDto } from './dto/query-campaigns.dto';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { CreateUpdateDto } from './dto/create-update.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller()
 export class CampaignsController {
   constructor(private readonly campaigns: CampaignsService) {}
-
-  // ── Public ────────────────────────────────────────────────────────────────
 
   @Get('stats')
   getPublicStats() {
@@ -53,7 +49,6 @@ export class CampaignsController {
   }
 
   @Get('projects/:id/contributions/export')
-  @UseGuards(JwtAuthGuard)
   exportContributions(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -61,10 +56,7 @@ export class CampaignsController {
     return this.campaigns.exportContributions(id, user.userId);
   }
 
-  // ── Creator ───────────────────────────────────────────────────────────────
-
   @Post('projects')
-  @UseGuards(JwtAuthGuard)
   createCampaign(
     @CurrentUser() user: any,
     @Body() dto: CreateCampaignDto,
@@ -73,7 +65,6 @@ export class CampaignsController {
   }
 
   @Put('projects/:id')
-  @UseGuards(JwtAuthGuard)
   updateCampaign(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -83,7 +74,6 @@ export class CampaignsController {
   }
 
   @Post('projects/:id/updates')
-  @UseGuards(JwtAuthGuard)
   createUpdate(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -93,7 +83,6 @@ export class CampaignsController {
   }
 
   @Post('projects/:id/resubmit')
-  @UseGuards(JwtAuthGuard)
   resubmitCampaign(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -102,7 +91,6 @@ export class CampaignsController {
   }
 
   @Get('creator/projects')
-  @UseGuards(JwtAuthGuard)
   getCreatorProjects(@CurrentUser() user: any) {
     return this.campaigns.findCreatorProjects(user.userId);
   }

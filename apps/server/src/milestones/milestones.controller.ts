@@ -1,7 +1,6 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { MilestonesService } from './milestones.service';
 import { SubmitProofDto } from './dto/submit-proof.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('milestones')
@@ -14,7 +13,6 @@ export class MilestonesController {
   }
 
   @Post(':id/proof')
-  @UseGuards(JwtAuthGuard)
   submitProof(
     @Param('id') id: string,
     @CurrentUser() user: any,

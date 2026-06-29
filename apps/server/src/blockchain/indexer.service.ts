@@ -246,7 +246,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     if (dbStatus === CampaignStatus.FUNDED) {
       const campaign = await this.prisma.campaign.findFirst({ where: { onChainId } });
       if (campaign) {
-        // Notify contributors that the campaign is fully funded
         this.notifications.createForContributors(
           campaign.id,
           NotificationType.CAMPAIGN_FULLY_FUNDED,
@@ -256,11 +255,10 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
           `CAMPAIGN_FULLY_FUNDED:${campaign.id}`,
         ).catch((err) => this.logger.error('Failed to create CAMPAIGN_FULLY_FUNDED notification', err));
 
-        // F3 — also notify the creator that their campaign has been fully funded
         this.notifications.createForCampaignCreator(
           campaign.id,
           NotificationType.CAMPAIGN_FULLY_FUNDED,
-          '🎉 Your Campaign is Fully Funded!',
+          'Your Campaign is Fully Funded!',
           `Congratulations! "${campaign.title}" has reached its funding goal. You can now submit milestone proofs.`,
           { campaignId: campaign.id, campaignTitle: campaign.title },
           `CREATOR:CAMPAIGN_FULLY_FUNDED:${campaign.id}`,
@@ -336,7 +334,6 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       include: { campaign: { select: { id: true, title: true } } },
     });
     if (milestone) {
-      // Notify contributors that voting has started
       this.notifications.createForContributors(
         milestone.campaignId,
         NotificationType.MILESTONE_VOTING_STARTED,
@@ -351,11 +348,10 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
         `MILESTONE_VOTING_STARTED:${milestone.id}`,
       ).catch((err) => this.logger.error('Failed to create MILESTONE_VOTING_STARTED notification', err));
 
-      // F3 — notify creator that their milestone is being voted on
       this.notifications.createForCampaignCreator(
         milestone.campaignId,
         NotificationType.MILESTONE_VOTING_STARTED,
-        '🗳️ Your Milestone is Being Voted On',
+        'Your Milestone is Being Voted On',
         `Voting has started for '${milestone.title}'. Results will be available after the voting period ends.`,
         {
           campaignId: milestone.campaignId,
@@ -409,9 +405,8 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       const type = approved ? NotificationType.MILESTONE_APPROVED : NotificationType.MILESTONE_REJECTED;
       const title = approved ? 'Milestone Approved' : 'Milestone Rejected';
       const body = approved
-        ? `'${milestone.title}' on "${milestone.campaign.title}" was approved ✓`
+        ? `'${milestone.title}' on "${milestone.campaign.title}" was approved`
         : `'${milestone.title}' on "${milestone.campaign.title}" was rejected`;
-      // Notify contributors of the voting result
       this.notifications.createForContributors(
         milestone.campaignId, type, title, body,
         {
@@ -423,8 +418,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
         `${type}:${milestone.id}`,
       ).catch((err) => this.logger.error('Failed to create milestone vote result notification', err));
 
-      // F3 — notify creator of their milestone voting result
-      const creatorTitle = approved ? '✅ Milestone Approved!' : '❌ Milestone Rejected';
+      const creatorTitle = approved ? 'Milestone Approved' : 'Milestone Rejected';
       const creatorBody = approved
         ? `Your milestone '${milestone.title}' was approved by voters. Await admin fund release.`
         : `Your milestone '${milestone.title}' was rejected by voters. You may resubmit up to 3 times.`;

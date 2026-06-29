@@ -7,13 +7,11 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ForumService } from './forum.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { ReactionDto } from './dto/reaction.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('projects/:id/forum')
@@ -34,7 +32,6 @@ export class ForumController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   postMessage(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -44,7 +41,6 @@ export class ForumController {
   }
 
   @Patch(':messageId')
-  @UseGuards(JwtAuthGuard)
   updateMessage(
     @Param('id') id: string,
     @Param('messageId') messageId: string,
@@ -55,7 +51,6 @@ export class ForumController {
   }
 
   @Delete(':messageId')
-  @UseGuards(JwtAuthGuard)
   deleteMessage(
     @Param('id') id: string,
     @Param('messageId') messageId: string,
@@ -65,7 +60,6 @@ export class ForumController {
   }
 
   @Post(':messageId/reactions')
-  @UseGuards(JwtAuthGuard)
   toggleReaction(
     @Param('messageId') messageId: string,
     @CurrentUser() user: any,

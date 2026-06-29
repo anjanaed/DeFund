@@ -401,7 +401,7 @@ describe('AdminService', () => {
 
   describe('proposeRefund', () => {
     it('returns guidance message for on-chain campaign', async () => {
-      mockPrisma.campaign.findUnique.mockResolvedValue(makeCampaign({ onChainId: 5 }));
+      mockPrisma.campaign.findUnique.mockResolvedValue(makeCampaign({ onChainId: 5, status: CampaignStatus.FLAGGED }));
 
       mockPrisma.campaign.update.mockResolvedValue({});
       const result = await service.proposeRefund('campaign-1', 'test reason');

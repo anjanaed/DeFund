@@ -1,11 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { NonceRequestDto } from './dto/nonce-request.dto';
 import { VerifySignatureDto } from './dto/verify-signature.dto';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
+import { Public } from './public.decorator';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -20,6 +20,7 @@ export class AuthController {
 
   // M2 — rate-limit nonce generation to 5 requests per minute per IP
   // to prevent spam / wallet-slot exhaustion attacks.
+  @Public()
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('nonce')
   @HttpCode(HttpStatus.OK)
@@ -27,6 +28,7 @@ export class AuthController {
     return this.authService.getNonce(dto);
   }
 
+  @Public()
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   async verifySignature(
@@ -38,6 +40,7 @@ export class AuthController {
     return { user };
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) res: Response) {
@@ -46,7 +49,6 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: any) {
     return { user };
   }

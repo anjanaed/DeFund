@@ -117,8 +117,8 @@ describe('MilestonesService', () => {
     const dto = { proofUrl: 'QmProofHash123' };
 
     it('updates the milestone proofUrl for the campaign creator', async () => {
-      mockPrisma.milestone.findUnique.mockResolvedValue(makeMilestone());
-      const updated = makeMilestone({ proofUrl: dto.proofUrl });
+      mockPrisma.milestone.findUnique.mockResolvedValue(makeMilestone({ status: 'ONGOING' }));
+      const updated = makeMilestone({ status: 'ONGOING', proofUrl: dto.proofUrl });
       mockPrisma.milestone.update.mockResolvedValue(updated);
 
       const result = await service.submitProof('milestone-1', 'user-1', dto);
