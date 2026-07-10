@@ -13,30 +13,42 @@ interface Campaign {
   creator: { walletAddress: string; name?: string }
 }
 
+interface VerificationPage {
+  items: Campaign[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export default function AdminVerificationPage() {
   const navigate = useNavigate()
-  const [projects, setProjects] = useState<Campaign[]>([])
+  const [page, setPage] = useState<VerificationPage | null>(null)
   const [pendingApprovalIds, setPendingApprovalIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
 
   useEffect(() => {
-    Promise.all([
-      apiFetch('/admin/verification').then((r) => r.json()),
-      apiFetch('/admin/governance/pending-approvals').then((r) => r.json()).catch(() => []),
-    ]).then(([data, approvals]) => {
-      setProjects(Array.isArray(data?.items) ? data.items : [])
-      const ids = new Set<string>(Array.isArray(approvals) ? approvals.map((a: any) => a.campaignId) : [])
-      setPendingApprovalIds(ids)
-    }).catch(() => setProjects([]))
-      .finally(() => setLoading(false))
-  }, [])
+    const timer = setTimeout(() => {
+      setLoading(true)
+      const params = new URLSearchParams({ page: String(currentPage), limit: String(itemsPerPage) })
+      if (searchTerm) params.set('search', searchTerm)
+      Promise.all([
+        apiFetch(`/admin/verification?${params}`).then((r) => r.json()),
+        apiFetch('/admin/governance/pending-approvals').then((r) => r.json()).catch(() => []),
+      ]).then(([data, approvals]) => {
+        setPage(data)
+        const ids = new Set<string>(Array.isArray(approvals) ? approvals.map((a: any) => a.campaignId) : [])
+        setPendingApprovalIds(ids)
+      }).catch(() => setPage(null))
+        .finally(() => setLoading(false))
+    }, searchTerm ? 300 : 0)
+    return () => clearTimeout(timer)
+  }, [currentPage, searchTerm])
 
-  const filtered = projects.filter(
-    (p) =>
-      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.creator.walletAddress.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const projects = page?.items ?? []
 
   return (
     <div>
@@ -53,14 +65,14 @@ export default function AdminVerificationPage() {
               type="text"
               placeholder="Search projects..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
             />
           </div>
         </div>
 
         {loading ? (
           <Spinner label="Loading verification queue…" />
-        ) : filtered.length === 0 ? (
+        ) : projects.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
             No pending campaigns.
           </div>
@@ -76,7 +88,7 @@ export default function AdminVerificationPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((project) => (
+              {projects.map((project) => (
                 <tr
                   key={project.id}
                   onClick={() => navigate(`/admin/verification/${project.id}`)}
@@ -109,6 +121,34 @@ export default function AdminVerificationPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && projects.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+              {page
+                ? `Showing ${(page.page - 1) * page.limit + 1}-${(page.page - 1) * page.limit + page.items.length} of ${page.total} campaigns`
+                : '—'}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn"
+                style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: currentPage === 1 ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+              >
+                Previous
+              </button>
+              <button
+                className="btn"
+                style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: page && currentPage >= page.totalPages ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: page && currentPage >= page.totalPages ? 'not-allowed' : 'pointer' }}
+                disabled={!page || currentPage >= page.totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -27,27 +27,39 @@ interface RoleProposal {
   executed: boolean
 }
 
+interface UsersPage {
+  items: AdminUser[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth()
   const navigate = useNavigate()
-  const [users, setUsers] = useState<AdminUser[]>([])
+  const [page, setPage] = useState<UsersPage | null>(null)
   const [pendingProposals, setPendingProposals] = useState<RoleProposal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('') // kept for load errors only
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [proposingId, setProposingId] = useState<string | null>(null)
+  const itemsPerPage = 20
 
   const load = async () => {
     setLoading(true)
     setError('')
     try {
+      const params = new URLSearchParams({ page: String(currentPage), limit: String(itemsPerPage) })
+      if (searchTerm) params.set('search', searchTerm)
       const [usersRes, proposalsRes] = await Promise.all([
-        apiFetch('/admin/users'),
+        apiFetch(`/admin/users?${params}`),
         apiFetch('/admin/governance/role-proposals?pending=true'),
       ])
-      const usersData = await usersRes.json()
+      const usersData: UsersPage = await usersRes.json()
       const proposalsData = await proposalsRes.json()
-      setUsers(Array.isArray(usersData.items) ? usersData.items : [])
+      setPage(usersData)
       setPendingProposals(Array.isArray(proposalsData) ? proposalsData : [])
     } catch {
       setError('Failed to load users')
@@ -57,9 +69,10 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
-    load()
+    const timer = setTimeout(load, searchTerm ? 300 : 0)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [currentPage, searchTerm])
 
   const handlePropose = async (userId: string, targetRole: Role) => {
     setProposingId(userId)
@@ -80,14 +93,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const filtered = users.filter((u) => {
-    const q = searchTerm.toLowerCase()
-    return (
-      (u.name?.toLowerCase().includes(q) ?? false) ||
-      u.walletAddress.toLowerCase().includes(q) ||
-      (u.email?.toLowerCase().includes(q) ?? false)
-    )
-  })
+  const users = page?.items ?? []
 
   const pendingFor = (userId: string) => pendingProposals.find((p) => p.targetUserId === userId)
 
@@ -112,7 +118,7 @@ export default function AdminUsersPage() {
               type="text"
               placeholder="Search by name, wallet, or email..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
             />
           </div>
         </div>
@@ -133,9 +139,9 @@ export default function AdminUsersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={8} style={{ padding: 0 }}><Spinner label="Loading users…" /></td></tr>
-            ) : filtered.length === 0 ? (
+            ) : users.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No users found.</td></tr>
-            ) : filtered.map((u) => {
+            ) : users.map((u) => {
               const proposal = pendingFor(u.id)
               const isSelf = u.id === currentUser?.id
               const isSaving = proposingId === u.id
@@ -191,6 +197,32 @@ export default function AdminUsersPage() {
             })}
           </tbody>
         </table>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+            {page
+              ? `Showing ${(page.page - 1) * page.limit + (page.items.length > 0 ? 1 : 0)}-${(page.page - 1) * page.limit + page.items.length} of ${page.total} users`
+              : '—'}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className="btn"
+              style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: currentPage === 1 ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              Previous
+            </button>
+            <button
+              className="btn"
+              style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'white', color: page && currentPage >= page.totalPages ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', cursor: page && currentPage >= page.totalPages ? 'not-allowed' : 'pointer' }}
+              disabled={!page || currentPage >= page.totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

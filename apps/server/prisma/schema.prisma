@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -91,10 +85,6 @@ model Campaign {
   refundReason     String?
   ipfsHash         String?
 
-  // Media cached from IPFS for fast rendering. The authoritative copy is the
-  // metadata JSON referenced by `ipfsHash`; these mirror its contents so list
-  // and detail pages do not need a gateway round-trip per campaign.
-  // images holds IPFS CIDs; documents is [{ name, cid, mimetype }].
   images     String[] @default([])
   documents  Json?
 
@@ -117,7 +107,7 @@ model RefundProposal {
   id         String   @id @default(uuid())
   onChainId  Int      @unique
   proposer   String
-  confirmer  String?  // [L2] renamed from `approver` to match FlagProposal/ReleaseFundsProposal naming
+  confirmer  String?
   executed   Boolean  @default(false)
   proposedAt DateTime @default(now())
 
@@ -151,8 +141,6 @@ model ReleaseFundsProposal {
   milestoneId String
   milestone   Milestone @relation(fields: [milestoneId], references: [id])
 }
-
-
 
 model Milestone {
   id          String          @id @default(uuid())
@@ -194,10 +182,9 @@ model Contribution {
 
 model Vote {
   id        String   @id @default(uuid())
-  choice    Boolean // True = Approve, False = Reject
+  choice    Boolean
   weight    Decimal  @default(0) @db.Decimal(36, 0)
   timestamp DateTime @default(now())
-
 
   voterId     String
   voter       User      @relation(fields: [voterId], references: [id])
@@ -206,7 +193,6 @@ model Vote {
 
   @@unique([voterId, milestoneId])
 }
-
 
 model Update {
   id        String   @id @default(uuid())
@@ -271,15 +257,14 @@ model IndexerState {
   updatedAt DateTime @updatedAt
 }
 
-// U8 — Admin audit log: tracks who did what and when
 model AdminAuditLog {
   id          String   @id @default(uuid())
-  adminWallet String   // wallet address of the admin who performed the action
-  action      String   // e.g. APPROVE_CAMPAIGN, REJECT_CAMPAIGN, PROPOSE_FLAG, CONFIRM_FLAG, etc.
-  entityType  String   // "campaign" | "milestone"
-  entityId    String   // DB id of the affected entity
-  entityTitle String?  // human-readable title for display
-  metadata    Json?    // additional context (onChainId, reason, etc.)
+  adminWallet String
+  action      String
+  entityType  String
+  entityId    String
+  entityTitle String?
+  metadata    Json?
   createdAt   DateTime @default(now())
 
   @@index([adminWallet, createdAt])
@@ -303,11 +288,11 @@ enum NotificationType {
 
 model CampaignApprovalProposal {
   id         String   @id @default(uuid())
-  proposer   String   // wallet address of first admin
+  proposer   String
   executed   Boolean  @default(false)
   proposedAt DateTime @default(now())
 
-  campaignId String   @unique  // one active proposal per campaign
+  campaignId String   @unique
   campaign   Campaign @relation(fields: [campaignId], references: [id])
 }
 
@@ -315,8 +300,8 @@ model AdminRoleProposal {
   id           String    @id @default(uuid())
   targetUserId String
   targetRole   UserRole
-  proposer     String    // wallet address of proposing admin
-  confirmer    String?   // wallet address of confirming admin; null until executed
+  proposer     String
+  confirmer    String?
   executed     Boolean   @default(false)
   proposedAt   DateTime  @default(now())
 
@@ -330,7 +315,7 @@ model Notification {
   body      String
   isRead    Boolean          @default(false)
   metadata  Json?
-  eventKey  String?          // deduplication key: {type}:{campaignId}[:{milestoneId}]
+  eventKey  String?
   createdAt DateTime         @default(now())
 
   userId String

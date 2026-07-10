@@ -131,10 +131,16 @@ export class AdminService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async getProjects(page = 1, limit = 20, status?: string) {
+  async getProjects(page = 1, limit = 20, status?: string, search?: string) {
     const skip = (page - 1) * limit;
     const where: any = {};
     if (status) where.status = status;
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { creator: { walletAddress: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
     const [items, total] = await Promise.all([
       this.prisma.campaign.findMany({
         where,

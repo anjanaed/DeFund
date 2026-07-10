@@ -33,9 +33,17 @@ function statusBadge(status: string): 'success' | 'warning' | 'error' | 'neutral
   }
 }
 
+interface ProjectsPage {
+  items: ProjectRow[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export default function AdminRiskPage() {
   const navigate = useNavigate()
-  const [projects, setProjects] = useState<ProjectRow[]>([])
+  const [page, setPage] = useState<ProjectsPage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -45,26 +53,23 @@ export default function AdminRiskPage() {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    apiFetch('/admin/projects')
-      .then((r) => r.json())
-      .then((data) => !cancelled && setProjects(Array.isArray(data?.items) ? data.items : []))
-      .catch(() => !cancelled && setError('Failed to load projects'))
-      .finally(() => !cancelled && setLoading(false))
-    return () => { cancelled = true }
-  }, [])
+    const timer = setTimeout(() => {
+      setLoading(true)
+      const params = new URLSearchParams({ page: String(currentPage), limit: String(itemsPerPage) })
+      if (statusFilter !== 'All') params.set('status', statusFilter.toUpperCase())
+      if (searchTerm) params.set('search', searchTerm)
+      apiFetch(`/admin/projects?${params}`)
+        .then((r) => r.json())
+        .then((data) => !cancelled && setPage(data))
+        .catch(() => !cancelled && setError('Failed to load projects'))
+        .finally(() => !cancelled && setLoading(false))
+    }, searchTerm ? 300 : 0)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [currentPage, statusFilter, searchTerm])
 
-  const filtered = projects.filter((p) => {
-    const q = searchTerm.toLowerCase()
-    const matchesSearch =
-      p.title.toLowerCase().includes(q) ||
-      p.creator.walletAddress.toLowerCase().includes(q)
-    const matchesStatus = statusFilter === 'All' || p.status === statusFilter.toUpperCase()
-    return matchesSearch && matchesStatus
-  })
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginated = page?.items ?? []
+  const totalPages = page?.totalPages ?? 1
+  const total = page?.total ?? 0
 
   return (
     <div>
@@ -147,7 +152,7 @@ export default function AdminRiskPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid var(--color-border)' }}>
           <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-            Showing {paginated.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-{Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} projects
+            Showing {paginated.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-{(currentPage - 1) * itemsPerPage + paginated.length} of {total} projects
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
