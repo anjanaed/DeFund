@@ -26,7 +26,6 @@ jobs:
         working-directory: apps/server
         run: npx prisma generate
         env:
-          # prisma generate never connects; the config only needs a value present
           DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
 
       - name: Run unit tests
