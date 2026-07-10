@@ -9,10 +9,13 @@ import { apiFetch } from '../lib/api'
 
 interface HomeStats {
   totalRaised: number
+  ethUsdPrice: number
   activeProjects: number
   contributors: number
   successRate: number
 }
+
+const STATS_REFRESH_MS = 5 * 60 * 1000 // matches the backend's ETH price / stats cache refresh cadence
 
 const compactCurrency = (n: number) => {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -30,10 +33,16 @@ export default function LandingPage() {
   const [homeStats, setHomeStats] = useState<HomeStats | null>(null)
 
   useEffect(() => {
-    apiFetch('/stats/home')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setHomeStats(data) })
-      .catch(() => { /* keep placeholder */ })
+    const loadStats = () =>
+      apiFetch('/stats/home')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setHomeStats(data) })
+        .catch(() => { /* keep placeholder */ })
+    loadStats()
+
+    // Keep the live ETH-derived total fresh while the page stays open
+    const interval = setInterval(loadStats, STATS_REFRESH_MS)
+    return () => clearInterval(interval)
   }, [])
 
   const DUMMY_STATS = [

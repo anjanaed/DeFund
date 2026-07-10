@@ -134,7 +134,7 @@ export default function MilestoneVotingStatus({ milestoneOnChainId, campaignOnCh
           color: hasVoted ? '#16a34a' : 'var(--color-text-tertiary)',
           display: 'flex', alignItems: 'center', gap: 4,
         }}>
-          {hasVoted ? <><HiCheckCircle size={13} /> You have voted</> : '— You have not voted yet'}
+          {hasVoted ? <><HiCheckCircle size={13} /> You have voted</> : '- You have not voted yet'}
         </div>
       )}
 

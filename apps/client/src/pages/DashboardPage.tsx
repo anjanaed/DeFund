@@ -200,8 +200,8 @@ export default function DashboardPage() {
                 <div className="dashboard-stat-header"><span className="dashboard-stat-label">Wallet Balance</span></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
                   {[
-                    { token: 'ETH', val: ethBal ? Number(formatUnits(ethBal.value, 18)).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—' },
-                    { token: 'USDC', val: usdcBal ? Number(formatUnits(usdcBal.value, 6)).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—' },
+                    { token: 'ETH', val: ethBal ? Number(formatUnits(ethBal.value, 18)).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '-' },
+                    { token: 'USDC', val: usdcBal ? Number(formatUnits(usdcBal.value, 6)).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-' },
                   ].map(({ token, val }, i) => (
                     <div key={token}>
                       {i > 0 && <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 'var(--space-2)' }} />}
@@ -437,7 +437,7 @@ export default function DashboardPage() {
                       <div className="table-col tx-hash">
                         {tx.transactionHash
                           ? <a href={`https://sepolia.etherscan.io/tx/${tx.transactionHash}`} target="_blank" rel="noopener noreferrer">{tx.transactionHash.slice(0, 10)}...</a>
-                          : '—'}
+                          : '-'}
                       </div>
                     </div>
                   ))}
@@ -524,7 +524,7 @@ export default function DashboardPage() {
             handleClaimExecute(item)
           }}
           title="Confirm Refund Claim"
-          message={`You will receive approximately $${claimConfirmItem ? (claimConfirmItem.totalContributed * 0.95).toFixed(4) : ''} — 95% of your contribution. This action is irreversible.`}
+          message={`You will receive approximately $${claimConfirmItem ? (claimConfirmItem.totalContributed * 0.95).toFixed(4) : ''} - 95% of your contribution. This action is irreversible.`}
           confirmLabel="Claim Refund"
           variant="warning"
         />

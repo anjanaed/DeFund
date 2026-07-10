@@ -116,7 +116,7 @@ export default function AdminMilestoneDetailsPage() {
     : 0
   const isProposalStale = releaseProposal && !releaseProposal.executed && proposalAgeMs > 7 * 24 * 60 * 60 * 1000
 
-  const shortAddr = (addr: string) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '—'
+  const shortAddr = (addr: string) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '-'
 
   return (
     <div>
@@ -148,7 +148,7 @@ export default function AdminMilestoneDetailsPage() {
               </span>
             </div>
             <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-text-primary)' }}>{milestone.title}</h2>
-            <p style={{ color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '16px' }}>{milestone.description || '—'}</p>
+            <p style={{ color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '16px' }}>{milestone.description || '-'}</p>
 
             <div style={{ display: 'flex', gap: '24px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
               {milestone.deadline && (
@@ -190,10 +190,10 @@ export default function AdminMilestoneDetailsPage() {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '10px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#15803d', fontWeight: 600 }}>
-                    <HiHandThumbUp size={14} /> Approve — {approvePct}%
+                    <HiHandThumbUp size={14} /> Approve - {approvePct}%
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-error)', fontWeight: 600 }}>
-                    Reject — {rejectPct}% <HiHandThumbDown size={14} />
+                    Reject - {rejectPct}% <HiHandThumbDown size={14} />
                   </span>
                 </div>
 
@@ -289,7 +289,7 @@ export default function AdminMilestoneDetailsPage() {
                 <div style={{ marginBottom: '12px' }}>
                   <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px', lineHeight: '1.5' }}>
                     {!pendingProposal
-                      ? 'Voting passed. Propose a fund release — a different admin must confirm to execute.'
+                      ? 'Voting passed. Propose a fund release - a different admin must confirm to execute.'
                       : isProposer
                         ? 'You proposed this release. A different admin must confirm.'
                         : 'Another admin has proposed releasing funds. Confirm to execute the transfer.'}
@@ -351,7 +351,7 @@ export default function AdminMilestoneDetailsPage() {
 
             {!isVoting && milestone.status !== 'APPROVED' && (
               <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                No actions available — milestone is {milestone.status.toLowerCase()}.
+                No actions available - milestone is {milestone.status.toLowerCase()}.
               </p>
             )}
           </div>

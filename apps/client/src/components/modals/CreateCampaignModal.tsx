@@ -85,7 +85,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
         popup?.close()
         setConnectingPlatform(null)
         if (res.status === 401) {
-          toast.error('Session expired — please disconnect your wallet and reconnect, then try again.')
+          toast.error('Session expired - please disconnect your wallet and reconnect, then try again.')
         } else {
           const err = await res.json().catch(() => ({}))
           toast.error(`Could not start ${platform} auth: ${err.message || res.status}`)
@@ -270,7 +270,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSuccess }: Crea
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        if (res.status === 401) throw new Error('Session expired — please sign in again.')
+        if (res.status === 401) throw new Error('Session expired - please sign in again.')
         throw new Error(err.message || 'Failed to submit campaign')
       }
 

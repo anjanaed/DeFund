@@ -154,7 +154,7 @@ export default function AdminProjectReviewPage() {
   }
 
   const handleProposeFlag = async () => {
-    if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID — use Reject for off-chain submissions.'); return }
+    if (!campaign?.onChainId) { toast.error('Campaign has no on-chain ID - use Reject for off-chain submissions.'); return }
     setPending(true)
     try {
       await writeWithSimulate({ address: CAMPAIGN_FACTORY_ADDRESS, abi: CAMPAIGN_FACTORY_ABI, functionName: 'proposeFlagCampaign', args: [BigInt(campaign.onChainId), 'Flagged by admin'] })
@@ -195,7 +195,7 @@ export default function AdminProjectReviewPage() {
   const flagProposalAgeMs = flagProposal?.proposedAt ? Date.now() - new Date(flagProposal.proposedAt).getTime() : 0
   const isFlagProposalStale = flagProposal && !flagProposal.executed && flagProposalAgeMs > 7 * 24 * 60 * 60 * 1000
 
-  const shortAddr = (addr: string) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '—'
+  const shortAddr = (addr: string) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : '-'
 
   return (
     <div>
@@ -231,7 +231,7 @@ export default function AdminProjectReviewPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                   {isFlagProposalStale && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#92400e', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', padding: '6px 10px', maxWidth: '320px' }}>
-                      <HiExclamationTriangle style={{ flexShrink: 0 }} /><span>Flag proposal pending 7+ days — consider re-proposing.</span>
+                      <HiExclamationTriangle style={{ flexShrink: 0 }} /><span>Flag proposal pending 7+ days - consider re-proposing.</span>
                     </div>
                   )}
                   {pendingFlag && (
@@ -253,7 +253,7 @@ export default function AdminProjectReviewPage() {
             {pendingApprovalProposal && (
               <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-subtle)', borderRadius: '6px', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '320px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: '#d97706' }}>
-                  <HiClock size={13} /> Approval proposed — awaiting second admin
+                  <HiClock size={13} /> Approval proposed - awaiting second admin
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiUserCircle size={12} /><code style={{ fontFamily: 'monospace', fontSize: '11px' }}>{shortAddr(approvalProposal.proposer)}</code>{isApprovalProposer && <span style={{ color: 'var(--color-primary)', marginLeft: '2px' }}>(you)</span>}</span>
@@ -306,16 +306,16 @@ export default function AdminProjectReviewPage() {
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--color-text-primary)' }}>Project Overview</h3>
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Description</label>
-              <p style={{ lineHeight: '1.6', color: 'var(--color-text-secondary)' }}>{campaign.description || '—'}</p>
+              <p style={{ lineHeight: '1.6', color: 'var(--color-text-secondary)' }}>{campaign.description || '-'}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Category</label>
-                <div style={{ fontWeight: '500' }}>{campaign.category || '—'}</div>
+                <div style={{ fontWeight: '500' }}>{campaign.category || '-'}</div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Creator Wallet</label>
-                <div style={{ fontFamily: 'monospace', background: 'var(--color-bg-subtle)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', fontSize: '13px' }}>{campaign.creator?.walletAddress || '—'}</div>
+                <div style={{ fontFamily: 'monospace', background: 'var(--color-bg-subtle)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', fontSize: '13px' }}>{campaign.creator?.walletAddress || '-'}</div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Fund Goal</label>
@@ -323,7 +323,7 @@ export default function AdminProjectReviewPage() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-tertiary)', marginBottom: '4px', textTransform: 'uppercase' }}>Deadline</label>
-                <div style={{ fontWeight: '500' }}>{campaign.deadline ? new Date(campaign.deadline).toLocaleDateString() : '—'}</div>
+                <div style={{ fontWeight: '500' }}>{campaign.deadline ? new Date(campaign.deadline).toLocaleDateString() : '-'}</div>
               </div>
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function AdminProjectReviewPage() {
                     <div style={{ fontWeight: '600' }}>{idx + 1}. {m.title}</div>
                     <div style={{ fontWeight: '700', color: 'var(--color-primary)' }}>{m.amount?.toLocaleString()} {campaign.paymentToken}</div>
                   </div>
-                  <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>{m.description || '—'}</p>
+                  <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>{m.description || '-'}</p>
                   {m.deadline && (
                     <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <HiClock size={12} /> Due {new Date(m.deadline).toLocaleDateString()}

@@ -13,36 +13,43 @@ import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { CreateUpdateDto } from './dto/create-update.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Public } from '../auth/public.decorator';
 
 @Controller()
 export class CampaignsController {
   constructor(private readonly campaigns: CampaignsService) {}
 
+  @Public()
   @Get('stats')
   getPublicStats() {
     return this.campaigns.getPublicStats();
   }
 
+  @Public()
   @Get('projects')
   findAll(@Query() query: QueryCampaignsDto) {
     return this.campaigns.findAll(query);
   }
 
+  @Public()
   @Get('projects/trending')
   findTrending() {
     return this.campaigns.findTrending();
   }
 
+  @Public()
   @Get('projects/:id')
   findOne(@Param('id') id: string) {
     return this.campaigns.findOne(id);
   }
 
+  @Public()
   @Get('projects/:id/milestones')
   findMilestones(@Param('id') id: string) {
     return this.campaigns.findMilestones(id);
   }
 
+  @Public()
   @Get('projects/:id/updates')
   findUpdates(@Param('id') id: string) {
     return this.campaigns.findUpdates(id);

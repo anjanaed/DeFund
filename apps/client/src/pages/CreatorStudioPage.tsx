@@ -110,7 +110,7 @@ function AnalyticsPanel({ project, data }: { project: CreatorCampaign; data: Con
   if (data.contributions.length === 0) {
     return (
       <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '8px 0 16px' }}>
-        No contributions yet — charts will appear once the first contribution arrives.
+        No contributions yet - charts will appear once the first contribution arrives.
       </p>
     )
   }
@@ -624,7 +624,7 @@ export default function CreatorStudioPage() {
                         </div>
                         <div>
                           <span style={{ color: 'var(--color-text-tertiary)' }}>Avg contribution: </span>
-                          <span style={{ fontWeight: '600' }}>{avgContrib > 0 ? `${avgContrib.toFixed(4)} ${project.paymentToken}` : '—'}</span>
+                          <span style={{ fontWeight: '600' }}>{avgContrib > 0 ? `${avgContrib.toFixed(4)} ${project.paymentToken}` : '-'}</span>
                         </div>
                         <div>
                           <span style={{ color: 'var(--color-text-tertiary)' }}>Milestones: </span>
@@ -708,7 +708,7 @@ export default function CreatorStudioPage() {
                             <div className="creator-milestone-action">
                               {/* View proof */}
                               {(isApproved || isRejected) && m.proofUrl && (
-                                <button className="creator-submit-proof-btn" onClick={() => { setSelectedProof({ title: `${m.title} — ${m.status}`, content: m.proofUrl! }); setShowProofModal(true) }}
+                                <button className="creator-submit-proof-btn" onClick={() => { setSelectedProof({ title: `${m.title} - ${m.status}`, content: m.proofUrl! }); setShowProofModal(true) }}
                                   style={{ marginRight: 8, background: 'transparent', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
                                   <HiEye /> View Proof
                                 </button>
@@ -775,8 +775,8 @@ export default function CreatorStudioPage() {
                                 <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <HiClock size={13} />
                                   {msLeft !== null && msLeft > 0
-                                    ? `Voting closes in ${daysLeft && daysLeft > 0 ? `${daysLeft}d ` : ''}${hoursLeft! % 24}h — ${votingEndDate.toLocaleDateString()}`
-                                    : 'Voting period has ended — awaiting finalization'}
+                                    ? `Voting closes in ${daysLeft && daysLeft > 0 ? `${daysLeft}d ` : ''}${hoursLeft! % 24}h - ${votingEndDate.toLocaleDateString()}`
+                                    : 'Voting period has ended - awaiting finalization'}
                                 </div>
                               )}
                               {approvePct !== null && (
@@ -792,7 +792,7 @@ export default function CreatorStudioPage() {
                               )}
                               {approvePct === null && (
                                 <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                                  No votes recorded yet — you'll be notified when the result is finalized.
+                                  No votes recorded yet - you'll be notified when the result is finalized.
                                 </div>
                               )}
                             </div>

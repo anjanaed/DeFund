@@ -18,7 +18,7 @@ export default function AdminLayout() {
   ]
 
   const wallet = user?.walletAddress
-  const shortWallet = wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '—'
+  const shortWallet = wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '-'
 
   const handleLogout = () => {
     logout()

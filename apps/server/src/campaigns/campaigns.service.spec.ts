@@ -4,6 +4,7 @@ import { CampaignsService } from './campaigns.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IpfsService } from '../ipfs/ipfs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EthPriceService } from '../pricing/eth-price.service';
 import { CampaignStatus } from '../generated/prisma';
 
 const makeCampaign = (overrides: Partial<Record<string, any>> = {}) => ({
@@ -28,6 +29,7 @@ const mockPrisma = {
     findUnique: jest.fn(),
     count: jest.fn(),
     aggregate: jest.fn(),
+    groupBy: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -55,6 +57,10 @@ const mockNotifications = {
   notifyAdmins: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockEthPrice = {
+  getUsdPrice: jest.fn().mockReturnValue(2000),
+};
+
 describe('CampaignsService', () => {
   let service: CampaignsService;
 
@@ -67,6 +73,7 @@ describe('CampaignsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: IpfsService, useValue: mockIpfs },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: EthPriceService, useValue: mockEthPrice },
       ],
     }).compile();
 
@@ -408,24 +415,29 @@ describe('CampaignsService', () => {
   });
 
   describe('getPublicStats', () => {
-    it('computes stats from aggregate and count queries', async () => {
-      mockPrisma.campaign.aggregate.mockResolvedValue({ _sum: { raisedAmount: 50000 } });
+    it('converts ETH raised to USD using the live price and adds USDC 1:1', async () => {
+      mockPrisma.campaign.groupBy.mockResolvedValue([
+        { paymentToken: 'ETH', _sum: { raisedAmount: 10 } },
+        { paymentToken: 'USDC', _sum: { raisedAmount: 5000 } },
+      ]);
       mockPrisma.campaign.count
         .mockResolvedValueOnce(10)  // activeCampaigns
         .mockResolvedValueOnce(5)   // completedCampaigns
         .mockResolvedValueOnce(8);  // finishedCampaigns (completed + failed + flagged)
       mockPrisma.user.count.mockResolvedValue(200);
+      mockEthPrice.getUsdPrice.mockReturnValue(2000);
 
       const result = await service.getPublicStats();
 
-      expect(result.totalRaised).toBe(50000);
+      expect(result.totalRaised).toBe(10 * 2000 + 5000);
+      expect(result.ethUsdPrice).toBe(2000);
       expect(result.activeCampaigns).toBe(10);
       expect(result.totalContributors).toBe(200);
       expect(result.successRate).toBe(Math.round((5 / 8) * 100));
     });
 
     it('returns 0 successRate when no campaigns have finished', async () => {
-      mockPrisma.campaign.aggregate.mockResolvedValue({ _sum: { raisedAmount: null } });
+      mockPrisma.campaign.groupBy.mockResolvedValue([]);
       mockPrisma.campaign.count
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)

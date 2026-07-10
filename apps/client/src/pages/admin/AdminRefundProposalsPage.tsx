@@ -38,7 +38,7 @@ export default function AdminRefundProposalsPage() {
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">Refund Proposals</h1>
-        <p className="admin-page-subtitle">Two-admin refund flow — pending and historical proposals</p>
+        <p className="admin-page-subtitle">Two-admin refund flow - pending and historical proposals</p>
       </div>
 
       {error && (
@@ -110,7 +110,7 @@ export default function AdminRefundProposalsPage() {
                   {p.proposer.slice(0, 8)}…{p.proposer.slice(-4)}
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
-                  {p.confirmer ? `${p.confirmer.slice(0, 8)}…${p.confirmer.slice(-4)}` : '—'}
+                  {p.confirmer ? `${p.confirmer.slice(0, 8)}…${p.confirmer.slice(-4)}` : '-'}
                 </td>
                 <td>{new Date(p.proposedAt).toLocaleString()}</td>
               </tr>

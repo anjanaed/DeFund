@@ -7,7 +7,7 @@ import LoadingScreen from '../components/common/LoadingScreen'
 
 const CATEGORIES = ['All', 'DeFi', 'Gaming', 'NFT', 'DAO', 'Education', 'Infrastructure', 'Open Source']
 const SORT_OPTIONS = [
-  { value: 'trending', label: 'Trending' },
+  { value: 'trending', label: 'Popular' },
   { value: 'newest', label: 'Newest' },
 ]
 const STATUS_OPTIONS = [

@@ -11,8 +11,6 @@ type Role = 'USER' | 'ADMIN'
 
 interface AdminUser {
   id: string
-  name: string | null
-  email: string | null
   walletAddress: string
   role: Role
   createdAt: string
@@ -101,7 +99,7 @@ export default function AdminUsersPage() {
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">User Management</h1>
-        <p className="admin-page-subtitle">View users and propose role changes — role promotions require a second admin to confirm</p>
+        <p className="admin-page-subtitle">View users and propose role changes - role promotions require a second admin to confirm</p>
       </div>
 
       {error && (
@@ -116,7 +114,7 @@ export default function AdminUsersPage() {
             <HiMagnifyingGlass color="var(--color-text-tertiary)" />
             <input
               type="text"
-              placeholder="Search by name, wallet, or email..."
+              placeholder="Search by wallet..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
             />
@@ -126,9 +124,7 @@ export default function AdminUsersPage() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Name</th>
               <th>Wallet</th>
-              <th>Email</th>
               <th>Campaigns</th>
               <th>Contributions</th>
               <th>Joined</th>
@@ -138,20 +134,18 @@ export default function AdminUsersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ padding: 0 }}><Spinner label="Loading users…" /></td></tr>
+              <tr><td colSpan={6} style={{ padding: 0 }}><Spinner label="Loading users…" /></td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No users found.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-secondary)' }}>No users found.</td></tr>
             ) : users.map((u) => {
               const proposal = pendingFor(u.id)
               const isSelf = u.id === currentUser?.id
               const isSaving = proposingId === u.id
               return (
                 <tr key={u.id}>
-                  <td style={{ fontWeight: '500' }}>{u.name || '—'}</td>
                   <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>
                     {u.walletAddress.slice(0, 8)}…{u.walletAddress.slice(-4)}
                   </td>
-                  <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{u.email || '—'}</td>
                   <td>{u._count.createdCampaigns}</td>
                   <td>{u._count.contributions}</td>
                   <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
@@ -173,7 +167,7 @@ export default function AdminUsersPage() {
                         <HiClock size={12} /> Proposal pending
                       </button>
                     ) : isSelf ? (
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>—</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>-</span>
                     ) : u.role === 'USER' ? (
                       <button
                         onClick={() => handlePropose(u.id, 'ADMIN')}
@@ -202,7 +196,7 @@ export default function AdminUsersPage() {
           <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             {page
               ? `Showing ${(page.page - 1) * page.limit + (page.items.length > 0 ? 1 : 0)}-${(page.page - 1) * page.limit + page.items.length} of ${page.total} users`
-              : '—'}
+              : '-'}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button

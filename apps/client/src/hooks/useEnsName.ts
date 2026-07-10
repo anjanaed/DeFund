@@ -46,6 +46,6 @@ export function useEnsName(address: string | undefined): string | null {
  */
 export function displayAddress(address: string, ensName: string | null): string {
   if (ensName) return ensName
-  if (!address) return '—'
+  if (!address) return '-'
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }

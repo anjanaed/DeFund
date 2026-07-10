@@ -7,6 +7,7 @@ import { apiFetch } from '../lib/api'
 
 interface PublicStats {
   totalRaised: number
+  ethUsdPrice: number
   activeCampaigns: number
   totalContributors: number
   successRate: number
@@ -19,19 +20,32 @@ interface Campaign {
   category: string
   raisedAmount: string
   goalAmount: string
+  paymentToken: string
   _count: { milestones: number; contributions: number }
 }
 
+// n is already a USD value (e.g. stats.totalRaised, or a token amount pre-converted via toUsd)
 const fmt = (n: number) =>
-  n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`
+  n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n.toFixed(2)}`
+
+// USDC is treated 1:1 with USD; ETH is converted using the live ETH/USD price
+const toUsd = (amount: number, token: string, ethUsdPrice: number) =>
+  token === 'ETH' ? amount * ethUsdPrice : amount
+
+const STATS_REFRESH_MS = 5 * 60 * 1000 // matches the backend's ETH price / stats cache refresh cadence
 
 export default function HomePage() {
   const [stats, setStats] = useState<PublicStats | null>(null)
   const [trending, setTrending] = useState<Campaign[]>([])
 
   useEffect(() => {
-    apiFetch('/stats').then(r => r.ok ? r.json() : null).then(d => d && setStats(d))
+    const loadStats = () => apiFetch('/stats').then(r => r.ok ? r.json() : null).then(d => d && setStats(d))
+    loadStats()
     apiFetch('/projects/trending').then(r => r.ok ? r.json() : null).then(d => d && setTrending(d))
+
+    // Keep the live ETH-derived totals fresh while the page stays open
+    const interval = setInterval(loadStats, STATS_REFRESH_MS)
+    return () => clearInterval(interval)
   }, [])
 
   const displayStats = stats
@@ -89,7 +103,7 @@ export default function HomePage() {
           <div className="container">
             <div className="app-section-header">
               <div>
-                <h2 className="app-section-title">Trending Projects</h2>
+                <h2 className="app-section-title">Popular Projects</h2>
                 <p className="app-section-subtitle">Discover the most popular campaigns</p>
               </div>
               <Link to="/explore" className="app-view-all">View All</Link>
@@ -99,6 +113,9 @@ export default function HomePage() {
               {trending.map((project) => {
                 const raised = Number(project.raisedAmount)
                 const goal = Number(project.goalAmount)
+                const ethUsdPrice = stats?.ethUsdPrice ?? 0
+                const raisedUsd = toUsd(raised, project.paymentToken, ethUsdPrice)
+                const goalUsd = toUsd(goal, project.paymentToken, ethUsdPrice)
                 return (
                   <Link
                     key={project.id}
@@ -114,8 +131,8 @@ export default function HomePage() {
                     <p className="app-project-description">{project.description}</p>
                     <div className="app-project-progress">
                       <div className="app-progress-header">
-                        <span className="app-progress-amount">{fmt(raised)} raised</span>
-                        <span className="app-progress-goal">of {fmt(goal)}</span>
+                        <span className="app-progress-amount">{fmt(raisedUsd)} raised</span>
+                        <span className="app-progress-goal">of {fmt(goalUsd)}</span>
                       </div>
                       <div className="app-progress-bar">
                         <div

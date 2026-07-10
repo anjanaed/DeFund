@@ -37,7 +37,7 @@ export default function AdminLoginPage() {
 
       await signIn()
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Login failed')
+      setErrorMsg(err?.message?.toLowerCase().includes('user rejected') ? 'Permission Denied' : (err?.message || 'Login failed'))
       setStatus('error')
     }
   }
@@ -57,6 +57,8 @@ export default function AdminLoginPage() {
     } catch (err: any) {
       if (err?.message?.includes('verification') || err?.message?.includes('401')) {
         setErrorMsg('Authentication failed. Please try again.')
+      } else if (err?.message?.toLowerCase().includes('user rejected')) {
+        setErrorMsg('Permission Denied')
       } else {
         setErrorMsg(err?.message || 'Login failed')
       }

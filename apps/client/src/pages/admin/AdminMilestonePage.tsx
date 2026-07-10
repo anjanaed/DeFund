@@ -31,7 +31,7 @@ function votingEndLabel(end: string | null, status: string): { text: string; ove
     if (status === 'ONGOING') return { text: 'Awaiting submission', overdue: false }
     if (status === 'NOT_STARTED') return { text: 'Not yet unlocked', overdue: false }
     if (status === 'COMPLETED' || status === 'APPROVED') return { text: 'Closed', overdue: false }
-    return { text: '—', overdue: false }
+    return { text: '-', overdue: false }
   }
   const now = Date.now()
   const ts = new Date(end).getTime()
@@ -170,7 +170,7 @@ export default function AdminMilestonePage() {
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', paddingLeft: showCampaign ? 0 : '12px' }}>{item.title}</div>
                   </td>
                   <td>
-                    <div>{item.votingEndTime ? new Date(item.votingEndTime).toLocaleDateString() : '—'}</div>
+                    <div>{item.votingEndTime ? new Date(item.votingEndTime).toLocaleDateString() : '-'}</div>
                     <div style={{ fontSize: '11px', color: dl.overdue ? 'var(--color-error)' : 'var(--color-text-secondary)' }}>{dl.text}</div>
                   </td>
                   <td style={{ width: '250px' }}>
@@ -194,7 +194,7 @@ export default function AdminMilestonePage() {
           <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             {page
               ? `Showing ${(page.page - 1) * page.limit + (page.items.length > 0 ? 1 : 0)}-${(page.page - 1) * page.limit + page.items.length} of ${page.total} milestones`
-              : '—'}
+              : '-'}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button

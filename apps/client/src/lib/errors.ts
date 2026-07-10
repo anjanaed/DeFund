@@ -1,6 +1,6 @@
 const CONTRACT_ERROR_MAP: Record<string, string> = {
   // Voting
-  'Voting period not ended': 'Voting is still in progress — wait until the voting period ends.',
+  'Voting period not ended': 'Voting is still in progress - wait until the voting period ends.',
   'Voting period ended': 'The voting period for this milestone has already ended.',
   'Already voted': 'You have already voted on this milestone.',
   'Not a contributor': 'Only contributors to this campaign can vote on milestones.',
@@ -24,10 +24,10 @@ const CONTRACT_ERROR_MAP: Record<string, string> = {
   'No contribution found': 'No contribution was found for your wallet address on this campaign.',
   'Refund not available': 'Refunds are not yet available for this campaign.',
   'Already refunded': 'You have already claimed your refund for this campaign.',
-  'Funds not reclaimed': 'The campaign funds have not been reclaimed yet — refunds are not available.',
+  'Funds not reclaimed': 'The campaign funds have not been reclaimed yet - refunds are not available.',
 
   // Two-admin multisig
-  'Cannot confirm own proposal': 'A different admin must confirm this action — you cannot confirm your own proposal.',
+  'Cannot confirm own proposal': 'A different admin must confirm this action - you cannot confirm your own proposal.',
   'Proposal already executed': 'This proposal has already been executed.',
   'No pending proposal': 'No pending proposal was found for this action.',
   'Not an admin': 'You must be an admin to perform this action.',
@@ -40,19 +40,19 @@ const CONTRACT_ERROR_MAP: Record<string, string> = {
   // Expire campaign
   'Campaign not funded': 'This campaign is not in the Funded state (must be Funded to expire).',
   'Campaign deadline not reached': 'The campaign deadline has not passed yet.',
-  'All milestones have been submitted': 'All milestones have been submitted — this campaign cannot be expired.',
+  'All milestones have been submitted': 'All milestones have been submitted - this campaign cannot be expired.',
 
   // Generic wallet / gas
   'user rejected': 'Transaction was rejected in your wallet.',
   'User rejected': 'Transaction was rejected in your wallet.',
   'denied transaction': 'Transaction was rejected in your wallet.',
-  'nonce too high': "Transaction nonce mismatch — please reset your wallet's nonce in MetaMask (Settings → Advanced).",
-  'nonce too low': "Transaction nonce mismatch — please reset your wallet's nonce in MetaMask (Settings → Advanced).",
+  'nonce too high': "Transaction nonce mismatch - please reset your wallet's nonce in MetaMask (Settings → Advanced).",
+  'nonce too low': "Transaction nonce mismatch - please reset your wallet's nonce in MetaMask (Settings → Advanced).",
   'insufficient funds': 'Insufficient funds in your wallet to cover this transaction and gas fees.',
   'gas required exceeds': 'This transaction would exceed the gas limit. Please try again.',
-  'gas limit too high': 'Gas estimation failed — the transaction may revert. Check inputs and try again.',
+  'gas limit too high': 'Gas estimation failed - the transaction may revert. Check inputs and try again.',
   'exceeds block gas limit': 'This transaction exceeds the block gas limit.',
-  'intrinsic gas too low': 'Gas estimate was too low — please try again.',
+  'intrinsic gas too low': 'Gas estimate was too low - please try again.',
 };
 
 /** Collect every string field from the error and its full cause chain. */
@@ -115,5 +115,5 @@ export function parseContractError(err: unknown): string {
     return 'You do not have the required on-chain role. Ask the contract owner to run grant-admin for your wallet.';
   }
 
-  return 'Transaction failed — please check your wallet and try again.';
+  return 'Transaction failed - please check your wallet and try again.';
 }

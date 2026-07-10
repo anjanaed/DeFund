@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { IpfsService } from '../ipfs/ipfs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EthPriceService } from '../pricing/eth-price.service';
 import { QueryCampaignsDto } from './dto/query-campaigns.dto';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
@@ -33,6 +34,7 @@ export class CampaignsService {
     private readonly prisma: PrismaService,
     private readonly ipfs: IpfsService,
     private readonly notifications: NotificationsService,
+    private readonly ethPrice: EthPriceService,
   ) {}
 
   async findAll(query: QueryCampaignsDto) {
@@ -263,9 +265,9 @@ export class CampaignsService {
   }
 
   async getPublicStats() {
-    const [totalRaisedAgg, activeCampaigns, completedCampaigns, finishedCampaigns, totalContributors] =
+    const [raisedByToken, activeCampaigns, completedCampaigns, finishedCampaigns, totalContributors] =
       await Promise.all([
-        this.prisma.campaign.aggregate({ _sum: { raisedAmount: true } }),
+        this.prisma.campaign.groupBy({ by: ['paymentToken'], _sum: { raisedAmount: true } }),
         this.prisma.campaign.count({
           where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.FUNDED] } },
         }),
@@ -278,8 +280,16 @@ export class CampaignsService {
         this.prisma.user.count({ where: { contributions: { some: {} } } }),
       ]);
 
+    // ETH and USDC amounts can't just be added together - convert ETH to its
+    // live USD value first so "Total Raised" is an actual dollar figure.
+    const ethUsdPrice = this.ethPrice.getUsdPrice();
+    const ethRaised = Number(raisedByToken.find((r) => r.paymentToken === 'ETH')?._sum.raisedAmount ?? 0);
+    const usdcRaised = Number(raisedByToken.find((r) => r.paymentToken === 'USDC')?._sum.raisedAmount ?? 0);
+    const totalRaised = ethRaised * ethUsdPrice + usdcRaised;
+
     return {
-      totalRaised: Number(totalRaisedAgg._sum.raisedAmount ?? 0),
+      totalRaised,
+      ethUsdPrice,
       activeCampaigns,
       totalContributors,
       successRate: finishedCampaigns > 0 ? Math.round((completedCampaigns / finishedCampaigns) * 100) : 0,

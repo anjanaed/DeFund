@@ -138,7 +138,7 @@ export default function EditCampaignModal({ isOpen, campaign, onClose, onSuccess
             <div className="form-group">
               <label className="form-label">License</label>
               <select className="form-input" value={form.license} onChange={set('license')} disabled={submitting}>
-                <option value="">— None —</option>
+                <option value="">- None -</option>
                 {LICENSES.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>

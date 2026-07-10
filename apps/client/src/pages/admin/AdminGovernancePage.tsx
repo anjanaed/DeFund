@@ -151,7 +151,7 @@ export default function AdminGovernancePage() {
             <tbody>
               {pendingApprovals.map((p: any) => (
                 <tr key={p.id}>
-                  <td style={{ fontWeight: '600' }}>{p.campaign?.title || '—'}</td>
+                  <td style={{ fontWeight: '600' }}>{p.campaign?.title || '-'}</td>
                   <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{p.proposer?.slice(0, 8)}…{p.proposer?.slice(-4)}</td>
                   <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{new Date(p.proposedAt).toLocaleDateString()}</td>
                   <td>
@@ -181,7 +181,7 @@ export default function AdminGovernancePage() {
             ) : pendingFlags.map(p => (
               <tr key={p.id}>
                 <td style={{ fontWeight: '600' }}>{p.campaign.title}</td>
-                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)', maxWidth: '200px' }}>{p.reason || '—'}</td>
+                <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)', maxWidth: '200px' }}>{p.reason || '-'}</td>
                 <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{shortAddr(p.proposer)}</td>
                 <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{new Date(p.proposedAt).toLocaleDateString()}</td>
                 <td><button className="btn" onClick={() => navigate(`/admin/risk/${p.campaignId}`)} style={{ padding: '5px 12px', fontSize: '12px', border: '1px solid var(--color-error)', borderRadius: '6px', background: 'white', color: 'var(--color-error)', fontWeight: '600', cursor: 'pointer' }}>Go to Campaign</button></td>
@@ -270,7 +270,7 @@ export default function AdminGovernancePage() {
                 <tr key={p.id}>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontWeight: '600' }}>{p.targetUser.name || '—'}</span>
+                      <span style={{ fontWeight: '600' }}>{p.targetUser.name || '-'}</span>
                       <code style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
                         {shortAddr(p.targetUser.walletAddress)}
                       </code>

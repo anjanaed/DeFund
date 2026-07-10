@@ -68,7 +68,7 @@ function timeAgo(iso: string): string {
 }
 
 function shortHash(hash: string | null): string {
-  if (!hash) return '—'
+  if (!hash) return '-'
   return `${hash.slice(0, 6)}…${hash.slice(-4)}`
 }
 
@@ -160,10 +160,10 @@ export default function AdminDashboardPage() {
   const filteredTransactions = txPage?.items ?? []
 
   const statCards = [
-    { label: 'Active Projects', value: stats?.active ?? '—', subtitle: 'Live and funded campaigns', icon: HiRocketLaunch, trend: 'positive' },
-    { label: 'Pending Verification', value: stats?.pending ?? '—', subtitle: 'Awaiting admin approval', icon: HiClock, trend: 'neutral' },
-    { label: 'Total Raised', value: stats ? `$${stats.totalRaised.toFixed(2)}` : '—', subtitle: 'Across all campaigns', icon: HiChartBar, trend: 'positive' },
-    { label: 'Flagged Projects', value: stats?.flagged ?? '—', subtitle: 'Require attention', icon: HiFlag, trend: 'negative' },
+    { label: 'Active Projects', value: stats?.active ?? '-', subtitle: 'Live and funded campaigns', icon: HiRocketLaunch, trend: 'positive' },
+    { label: 'Pending Verification', value: stats?.pending ?? '-', subtitle: 'Awaiting admin approval', icon: HiClock, trend: 'neutral' },
+    { label: 'Total Raised', value: stats ? `$${stats.totalRaised.toFixed(2)}` : '-', subtitle: 'Across all campaigns', icon: HiChartBar, trend: 'positive' },
+    { label: 'Flagged Projects', value: stats?.flagged ?? '-', subtitle: 'Require attention', icon: HiFlag, trend: 'negative' },
   ]
 
   return (
@@ -214,7 +214,7 @@ export default function AdminDashboardPage() {
                   .map((item) => {
                     const label = item.type === 'campaign'
                       ? item.title
-                      : `${item.title} — ${item.campaign?.title ?? ''}`
+                      : `${item.title} - ${item.campaign?.title ?? ''}`
                     const sublabel = item.type === 'campaign'
                       ? `Campaign ${item.status.toLowerCase()}`
                       : `Milestone ${item.status.toLowerCase()}`
@@ -265,7 +265,7 @@ export default function AdminDashboardPage() {
                   },
                   {
                     name: 'Last Indexed Block',
-                    status: health?.indexer.lastBlockProcessed ? `#${health.indexer.lastBlockProcessed.toLocaleString()}` : '—',
+                    status: health?.indexer.lastBlockProcessed ? `#${health.indexer.lastBlockProcessed.toLocaleString()}` : '-',
                     color: health?.indexer.lastPollAt ? 'success' : 'neutral',
                     icon: HiCubeTransparent,
                   },
@@ -313,7 +313,7 @@ export default function AdminDashboardPage() {
                         {label}
                       </span>
                       {entry.entityTitle && (
-                        <span style={{ color: 'var(--color-text-primary)' }}> — {entry.entityTitle}</span>
+                        <span style={{ color: 'var(--color-text-primary)' }}> - {entry.entityTitle}</span>
                       )}
                       <div style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
                         <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>
@@ -392,7 +392,7 @@ export default function AdminDashboardPage() {
           <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             {txPage
               ? `Showing ${(txPage.page - 1) * txPage.limit + (txPage.items.length > 0 ? 1 : 0)}-${(txPage.page - 1) * txPage.limit + txPage.items.length} of ${txPage.total} transactions`
-              : '—'}
+              : '-'}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button

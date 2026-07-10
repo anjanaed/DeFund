@@ -128,7 +128,7 @@ export default function AdminVerificationPage() {
             <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
               {page
                 ? `Showing ${(page.page - 1) * page.limit + 1}-${(page.page - 1) * page.limit + page.items.length} of ${page.total} campaigns`
-                : '—'}
+                : '-'}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
